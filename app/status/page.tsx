@@ -276,31 +276,31 @@ export default function StatusPage() {
             {/* KPI 카드 2개 */}
             <Grid container spacing={4} sx={{ mb: 6 }}>
               {/* 유입호 */}
-              <Grid item xs={12} md={6}>
-                <Card elevation={0} sx={{ bgcolor: 'rgba(30, 41, 59, 0.6)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '20px', backdropFilter: 'blur(10px)' }}>
-                  <CardContent sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 4 }}>
-                    <Box>
-                      <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: '#94a3b8' }}>
-                        📞 총 유입호 (Inflow)
-                      </Typography>
-                      <TextField
-                        variant="standard"
-                        value={callStats.inflow}
-                        type="number"
-                        onChange={(e) => setCallStats({...callStats, inflow: Number(e.target.value)})}
-                        InputProps={{ disableUnderline: true, style: { fontSize: '2.5rem', fontWeight: 800, color: '#3b82f6' } }}
-                        sx={{ width: '150px' }}
-                      />
-                    </Box>
-                    <Box sx={{ bgcolor: 'rgba(59, 130, 246, 0.1)', p: 2, borderRadius: '16px', color: '#3b82f6' }}>
-                      <PhoneIcon sx={{ fontSize: 40 }} />
-                    </Box>
-                  </CardContent>
-                </Card>
-              </Grid>
+              <Grid size={{ xs: 12, md: 6 }}>
+  <Card elevation={0} sx={{ bgcolor: 'rgba(30, 41, 59, 0.6)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '20px', backdropFilter: 'blur(10px)' }}>
+    <CardContent sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 4 }}>
+      <Box>
+        <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: '#94a3b8' }}>
+          📞 총 유입호 (Inflow)
+        </Typography>
+        <TextField
+          variant="standard"
+          value={callStats.inflow}
+          type="number"
+          onChange={(e) => setCallStats({...callStats, inflow: Number(e.target.value)})}
+          InputProps={{ disableUnderline: true, style: { fontSize: '2.5rem', fontWeight: 800, color: '#3b82f6' } }}
+          sx={{ width: '150px' }}
+        />
+      </Box>
+      <Box sx={{ bgcolor: 'rgba(59, 130, 246, 0.1)', p: 2, borderRadius: '16px', color: '#3b82f6' }}>
+        <PhoneIcon sx={{ fontSize: 40 }} />
+      </Box>
+    </CardContent>
+  </Card>
+</Grid>
 
-              {/* 응대콜 */}
-              <Grid item xs={12} md={6}>
+{/* 응대콜 */}
+<Grid size={{ xs: 12, md: 6 }}>
                 <Card elevation={0} sx={{ bgcolor: 'rgba(30, 41, 59, 0.6)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '20px', backdropFilter: 'blur(10px)' }}>
                   <CardContent sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 4 }}>
                     <Box>
