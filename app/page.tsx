@@ -117,7 +117,7 @@ export default function DashboardHome() {
             {/* DB 값으로 렌더링되는 카드들 */}
             <Grid container spacing={3}>
               {SUMMARY_DATA.map((item, index) => (
-                <Grid item xs={12} sm={6} md={3} key={index}>
+                <Grid size={{ xs: 12, sm: 6, md: 3 }} key={index}>
                   <Card elevation={0} sx={{ bgcolor: 'rgba(30, 41, 59, 0.6)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '16px', backdropFilter: 'blur(10px)', transition: 'transform 0.2s', '&:hover': { transform: 'translateY(-4px)', boxShadow: `0 8px 24px ${item.bg}`, borderColor: 'rgba(255, 255, 255, 0.2)' } }}>
                     <CardContent sx={{ p: 3, display: 'flex', flexDirection: 'column', gap: 2 }}>
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
