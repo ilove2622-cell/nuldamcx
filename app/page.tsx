@@ -4,12 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
-// MUI Components
-import {
-  Box, Container, Typography, Button, Fade, Card, CardContent, Stack, Menu, MenuItem, CircularProgress,
-} from '@mui/material';
-
-// MUI Icons
+import { Box, Container, Typography, Button, Fade, Card, CardContent, Stack, Menu, MenuItem, CircularProgress } from '@mui/material';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
 import CloudDownloadIcon from '@mui/icons-material/CloudDownload';
@@ -18,61 +13,66 @@ import InboxIcon from '@mui/icons-material/Inbox';
 import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import RateReviewIcon from '@mui/icons-material/RateReview';
+import FilterAltIcon from '@mui/icons-material/FilterAlt'; // 미답변 전용 아이콘
 
 export default function DashboardHome() {
   const router = useRouter();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const open = Boolean(anchorEl);
-  const [isCollecting, setIsCollecting] = useState(false);
   
-  const [counts, setCounts] = useState({
-    total: 0,
-    pending: 0,
-    completed: 0,
-    reviewing: 0
-  });
+  // 상태 분리 (전체 수집용 / 미답변 수집용)
+  const [isCollectingAll, setIsCollectingAll] = useState(false);
+  const [isCollectingUnanswered, setIsCollectingUnanswered] = useState(false);
+  
+  const [counts, setCounts] = useState({ total: 0, pending: 0, completed: 0, reviewing: 0 });
 
   const fetchCounts = async () => {
     const { count: total } = await supabase.from('inquiries').select('*', { count: 'exact', head: true });
     const { count: pending } = await supabase.from('inquiries').select('*', { count: 'exact', head: true }).eq('status', '대기');
     const { count: completed } = await supabase.from('inquiries').select('*', { count: 'exact', head: true }).eq('status', '등록완료');
     const { count: reviewing } = await supabase.from('inquiries').select('*', { count: 'exact', head: true }).eq('status', '검토중');
-
     setCounts({ total: total || 0, pending: pending || 0, completed: completed || 0, reviewing: reviewing || 0 });
   };
 
   useEffect(() => { fetchCounts(); }, []);
 
-  const handleCollectInquiries = async () => {
-    if (isCollecting) return;
-    setIsCollecting(true);
+  // 1. 기존: 전체 수집
+  const handleCollectAll = async () => {
+    if (isCollectingAll) return;
+    setIsCollectingAll(true);
     try {
-      // 1. [핵심 변경] Railway 봇 대신 Vercel 내부 API로 요청을 보냅니다.
-      const ENDPOINT = "/api/collect";
-      
-      const response = await fetch(ENDPOINT, { 
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        }
-      });
-
+      const response = await fetch("/api/collect", { method: "POST" });
+      const data = await response.json();
       if (response.ok) {
-        // 2. 내부 API가 보내준 결과 메시지(신규 업데이트 건수)를 받아옵니다.
-        const data = await response.json();
-        alert(`🚀 ${data.message || '수집 완료!'}`);
-        
-        // 3. [센스 추가] 수집이 완료되면 대시보드 숫자를 즉시 새로고침합니다!
+        alert(`🚀 [전체 수집] ${data.message || '완료!'}`);
         fetchCounts(); 
       } else {
-        const errorData = await response.json().catch(() => ({}));
-        alert(`❌ 서버 오류: ${response.status} ${errorData.message || ''}`);
+        alert(`❌ 서버 오류: ${data.message}`);
       }
     } catch (error) {
-      console.error("Connection Error:", error);
-      alert("❌ 서버 연결 실패 (네트워크 연결이나 서버 상태를 확인하세요)");
+      alert("❌ 서버 연결 실패");
     } finally {
-      setIsCollecting(false);
+      setIsCollectingAll(false);
+    }
+  };
+
+  // 2. 신규: 미답변만 수집
+  const handleCollectUnanswered = async () => {
+    if (isCollectingUnanswered) return;
+    setIsCollectingUnanswered(true);
+    try {
+      const response = await fetch("/api/collect-unanswered", { method: "POST" });
+      const data = await response.json();
+      if (response.ok) {
+        alert(`🎯 [미답변 수집] ${data.message || '완료!'}`);
+        fetchCounts(); 
+      } else {
+        alert(`❌ 서버 오류: ${data.message}`);
+      }
+    } catch (error) {
+      alert("❌ 서버 연결 실패");
+    } finally {
+      setIsCollectingUnanswered(false);
     }
   };
 
@@ -85,8 +85,8 @@ export default function DashboardHome() {
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'transparent', color: '#f8fafc', display: 'flex', flexDirection: 'column' }}>
-      {/* 1. Header */}
       <Box component="header" sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(10px)', bgcolor: 'rgba(15, 23, 42, 0.6)', position: 'sticky', top: 0, zIndex: 50 }}>
+        {/* 헤더 생략 (기존과 동일) */}
         <Container maxWidth="lg" sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 2.5 }}>
           <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
             <Typography variant="h5" sx={{ fontWeight: 800, letterSpacing: '-1px' }}>
@@ -105,33 +105,21 @@ export default function DashboardHome() {
         </Container>
       </Box>
 
-      {/* 2. Main Body */}
       <Container maxWidth="lg" sx={{ mt: 6, mb: 8, flex: 1 }}>
         <Fade in timeout={800}>
           <Box>
             <Typography variant="h5" sx={{ fontWeight: 700, mb: 4 }}>📊 오늘의 현황</Typography>
             
-            <Box sx={{ 
-              display: 'flex', 
-              flexWrap: 'wrap', 
-              gap: 3, 
-              '& > *': { flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 12px)', md: '1 1 calc(25% - 18px)' } } 
-            }}>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 3, '& > *': { flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 12px)', md: '1 1 calc(25% - 18px)' } } }}>
               {SUMMARY_DATA.map((item, index) => (
-                <Card key={index} elevation={0} sx={{ 
-                  bgcolor: 'rgba(30, 41, 59, 0.6)', 
-                  border: '1px solid rgba(255, 255, 255, 0.08)', 
-                  borderRadius: '16px', 
-                  backdropFilter: 'blur(10px)',
-                  '&:hover': { transform: 'translateY(-4px)', borderColor: 'rgba(255, 255, 255, 0.2)', transition: '0.2s' } 
-                }}>
+                <Card key={index} elevation={0} sx={{ bgcolor: 'rgba(30, 41, 59, 0.6)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '16px', backdropFilter: 'blur(10px)', '&:hover': { transform: 'translateY(-4px)', borderColor: 'rgba(255, 255, 255, 0.2)', transition: '0.2s' } }}>
                   <CardContent sx={{ p: 3, display: 'flex', flexDirection: 'column', gap: 2 }}>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                       <Typography variant="subtitle2" sx={{ color: '#94a3b8', fontWeight: 600 }}>{item.title}</Typography>
                       <Box sx={{ color: item.color, p: 1, bgcolor: item.bg, borderRadius: '12px', display: 'flex' }}>{item.icon}</Box>
                     </Box>
                     <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
-                      <Typography variant="h3" sx={{ color: '#ffffffff', fontWeight: 800,  }}>{item.count}</Typography>
+                      <Typography variant="h3" sx={{ color: '#ffffffff', fontWeight: 800 }}>{item.count}</Typography>
                       <Typography variant="subtitle1" sx={{ color: '#64748b' }}>건</Typography>
                     </Box>
                   </CardContent>
@@ -140,31 +128,35 @@ export default function DashboardHome() {
             </Box>
 
             {/* Quick Action Section */}
-            <Box sx={{ 
-              mt: 8, p: 6, 
-              bgcolor: 'rgba(15, 23, 42, 0.4)', 
-              borderRadius: '24px', 
-              border: '1px dashed rgba(255,255,255,0.1)',
-              textAlign: 'center' 
-            }}>
+            <Box sx={{ mt: 8, p: 6, bgcolor: 'rgba(15, 23, 42, 0.4)', borderRadius: '24px', border: '1px dashed rgba(255,255,255,0.1)', textAlign: 'center' }}>
               <Typography variant="subtitle1" sx={{ color: '#cbd5e1', mb: 4, fontWeight: 600 }}>🚀 빠른 작업 시작</Typography>
-              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={3} justifyContent="center">
+              
+              {/* 버튼을 3개로 구성했습니다! */}
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} justifyContent="center">
+                <Button 
+                  variant="outlined" 
+                  startIcon={isCollectingAll ? <CircularProgress size={20} color="inherit" /> : <CloudDownloadIcon />}
+                  onClick={handleCollectAll}
+                  disabled={isCollectingAll || isCollectingUnanswered}
+                  sx={{ borderColor: '#64748b', color: '#cbd5e1', px: 4, py: 1.5, borderRadius: '12px', fontWeight: 600 }}
+                >
+                  {isCollectingAll ? '수집 중...' : '최근 전체 수집'}
+                </Button>
+
                 <Button 
                   variant="contained" 
-                  startIcon={isCollecting ? <CircularProgress size={20} color="inherit" /> : <CloudDownloadIcon />}
-                  onClick={handleCollectInquiries}
-                  disabled={isCollecting}
-                  sx={{ 
-                    bgcolor: '#3b82f6', px: 6, py: 2, borderRadius: '14px', fontSize: '1.1rem', fontWeight: 700,
-                    '&:hover': { bgcolor: '#2563eb' }
-                  }}
+                  startIcon={isCollectingUnanswered ? <CircularProgress size={20} color="inherit" /> : <FilterAltIcon />}
+                  onClick={handleCollectUnanswered}
+                  disabled={isCollectingAll || isCollectingUnanswered}
+                  sx={{ bgcolor: '#f59e0b', color: '#fff', px: 5, py: 1.5, borderRadius: '12px', fontWeight: 700, '&:hover': { bgcolor: '#d97706' } }}
                 >
-                  {isCollecting ? '수집 중...' : '새로운 문의 수집'}
+                  {isCollectingUnanswered ? '수집 중...' : '미답변만 수집'}
                 </Button>
+
                 <Button 
                   variant="outlined" 
                   startIcon={<AutoAwesomeIcon />}
-                  sx={{ borderColor: '#8b5cf6', color: '#c4b5fd', px: 6, py: 2, borderRadius: '14px', fontSize: '1.1rem', fontWeight: 700, borderWidth: '2px' }}
+                  sx={{ borderColor: '#8b5cf6', color: '#c4b5fd', px: 4, py: 1.5, borderRadius: '12px', fontWeight: 600 }}
                 >
                   AI 초안 작성하기
                 </Button>
