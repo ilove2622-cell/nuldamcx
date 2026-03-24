@@ -8,7 +8,7 @@ import { supabase } from '@/lib/supabase';
 import {
   Box, Container, Typography, IconButton, Button,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper,
-  Tabs, Tab, TablePagination, Chip, TextField, Checkbox, Stack
+  Tabs, Tab, TablePagination, Chip, TextField, Checkbox, Stack, CircularProgress
 } from '@mui/material';
 
 // Icons
@@ -17,12 +17,13 @@ import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import SendIcon from '@mui/icons-material/Send';
 import CheckBoxIcon from '@mui/icons-material/CheckBox';
 import CheckBoxOutlineBlankIcon from '@mui/icons-material/CheckBoxOutlineBlank';
+import RocketLaunchIcon from '@mui/icons-material/RocketLaunch'; // 🚀 봇 실행용 새 아이콘
 
 const SITE_TABS = ['전체', '네이버', '쿠팡', '톡스토어', '이베이', '11번가', '롯데온', '카카오 지그재그', 'toss', '기타'];
 
 interface DBInquiry {
   id: string;
-  sabangnet_num: string; // ✅ 사방넷 번호 추가 (답변 전송 시 필수)
+  sabangnet_num: string;
   channel: string;
   order_number: string;
   customer_name: string;
@@ -44,7 +45,10 @@ export default function ChannelsWorkspacePage() {
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [replyTexts, setReplyTexts] = useState<Record<string, string>>({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // 버튼 로딩 상태 분리
+  const [isSubmitting, setIsSubmitting] = useState(false); // 사방넷 등록 로딩
+  const [isTriggeringBot, setIsTriggeringBot] = useState(false); // 봇 실행 로딩
 
   const fetchData = async () => {
     setLoading(true);
@@ -114,13 +118,12 @@ export default function ChannelsWorkspacePage() {
     setReplyTexts(prev => ({ ...prev, [id]: newText }));
   };
 
-  // 🌟 [핵심 변경] 일괄 처리 및 사방넷 전송 로직
+  // 🌟 [버튼 1] 사방넷 API로 '답변저장' 상태로 등록
   const handleBulkSubmit = async () => {
     if (selectedIds.length === 0) return;
     setIsSubmitting(true);
 
     try {
-      // 1. 선택된 항목들의 답변 내용을 Supabase에 저장하고, 상태를 '전송대기'로 바꿉니다.
       const updatePromises = selectedIds.map(id => {
         return supabase
           .from('inquiries')
@@ -129,17 +132,15 @@ export default function ChannelsWorkspacePage() {
       });
       await Promise.all(updatePromises);
       
-      // 2. 사방넷 전송 백엔드 API를 호출합니다.
       const res = await fetch('/api/reply', { method: 'POST' });
       const result = await res.json();
 
       if (res.ok) {
-        alert(`✅ 사방넷 전송 성공! (처리 건수: ${result.count}건)`);
+        alert(`✅ 사방넷 등록 성공! (${result.count}건)\n우측의 [쇼핑몰로 최종 답변 송신] 버튼을 눌러 발송을 완료해주세요.`);
       } else {
-        alert(`❌ 사방넷 전송 실패: ${result.message}`);
+        alert(`❌ 사방넷 등록 실패: ${result.message}`);
       }
       
-      // 3. 화면 새로고침
       fetchData();
       
     } catch (error) {
@@ -147,6 +148,30 @@ export default function ChannelsWorkspacePage() {
       alert('일괄 처리 중 오류가 발생했습니다.');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  // 🌟 [버튼 2] 항상 보이는 봇 실행 버튼 핸들러
+  const handleTriggerBot = async () => {
+    if (isTriggeringBot) return;
+    setIsTriggeringBot(true);
+
+    try {
+      // 🚨 주의: 아래 주소를 본인의 실제 Railway 주소로 꼭 변경해주세요! 🚨
+      const RAILWAY_BOT_URL = 'https://본인의_RAILWAY_주소.up.railway.app/trigger-bot';
+      
+      const res = await fetch(RAILWAY_BOT_URL, { method: 'POST' });
+      
+      if (res.ok) {
+        alert('🤖 송신 봇이 백그라운드에서 실행되었습니다!\n사방넷에서 각 쇼핑몰로 답변을 전송하고 있습니다. (약 1~3분 소요)');
+      } else {
+        alert('❌ 봇 실행 실패. 봇 서버 상태를 확인해주세요.');
+      }
+    } catch (error) {
+      console.error(error);
+      alert('❌ 봇 서버와 연결할 수 없습니다. (Railway 서버가 켜져 있는지 확인)');
+    } finally {
+      setIsTriggeringBot(false);
     }
   };
 
@@ -170,24 +195,60 @@ export default function ChannelsWorkspacePage() {
           </Tabs>
         </Box>
 
-        {selectedIds.length > 0 && (
-          <Box sx={{ mb: 2, p: 2, bgcolor: 'rgba(59, 130, 246, 0.15)', borderRadius: '12px', border: '1px solid rgba(59, 130, 246, 0.3)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', animation: 'fadeIn 0.3s' }}>
-            <Typography sx={{ color: '#3b82f6', fontWeight: 700 }}>
-              체크됨: {selectedIds.length}건
-            </Typography>
-            <Button
-              variant="contained"
-              color="primary"
-              startIcon={<SendIcon />}
-              onClick={handleBulkSubmit}
-              disabled={isSubmitting}
-              sx={{ fontWeight: 600, borderRadius: '8px', boxShadow: '0 4px 14px rgba(59, 130, 246, 0.4)' }}
-            >
-              {isSubmitting ? '사방넷으로 전송 중...' : '작성한 답변 사방넷으로 전송'}
-            </Button>
+        {/* 🌟 항상 보이는 액션 바 (좌측: 선택 등록 / 우측: 봇 실행) */}
+        <Box sx={{ 
+          mb: 2, p: 2, 
+          bgcolor: 'rgba(30, 41, 59, 0.6)', 
+          borderRadius: '12px', 
+          border: '1px solid rgba(255, 255, 255, 0.1)', 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center' 
+        }}>
+          {/* 좌측 액션 영역 (항목 선택 시에만 버튼 활성화) */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            {selectedIds.length > 0 ? (
+              <>
+                <Typography sx={{ color: '#3b82f6', fontWeight: 700 }}>
+                  체크됨: {selectedIds.length}건
+                </Typography>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  startIcon={<SendIcon />}
+                  onClick={handleBulkSubmit}
+                  disabled={isSubmitting}
+                  sx={{ fontWeight: 600, borderRadius: '8px', boxShadow: '0 4px 14px rgba(59, 130, 246, 0.4)' }}
+                >
+                  {isSubmitting ? '사방넷 등록 중...' : '1. 작성한 답변 사방넷으로 임시등록'}
+                </Button>
+              </>
+            ) : (
+              <Typography variant="body2" sx={{ color: '#94a3b8' }}>
+                목록을 체크하여 사방넷에 답변을 등록하세요.
+              </Typography>
+            )}
           </Box>
-        )}
 
+          {/* 우측 봇 실행 영역 (항상 활성화) */}
+          <Button
+            variant="contained"
+            startIcon={isTriggeringBot ? <CircularProgress size={20} color="inherit" /> : <RocketLaunchIcon />}
+            onClick={handleTriggerBot}
+            disabled={isTriggeringBot}
+            sx={{ 
+              fontWeight: 700, 
+              borderRadius: '8px', 
+              bgcolor: '#8b5cf6', 
+              '&:hover': { bgcolor: '#7c3aed' },
+              boxShadow: '0 4px 14px rgba(139, 92, 246, 0.4)' 
+            }}
+          >
+            {isTriggeringBot ? '봇 호출 중...' : '2. 쇼핑몰로 최종 답변 송신 (봇 작동)'}
+          </Button>
+        </Box>
+
+        {/* 테이블 본문 */}
         <TableContainer component={Paper} sx={{ bgcolor: 'rgba(30, 41, 59, 0.6)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px' }}>
           <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
             <Typography sx={{ fontWeight: 600 }}>{SITE_TABS[currentTab]} 문의 목록</Typography>

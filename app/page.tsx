@@ -13,7 +13,6 @@ import InboxIcon from '@mui/icons-material/Inbox';
 import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import RateReviewIcon from '@mui/icons-material/RateReview';
-import FilterAltIcon from '@mui/icons-material/FilterAlt'; 
 
 export default function DashboardHome() {
   const router = useRouter();
