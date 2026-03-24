@@ -34,7 +34,6 @@ export async function GET() {
     <DATA>
         <CS_ST_DATE>${csStDate}</CS_ST_DATE>
         <CS_ED_DATE>${sendDate}</CS_ED_DATE>
-        <CS_STATUS></CS_STATUS>
     </DATA>
 </SABANG_CS_LIST>`;
 
