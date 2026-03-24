@@ -22,9 +22,8 @@ export async function GET() {
   }
 
   const sendDate = getKSTDateString(0); 
-  const csStDate = getKSTDateString(-30); // 넉넉하게 30일 전부터
+  const csStDate = getKSTDateString(-30); 
 
-  // [핵심] <CS_STATUS>001</CS_STATUS> 추가 (001: 신규접수)
   const xmlString = `<?xml version="1.0" encoding="EUC-KR"?>
 <SABANG_CS_LIST>
     <HEADER>
@@ -35,7 +34,7 @@ export async function GET() {
     <DATA>
         <CS_ST_DATE>${csStDate}</CS_ST_DATE>
         <CS_ED_DATE>${sendDate}</CS_ED_DATE>
-        <CS_STATUS>001</CS_STATUS>
+        <CS_STATUS></CS_STATUS>
     </DATA>
 </SABANG_CS_LIST>`;
 

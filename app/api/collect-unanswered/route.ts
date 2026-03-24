@@ -12,9 +12,9 @@ export async function POST(req: Request) {
     const requestUrl = new URL(req.url);
     let domain = `${requestUrl.protocol}//${requestUrl.host}`;
 
-    // 💡 [중요] 로컬(localhost)에서 버튼을 누르면 사방넷이 접속할 수 없으므로, 실제 배포된 도메인으로 강제 고정합니다.
+    
     if (domain.includes('localhost')) {
-      domain = 'https://nuldamcx.vercel.app'; // ★ 본인의 실제 Vercel 도메인으로 꼭 바꿔주세요!
+      domain = 'https://nuldamcx.vercel.app'; 
     }
 
     // 사방넷 시스템이 URL 끝에 .xml이 없으면 거부하는 경우를 대비한 안전장치 (?ext=.xml)
@@ -36,22 +36,23 @@ export async function POST(req: Request) {
     
     const dataList = jsonObj?.SABANG_CS_LIST?.DATA;
 
-    // 🚨 [핵심 변경] 데이터가 없을 경우 사방넷이 보낸 에러 메시지를 가로챕니다!
+    
     if (!dataList || dataList.length === 0) {
-      const header = jsonObj?.SABANG_CS_LIST?.HEADER;
-      const errMsg = header?.ERR_MSG || header?.MSG;
-
-      // 사방넷이 에러 메시지를 보냈다면 화면에 팝업으로 띄웁니다.
-      if (errMsg) {
-        return NextResponse.json({ 
-          status: 'error', 
-          message: `[사방넷 거부 사유] ${errMsg}` 
-        }, { status: 400 });
-      }
-
-      // 에러 메시지도 없고 정말로 데이터가 0건인 경우
-      return NextResponse.json({ status: 'success', message: '새로운 미답변 문의가 없습니다.', count: 0 });
-    }
+  const header = jsonObj?.SABANG_CS_LIST?.HEADER;
+  console.log("[미답변 수집] 사방넷 원본 응답:", decodedXml); // ← 추가
+  console.log("[미답변 수집] 헤더 파싱 결과:", JSON.stringify(header)); // ← 추가
+  
+  const errMsg = header?.ERR_MSG || header?.MSG;
+  if (errMsg) {
+    return NextResponse.json({ status: 'error', message: `[사방넷 거부 사유] ${errMsg}` }, { status: 400 });
+  }
+  return NextResponse.json({ 
+    status: 'success', 
+    message: '새로운 미답변 문의가 없습니다.', 
+    count: 0,
+    debug_response: decodedXml // ← 추가
+  });
+}
 
     let newCount = 0;
     for (const item of dataList) {

@@ -13,14 +13,14 @@ import InboxIcon from '@mui/icons-material/Inbox';
 import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import RateReviewIcon from '@mui/icons-material/RateReview';
-import FilterAltIcon from '@mui/icons-material/FilterAlt'; // 미답변 전용 아이콘
+import FilterAltIcon from '@mui/icons-material/FilterAlt'; 
 
 export default function DashboardHome() {
   const router = useRouter();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const open = Boolean(anchorEl);
   
-  // 상태 분리 (전체 수집용 / 미답변 수집용)
+  
   const [isCollectingAll, setIsCollectingAll] = useState(false);
   const [isCollectingUnanswered, setIsCollectingUnanswered] = useState(false);
   
@@ -36,7 +36,7 @@ export default function DashboardHome() {
 
   useEffect(() => { fetchCounts(); }, []);
 
-  // 1. 기존: 전체 수집
+  
   const handleCollectAll = async () => {
     if (isCollectingAll) return;
     setIsCollectingAll(true);
@@ -56,7 +56,7 @@ export default function DashboardHome() {
     }
   };
 
-  // 2. 신규: 미답변만 수집
+  
   const handleCollectUnanswered = async () => {
     if (isCollectingUnanswered) return;
     setIsCollectingUnanswered(true);
@@ -86,7 +86,6 @@ export default function DashboardHome() {
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'transparent', color: '#f8fafc', display: 'flex', flexDirection: 'column' }}>
       <Box component="header" sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(10px)', bgcolor: 'rgba(15, 23, 42, 0.6)', position: 'sticky', top: 0, zIndex: 50 }}>
-        {/* 헤더 생략 (기존과 동일) */}
         <Container maxWidth="lg" sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 2.5 }}>
           <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
             <Typography variant="h5" sx={{ fontWeight: 800, letterSpacing: '-1px' }}>
@@ -127,11 +126,9 @@ export default function DashboardHome() {
               ))}
             </Box>
 
-            {/* Quick Action Section */}
             <Box sx={{ mt: 8, p: 6, bgcolor: 'rgba(15, 23, 42, 0.4)', borderRadius: '24px', border: '1px dashed rgba(255,255,255,0.1)', textAlign: 'center' }}>
               <Typography variant="subtitle1" sx={{ color: '#cbd5e1', mb: 4, fontWeight: 600 }}>🚀 빠른 작업 시작</Typography>
               
-              {/* 버튼을 3개로 구성했습니다! */}
               <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} justifyContent="center">
                 <Button 
                   variant="outlined" 

@@ -9,11 +9,9 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 export async function POST(req: Request) {
   try {
-    // 💡 [초강력 해결책] 환경변수 대신 현재 요청이 들어온 실제 Vercel 도메인을 자동으로 추출합니다!
     const requestUrl = new URL(req.url);
     const domain = `${requestUrl.protocol}//${requestUrl.host}`;
 
-    // 자동으로 추출한 도메인으로 사방넷에 넘겨줄 URL을 조립합니다.
     const xmlUrl = `${domain}/api/sabangnet-req`;
     const encodedXmlUrl = encodeURIComponent(xmlUrl);
     
@@ -31,7 +29,6 @@ export async function POST(req: Request) {
     const jsonObj = parser.parse(decodedXml);
     const dataList = jsonObj?.SABANG_CS_LIST?.DATA;
 
-    // 만약 사방넷이 오류 메시지를 보냈거나 데이터가 없으면, 원본 응답을 함께 반환해서 원인을 알 수 있게 합니다.
     if (!dataList || dataList.length === 0) {
       console.log("사방넷 원본 응답:", decodedXml);
       return NextResponse.json({ 
