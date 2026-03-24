@@ -88,6 +88,7 @@ export async function POST(req: Request) {
         answer:        getVal(item.RPLY_CNTS),
         customer_name: getVal(item.INS_NM),
         status:        '대기',
+        inquiry_date: getVal(item.INS_DM),
         created_at:    toTimestamp(item.INS_DM),   // ✅ 변환
         collected_at:  toTimestamp(item.REG_DM),   // ✅ 변환
       }));
