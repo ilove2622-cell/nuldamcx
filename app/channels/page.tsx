@@ -8,7 +8,7 @@ import { supabase } from '@/lib/supabase';
 import {
   Box, Container, Typography, IconButton, Button,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper,
-  Tabs, Tab, TablePagination, Chip, TextField, Checkbox, Stack, Tooltip
+  Tabs, Tab, TablePagination, Chip, TextField, Checkbox, Stack
 } from '@mui/material';
 
 // Icons
@@ -18,12 +18,11 @@ import SendIcon from '@mui/icons-material/Send';
 import CheckBoxIcon from '@mui/icons-material/CheckBox';
 import CheckBoxOutlineBlankIcon from '@mui/icons-material/CheckBoxOutlineBlank';
 
-const SITE_TABS = [
-  '전체', '네이버', '쿠팡', '톡스토어', '이베이', '11번가', '롯데온', '카카오 지그재그', 'toss', '기타'
-];
+const SITE_TABS = ['전체', '네이버', '쿠팡', '톡스토어', '이베이', '11번가', '롯데온', '카카오 지그재그', 'toss', '기타'];
 
 interface DBInquiry {
   id: string;
+  sabangnet_num: string; // ✅ 사방넷 번호 추가 (답변 전송 시 필수)
   channel: string;
   order_number: string;
   customer_name: string;
@@ -37,19 +36,16 @@ interface DBInquiry {
 export default function ChannelsWorkspacePage() {
   const router = useRouter();
   
-  // 기본 상태
   const [allData, setAllData] = useState<DBInquiry[]>([]);
   const [currentTab, setCurrentTab] = useState(0); 
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [loading, setLoading] = useState(true);
 
-  // ★ 일괄 처리 및 인라인 편집을 위한 상태
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [replyTexts, setReplyTexts] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // DB 데이터 불러오기
   const fetchData = async () => {
     setLoading(true);
     const { data, error } = await supabase
@@ -61,8 +57,6 @@ export default function ChannelsWorkspacePage() {
       console.error('데이터 불러오기 실패:', error);
     } else {
       setAllData(data || []);
-      
-      // 데이터를 불러올 때, 기존 답변이나 AI 초안을 입력창 초기값으로 세팅
       const initialReplies: Record<string, string> = {};
       data?.forEach(item => {
         initialReplies[item.id] = item.admin_reply || item.ai_draft || '';
@@ -70,20 +64,17 @@ export default function ChannelsWorkspacePage() {
       setReplyTexts(initialReplies);
     }
     setLoading(false);
-    setSelectedIds([]); // 불러올 때 선택 해제
+    setSelectedIds([]);
   };
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  useEffect(() => { fetchData(); }, []);
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setCurrentTab(newValue);
     setPage(0); 
-    setSelectedIds([]); // 탭 변경 시 선택 해제
+    setSelectedIds([]);
   };
 
-  // 탭 필터링
   const filteredData = useMemo(() => {
     const targetSite = SITE_TABS[currentTab];
     if (targetSite === '전체') return allData;
@@ -99,11 +90,9 @@ export default function ChannelsWorkspacePage() {
     return filteredData.slice(start, start + rowsPerPage);
   }, [filteredData, page, rowsPerPage]);
 
-  // ★ 체크박스 로직
   const handleSelectAllClick = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.checked) {
-      const newSelecteds = paginatedData.map((n) => n.id);
-      setSelectedIds(newSelecteds);
+      setSelectedIds(paginatedData.map((n) => n.id));
       return;
     }
     setSelectedIds([]);
@@ -112,50 +101,46 @@ export default function ChannelsWorkspacePage() {
   const handleClick = (id: string) => {
     const selectedIndex = selectedIds.indexOf(id);
     let newSelected: string[] = [];
-
-    if (selectedIndex === -1) {
-      newSelected = newSelected.concat(selectedIds, id);
-    } else if (selectedIndex === 0) {
-      newSelected = newSelected.concat(selectedIds.slice(1));
-    } else if (selectedIndex === selectedIds.length - 1) {
-      newSelected = newSelected.concat(selectedIds.slice(0, -1));
-    } else if (selectedIndex > 0) {
-      newSelected = newSelected.concat(
-        selectedIds.slice(0, selectedIndex),
-        selectedIds.slice(selectedIndex + 1),
-      );
-    }
+    if (selectedIndex === -1) newSelected = newSelected.concat(selectedIds, id);
+    else if (selectedIndex === 0) newSelected = newSelected.concat(selectedIds.slice(1));
+    else if (selectedIndex === selectedIds.length - 1) newSelected = newSelected.concat(selectedIds.slice(0, -1));
+    else if (selectedIndex > 0) newSelected = newSelected.concat(selectedIds.slice(0, selectedIndex), selectedIds.slice(selectedIndex + 1));
     setSelectedIds(newSelected);
   };
 
   const isSelected = (id: string) => selectedIds.indexOf(id) !== -1;
 
-  // ★ 인라인 텍스트 편집 핸들러
   const handleReplyChange = (id: string, newText: string) => {
     setReplyTexts(prev => ({ ...prev, [id]: newText }));
   };
 
-  // ★ 일괄 처리(Bulk Submit) 실행
+  // 🌟 [핵심 변경] 일괄 처리 및 사방넷 전송 로직
   const handleBulkSubmit = async () => {
     if (selectedIds.length === 0) return;
     setIsSubmitting(true);
 
     try {
-      // 선택된 ID들을 순회하며 Supabase 업데이트 실행
+      // 1. 선택된 항목들의 답변 내용을 Supabase에 저장하고, 상태를 '전송대기'로 바꿉니다.
       const updatePromises = selectedIds.map(id => {
         return supabase
           .from('inquiries')
-          .update({ 
-            admin_reply: replyTexts[id], 
-            status: '처리완료' 
-          })
+          .update({ admin_reply: replyTexts[id], status: '전송대기' })
           .eq('id', id);
       });
-
       await Promise.all(updatePromises);
       
-      alert(`✅ ${selectedIds.length}건의 답변이 일괄 등록/처리완료 되었습니다.`);
-      fetchData(); // 최신 상태로 새로고침
+      // 2. 사방넷 전송 백엔드 API를 호출합니다.
+      const res = await fetch('/api/reply', { method: 'POST' });
+      const result = await res.json();
+
+      if (res.ok) {
+        alert(`✅ 사방넷 전송 성공! (처리 건수: ${result.count}건)`);
+      } else {
+        alert(`❌ 사방넷 전송 실패: ${result.message}`);
+      }
+      
+      // 3. 화면 새로고침
+      fetchData();
       
     } catch (error) {
       console.error(error);
@@ -167,7 +152,6 @@ export default function ChannelsWorkspacePage() {
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'transparent', color: '#f8fafc', display: 'flex', flexDirection: 'column' }}>
-      
       <Box component="header" sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)', bgcolor: 'rgba(15, 23, 42, 0.6)', p: 2, position: 'sticky', top: 0, zIndex: 50 }}>
         <Container maxWidth="xl" sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -177,7 +161,6 @@ export default function ChannelsWorkspacePage() {
         </Container>
       </Box>
 
-      {/* 넓은 화면을 쓰기 위해 maxWidth="xl" 적용 */}
       <Container maxWidth="xl" sx={{ mt: 4, mb: 8, flex: 1 }}>
         <Box sx={{ borderBottom: 1, borderColor: 'rgba(255,255,255,0.1)', mb: 3 }}>
           <Tabs value={currentTab} onChange={handleTabChange} variant="scrollable" scrollButtons="auto" textColor="inherit" TabIndicatorProps={{ style: { backgroundColor: '#3b82f6' } }}>
@@ -187,7 +170,6 @@ export default function ChannelsWorkspacePage() {
           </Tabs>
         </Box>
 
-        {/* ★ 일괄 처리 액션 바 (선택된 항목이 있을 때만 나타남) */}
         {selectedIds.length > 0 && (
           <Box sx={{ mb: 2, p: 2, bgcolor: 'rgba(59, 130, 246, 0.15)', borderRadius: '12px', border: '1px solid rgba(59, 130, 246, 0.3)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', animation: 'fadeIn 0.3s' }}>
             <Typography sx={{ color: '#3b82f6', fontWeight: 700 }}>
@@ -201,7 +183,7 @@ export default function ChannelsWorkspacePage() {
               disabled={isSubmitting}
               sx={{ fontWeight: 600, borderRadius: '8px', boxShadow: '0 4px 14px rgba(59, 130, 246, 0.4)' }}
             >
-              {isSubmitting ? '처리 중...' : '선택된 항목 일괄 처리완료'}
+              {isSubmitting ? '사방넷으로 전송 중...' : '작성한 답변 사방넷으로 전송'}
             </Button>
           </Box>
         )}
@@ -214,7 +196,6 @@ export default function ChannelsWorkspacePage() {
           <Table>
             <TableHead sx={{ bgcolor: 'rgba(15, 23, 42, 0.8)' }}>
               <TableRow>
-                {/* 체크박스 헤더 */}
                 <TableCell padding="checkbox" sx={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
                   <Checkbox
                     color="primary"
@@ -247,7 +228,6 @@ export default function ChannelsWorkspacePage() {
                         '&.Mui-selected:hover': { bgcolor: 'rgba(59, 130, 246, 0.12)' }
                       }}
                     >
-                      {/* 1. 체크박스 */}
                       <TableCell padding="checkbox" sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)', verticalAlign: 'top', pt: 2.5 }}>
                         <Checkbox
                           color="primary"
@@ -257,14 +237,12 @@ export default function ChannelsWorkspacePage() {
                           checkedIcon={<CheckBoxIcon sx={{ color: '#3b82f6' }} />}
                         />
                       </TableCell>
-
-                      {/* 2. 고객/주문 정보 (압축 배치) */}
                       <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)', verticalAlign: 'top', pt: 3 }}>
                         <Stack spacing={1}>
                           <Chip label={row.status} size="small" sx={{
                             fontWeight: 'bold', width: 'fit-content',
-                            color: row.status === '대기중' ? '#f59e0b' : row.status === '처리완료' ? '#10b981' : '#3b82f6',
-                            bgcolor: row.status === '대기중' ? 'rgba(245, 158, 11, 0.1)' : row.status === '처리완료' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(59, 130, 246, 0.1)'
+                            color: row.status === '대기' ? '#f59e0b' : row.status === '처리완료' ? '#10b981' : '#3b82f6',
+                            bgcolor: row.status === '대기' ? 'rgba(245, 158, 11, 0.1)' : row.status === '처리완료' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(59, 130, 246, 0.1)'
                           }}/>
                           <Typography variant="body2" sx={{ fontWeight: 700, color: '#f8fafc' }}>{row.customer_name}</Typography>
                           <Typography variant="caption" sx={{ color: '#94a3b8' }}>{row.channel}</Typography>
@@ -272,8 +250,6 @@ export default function ChannelsWorkspacePage() {
                           <Typography variant="caption" sx={{ color: '#64748b' }}>{row.inquiry_date}</Typography>
                         </Stack>
                       </TableCell>
-
-                      {/* 3. 원본 문의 내용 */}
                       <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)', verticalAlign: 'top', pt: 3 }}>
                         <Box sx={{ bgcolor: 'rgba(15, 23, 42, 0.4)', p: 2, borderRadius: '8px', height: '100%' }}>
                           <Typography variant="body2" sx={{ color: '#cbd5e1', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
@@ -281,8 +257,6 @@ export default function ChannelsWorkspacePage() {
                           </Typography>
                         </Box>
                       </TableCell>
-
-                      {/* 4. 답변 작성 인라인 폼 */}
                       <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)', verticalAlign: 'top', pt: 3 }}>
                         <TextField
                           multiline
@@ -315,7 +289,6 @@ export default function ChannelsWorkspacePage() {
               )}
             </TableBody>
           </Table>
-
           <TablePagination
             component="div"
             count={filteredData.length}

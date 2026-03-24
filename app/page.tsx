@@ -141,16 +141,6 @@ export default function DashboardHome() {
                 </Button>
 
                 <Button 
-                  variant="contained" 
-                  startIcon={isCollectingUnanswered ? <CircularProgress size={20} color="inherit" /> : <FilterAltIcon />}
-                  onClick={handleCollectUnanswered}
-                  disabled={isCollectingAll || isCollectingUnanswered}
-                  sx={{ bgcolor: '#f59e0b', color: '#fff', px: 5, py: 1.5, borderRadius: '12px', fontWeight: 700, '&:hover': { bgcolor: '#d97706' } }}
-                >
-                  {isCollectingUnanswered ? '수집 중...' : '미답변만 수집'}
-                </Button>
-
-                <Button 
                   variant="outlined" 
                   startIcon={<AutoAwesomeIcon />}
                   sx={{ borderColor: '#8b5cf6', color: '#c4b5fd', px: 4, py: 1.5, borderRadius: '12px', fontWeight: 600 }}
