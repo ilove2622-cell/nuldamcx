@@ -14,87 +14,62 @@ export async function POST(req: Request) {
 
     if (domain.includes('localhost')) {
       domain = 'https://nuldamcx.vercel.app';
-      console.log(`[미답변 수집] localhost 감지 → 도메인 교체: ${domain}`);
     }
 
     const xmlUrl = `${domain}/api/sabangnet-req-unanswered?ext=.xml`;
     const encodedXmlUrl = encodeURIComponent(xmlUrl);
     const sabangnetApiUrl = `https://sbadmin15.sabangnet.co.kr/RTL_API/xml_cs_info.html?xml_url=${encodedXmlUrl}`;
 
-    console.log(`[미답변 수집] ① 사방넷으로 보낼 xmlUrl: ${xmlUrl}`);
-    console.log(`[미답변 수집] ② 최종 요청 URL: ${sabangnetApiUrl}`);
+    console.log(`[미답변 수집] 요청 시작 → ${sabangnetApiUrl}`);
 
     const response = await fetch(sabangnetApiUrl, { method: 'GET' });
-
-    console.log(`[미답변 수집] ③ 사방넷 응답 status: ${response.status} ${response.statusText}`);
-
     if (!response.ok) throw new Error(`사방넷 API 서버 응답 오류: ${response.status}`);
 
     const arrayBuffer = await response.arrayBuffer();
     const decodedXml = iconv.decode(Buffer.from(arrayBuffer), 'euc-kr');
 
-    console.log(`[미답변 수집] ④ 사방넷 원본 응답 (디코딩 후):\n${decodedXml}`);
-
     const parser = new XMLParser({ ignoreAttributes: true, isArray: (name) => name === 'DATA' });
     const jsonObj = parser.parse(decodedXml);
-
-    console.log(`[미답변 수집] ⑤ 파싱된 JSON:\n${JSON.stringify(jsonObj, null, 2)}`);
 
     const header = jsonObj?.SABANG_CS_LIST?.HEADER;
     const dataList = jsonObj?.SABANG_CS_LIST?.DATA;
 
-    console.log(`[미답변 수집] ⑥ HEADER:`, JSON.stringify(header));
-    console.log(`[미답변 수집] ⑦ DATA 건수:`, dataList ? dataList.length : 0);
+    console.log(`[미답변 수집] 사방넷 수신 건수: ${dataList?.length ?? 0}`);
 
     if (!dataList || dataList.length === 0) {
       const errMsg = header?.ERR_MSG || header?.MSG || header?.ERROR || header?.RESULT_MSG;
-      console.log(`[미답변 수집] ⑧ 에러 메시지 추출값: ${errMsg}`);
-
       if (errMsg) {
-        return NextResponse.json({
-          status: 'error',
-          message: `[사방넷 거부 사유] ${errMsg}`,
-          debug_header: header,
-          debug_raw: decodedXml,
-        }, { status: 400 });
+        return NextResponse.json({ status: 'error', message: `[사방넷 거부 사유] ${errMsg}` }, { status: 400 });
       }
-
-      return NextResponse.json({
-        status: 'success',
-        message: '새로운 미답변 문의가 없습니다.',
-        count: 0,
-        debug_header: header,
-        debug_raw: decodedXml,
-      });
+      return NextResponse.json({ status: 'success', message: '새로운 미답변 문의가 없습니다.', count: 0 });
     }
 
-    console.log(`[미답변 수집] ⑨ 수집된 DATA 목록:`);
-    dataList.forEach((item: any, i: number) => {
-      console.log(`  [${i + 1}] NUM=${item.NUM}, MALL_ID=${item.MALL_ID}, CS_STATUS=${item.CS_STATUS}, SUBJECT=${item.SUBJECT}`);
-    });
+    const getVal = (val: any) => val ? String(val).trim() : '';
 
-    let newCount = 0;
-    for (const item of dataList) {
-      const getVal = (val: any) => val ? String(val).trim() : '';
-      const num = getVal(item.NUM);
-      if (!num) {
-        console.log(`[미답변 수집] NUM 없는 항목 스킵`);
-        continue;
-      }
+    // ① 수신된 NUM 목록 추출
+    const incomingNums = dataList
+      .map((item: any) => getVal(item.NUM))
+      .filter(Boolean);
 
-      const { data: existing } = await supabase
-        .from('inquiries')
-        .select('id')
-        .eq('sabangnet_num', num)
-        .single();
+    // ② 기존 NUM 일괄 조회 (DB 요청 1번으로 해결 — 핵심 개선)
+    const { data: existingRows, error: fetchError } = await supabase
+      .from('inquiries')
+      .select('sabangnet_num')
+      .in('sabangnet_num', incomingNums);
 
-      if (existing) {
-        console.log(`[미답변 수집] 이미 존재 → 스킵: NUM=${num}`);
-        continue;
-      }
+    if (fetchError) throw new Error(`기존 데이터 조회 실패: ${fetchError.message}`);
 
-      const { error } = await supabase.from('inquiries').insert({
-        sabangnet_num: num,
+    const existingSet = new Set((existingRows ?? []).map((r: any) => r.sabangnet_num));
+    console.log(`[미답변 수집] DB 기존: ${existingSet.size}건 / 신규 후보: ${incomingNums.length - existingSet.size}건`);
+
+    // ③ 신규 건만 필터링
+    const newItems = dataList
+      .filter((item: any) => {
+        const num = getVal(item.NUM);
+        return num && !existingSet.has(num);
+      })
+      .map((item: any) => ({
+        sabangnet_num: getVal(item.NUM),
         site_name: getVal(item.MALL_ID),
         seller_id: getVal(item.MALL_USER_ID),
         order_number: getVal(item.ORDER_ID),
@@ -106,20 +81,32 @@ export async function POST(req: Request) {
         status: '대기',
         created_at: getVal(item.INS_DM),
         collected_at: getVal(item.REG_DM),
-      });
+      }));
 
-      if (error) {
-        console.error(`[미답변 수집] Supabase insert 실패 NUM=${num}:`, error.message);
+    if (newItems.length === 0) {
+      return NextResponse.json({ status: 'success', message: '신규 미답변 문의가 없습니다.', count: 0 });
+    }
+
+    // ④ 100건씩 분할 일괄 insert (DB 요청 최소화 — 핵심 개선)
+    const BATCH_SIZE = 100;
+    let insertedCount = 0;
+
+    for (let i = 0; i < newItems.length; i += BATCH_SIZE) {
+      const batch = newItems.slice(i, i + BATCH_SIZE);
+      const { error: insertError } = await supabase.from('inquiries').insert(batch);
+
+      if (insertError) {
+        console.error(`[미답변 수집] batch insert 실패 (${i + 1}~${i + batch.length}번):`, insertError.message);
       } else {
-        console.log(`[미답변 수집] ✅ insert 성공: NUM=${num}`);
-        newCount++;
+        insertedCount += batch.length;
+        console.log(`[미답변 수집] batch insert 성공: ${i + 1}~${i + batch.length}번`);
       }
     }
 
     return NextResponse.json({
       status: 'success',
-      message: `미답변 수집 완료! 신규 추가: ${newCount}건`,
-      count: newCount,
+      message: `미답변 수집 완료! 신규 추가: ${insertedCount}건`,
+      count: insertedCount,
     });
 
   } catch (error: any) {
