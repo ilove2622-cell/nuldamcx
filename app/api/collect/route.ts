@@ -13,17 +13,18 @@ export async function POST(req: Request) {
     let domain = `${requestUrl.protocol}//${requestUrl.host}`;
 
     if (domain.includes('localhost')) {
-      domain = 'https://nuldamcx.vercel.app';
+      domain = 'https://nuldamcx.vercel.app'; // 본인 도메인 확인
     }
 
-    const xmlUrl = `${domain}/api/sabangnet-req`;
+    // [전체 수집]용 XML 요청 주소 연결
+    const xmlUrl = `${domain}/api/sabangnet-req?ext=.xml`;
     const encodedXmlUrl = encodeURIComponent(xmlUrl);
     const sabangnetApiUrl = `https://sbadmin15.sabangnet.co.kr/RTL_API/xml_cs_info.html?xml_url=${encodedXmlUrl}`;
 
     console.log(`[전체 수집] 요청 시작 → ${sabangnetApiUrl}`);
 
     const response = await fetch(sabangnetApiUrl, { method: 'GET' });
-    if (!response.ok) throw new Error(`사방넷 서버 응답 오류: ${response.status}`);
+    if (!response.ok) throw new Error(`사방넷 API 서버 응답 오류: ${response.status}`);
 
     const arrayBuffer = await response.arrayBuffer();
     const decodedXml = iconv.decode(Buffer.from(arrayBuffer), 'euc-kr');
@@ -44,22 +45,20 @@ export async function POST(req: Request) {
       return NextResponse.json({ status: 'success', message: '새로운 문의사항이 없습니다.', count: 0 });
     }
 
-    // 사방넷 문자열값 추출
     const getVal = (val: any): string => val ? String(val).trim() : '';
 
-    // 사방넷 날짜형식 변환: "20260222095026" → "2026-02-22 09:50:26"
-    const toTimestamp = (val: any): string | null => {
-      const s = getVal(val);
-      if (s.length !== 14) return null;
+    // 💡 [핵심 방어막] 날짜가 비어있을 경우 대체값(fallbackVal)을 사용해 Null Constraint를 원천 차단합니다!
+    const toTimestamp = (val: any, fallbackVal?: any): string | null => {
+      let s = getVal(val);
+      if (s.length !== 14 && fallbackVal) {
+        s = getVal(fallbackVal); // 문의일자가 없으면 수집일자로 대체
+      }
+      if (s.length !== 14) return null; // 그래도 없으면 어쩔 수 없이 null (DB가 튕겨냄)
       return `${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)} ${s.slice(8,10)}:${s.slice(10,12)}:${s.slice(12,14)}`;
     };
 
-    // ① 수신된 NUM 목록 추출
-    const incomingNums = dataList
-      .map((item: any) => getVal(item.NUM))
-      .filter(Boolean);
+    const incomingNums = dataList.map((item: any) => getVal(item.NUM)).filter(Boolean);
 
-    // ② 기존 NUM 일괄 조회 (DB 요청 1번)
     const { data: existingRows, error: fetchError } = await supabase
       .from('inquiries')
       .select('sabangnet_num')
@@ -70,7 +69,6 @@ export async function POST(req: Request) {
     const existingSet = new Set((existingRows ?? []).map((r: any) => r.sabangnet_num));
     console.log(`[전체 수집] DB 기존: ${existingSet.size}건 / 신규 후보: ${incomingNums.length - existingSet.size}건`);
 
-    // ③ 신규 건만 필터링 + 날짜 변환 적용
     const newItems = dataList
       .filter((item: any) => {
         const num = getVal(item.NUM);
@@ -78,7 +76,7 @@ export async function POST(req: Request) {
       })
       .map((item: any) => ({
         sabangnet_num: getVal(item.NUM),
-        channel: getVal(item.MALL_ID),
+        channel:       getVal(item.MALL_ID),
         site_name:     getVal(item.MALL_ID),
         seller_id:     getVal(item.MALL_USER_ID),
         order_number:  getVal(item.ORDER_ID),
@@ -88,16 +86,15 @@ export async function POST(req: Request) {
         answer:        getVal(item.RPLY_CNTS),
         customer_name: getVal(item.INS_NM),
         status:        '대기',
-        inquiry_date: toTimestamp(item.INS_DM),
-        created_at:    toTimestamp(item.INS_DM),   // ✅ 변환
-        collected_at:  toTimestamp(item.REG_DM),   // ✅ 변환
+        inquiry_date:  toTimestamp(item.INS_DM, item.REG_DM), // null 방어 적용!
+        created_at:    toTimestamp(item.INS_DM, item.REG_DM),
+        collected_at:  toTimestamp(item.REG_DM),
       }));
 
     if (newItems.length === 0) {
       return NextResponse.json({ status: 'success', message: '신규 문의사항이 없습니다.', count: 0 });
     }
 
-    // ④ 100건씩 분할 일괄 insert
     const BATCH_SIZE = 100;
     let insertedCount = 0;
 
@@ -115,7 +112,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       status: 'success',
-      message: `수집 완료! 신규 업데이트: ${insertedCount}건`,
+      message: `전체 수집 완료! 신규 추가: ${insertedCount}건`,
       count: insertedCount,
     });
 
