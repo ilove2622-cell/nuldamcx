@@ -32,6 +32,7 @@ interface DBInquiry {
   status: string;
   ai_draft: string | null;
   admin_reply: string | null;
+  created_at?: string; // 정렬을 위해 생성 시간 추가
 }
 
 export default function ChannelsWorkspacePage() {
@@ -51,9 +52,11 @@ export default function ChannelsWorkspacePage() {
 
   const fetchData = async () => {
     setLoading(true);
+    // 🌟 1차 정렬: DB에서 가져올 때부터 문의일자 역순, 생성일자 역순으로 가져옵니다.
     const { data, error } = await supabase
       .from('inquiries')
       .select('*')
+      .order('inquiry_date', { ascending: false })
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -80,12 +83,25 @@ export default function ChannelsWorkspacePage() {
 
   const filteredData = useMemo(() => {
     const targetSite = SITE_TABS[currentTab];
-    if (targetSite === '전체') return allData;
-    if (targetSite === '기타') {
-      const mainChannels = SITE_TABS.slice(1, -1);
-      return allData.filter(item => !mainChannels.includes(item.channel));
+    let filtered = allData;
+
+    // 1. 탭 필터링
+    if (targetSite !== '전체') {
+      if (targetSite === '기타') {
+        const mainChannels = SITE_TABS.slice(1, -1);
+        filtered = allData.filter(item => !mainChannels.includes(item.channel));
+      } else {
+        filtered = allData.filter(item => item.channel === targetSite);
+      }
     }
-    return allData.filter(item => item.channel === targetSite);
+
+    // 🌟 2. 시간 순 강력 정렬 (프론트엔드)
+    // inquiry_date(문의 시간)를 기준으로 먼저 정렬하고, 없을 경우 DB 저장 시간(created_at)을 기준으로 최신순(내림차순) 정렬합니다.
+    return filtered.sort((a, b) => {
+      const timeA = new Date(a.inquiry_date || a.created_at || 0).getTime();
+      const timeB = new Date(b.inquiry_date || b.created_at || 0).getTime();
+      return timeB - timeA; 
+    });
   }, [allData, currentTab]);
 
   const paginatedData = useMemo(() => {
@@ -117,13 +133,11 @@ export default function ChannelsWorkspacePage() {
     setReplyTexts(prev => ({ ...prev, [id]: newText }));
   };
 
-  // 🌟 [버튼 1] 사방넷 API로 전송 (디버깅 로그 포함)
   const handleBulkSubmit = async () => {
     if (selectedIds.length === 0) return;
     setIsSubmitting(true);
 
     try {
-      // 1. 상태를 '답변저장'으로 업데이트
       const updatePromises = selectedIds.map(id => {
         return supabase
           .from('inquiries')
@@ -132,7 +146,6 @@ export default function ChannelsWorkspacePage() {
       });
       await Promise.all(updatePromises);
       
-      // 2. 🌟 API 호출 시 선택한 ID를 같이 보냅니다.
       const res = await fetch('/api/reply', { 
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -141,17 +154,11 @@ export default function ChannelsWorkspacePage() {
       const result = await res.json();
 
       if (res.ok) {
-        // 🌟 콘솔창에 실제 응답 로그 찍기!
-        console.log("====================================");
-        console.log("📢 사방넷 서버 실제 응답 내용:");
-        console.log(result.sabangnetResponse);
-        console.log("====================================");
-
         const responsePreview = result.sabangnetResponse 
           ? result.sabangnetResponse.substring(0, 150) 
           : "응답 없음";
 
-        alert(`✅ 1단계: 사방넷 임시등록 호출 완료 (${result.count}건)\n\n[사방넷 응답]\n${responsePreview}\n\n우측의 [쇼핑몰로 최종 답변 송신] 버튼을 눌러 발송을 완료해주세요.\n(자세한 에러는 F12 콘솔창 확인!)`);
+        alert(`✅ 1단계: 사방넷 임시등록 호출 완료 (${result.count}건)\n우측의 [쇼핑몰로 최종 답변 송신] 버튼을 눌러 발송을 완료해주세요.\n(자세한 에러는 F12 콘솔창 확인!)`);
       } else {
         alert(`❌ 사방넷 등록 실패: ${result.message}`);
       }
@@ -166,7 +173,6 @@ export default function ChannelsWorkspacePage() {
     }
   };
 
-  // 🌟 [버튼 2] 로컬 봇 호출
   const handleTriggerBot = async () => {
     if (isTriggeringBot) return;
     setIsTriggeringBot(true);
