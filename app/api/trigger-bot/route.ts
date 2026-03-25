@@ -1,28 +1,34 @@
 import { NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 export async function POST() {
   try {
-    // 🚨 본인의 Railway 주소로 변경 (https:// 포함, 끝에 / 제외)
-    const RAILWAY_BOT_URL = 'https://sabangnet-bot-production.up.railway.app/trigger-bot';
+    const { data, error } = await supabase
+      .from('inquiries')
+      .update({ status: '전송요청' })
+      .eq('status', '답변저장')
+      .select();
 
-    const response = await fetch(RAILWAY_BOT_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Railway 봇 응답 에러:", errorText);
-      throw new Error(`Railway 서버 에러: ${response.status}`);
+    if (error) {
+      console.error("Supabase 상태 변경 에러:", error);
+      throw new Error(`DB 업데이트 실패: ${error.message}`);
     }
 
-    const data = await response.json();
-    return NextResponse.json({ status: 'success', data });
+    console.log(`✅ [송신 요청 완료] ${data.length}건을 '전송요청' 상태로 변경했습니다.`);
+
+    return NextResponse.json({ 
+      status: 'success', 
+      message: `${data.length}건의 송신 요청이 로컬 PC로 전달되었습니다! (DB 감시 대기 중)`,
+      count: data.length
+    });
 
   } catch (error: any) {
-    console.error('봇 호출 실패:', error);
+    console.error('봇 호출(DB 업데이트) 실패:', error);
     return NextResponse.json({ status: 'error', message: error.message }, { status: 500 });
   }
 }
