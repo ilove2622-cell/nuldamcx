@@ -10,11 +10,11 @@ export async function GET() {
   const SABANGNET_ID = process.env.SABANGNET_ID || '';
   const SABANGNET_API_KEY = process.env.SABANGNET_API_KEY || '';
 
-  // 1. Supabase에서 방금 '전송대기' 상태로 바뀐 문의글들을 불러옵니다.
+  // 🌟 [핵심 수정] '전송대기'가 아닌 '답변저장' 상태인 문의글을 가져오도록 수정했습니다!
   const { data: pendingItems } = await supabase
     .from('inquiries')
     .select('sabangnet_num, admin_reply')
-    .eq('status', '전송대기');
+    .eq('status', '답변저장');
 
   // 날짜 형식 맞추기 (YYYYMMDD)
   const now = new Date();
