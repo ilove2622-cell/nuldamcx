@@ -117,13 +117,13 @@ export default function ChannelsWorkspacePage() {
     setReplyTexts(prev => ({ ...prev, [id]: newText }));
   };
 
-  // 🌟 [버튼 1] 
+  // 🌟 [버튼 1] 사방넷 API로 전송 (디버깅 로그 포함)
   const handleBulkSubmit = async () => {
     if (selectedIds.length === 0) return;
     setIsSubmitting(true);
 
     try {
-      // 1. 상태를 '답변저장'으로 업데이트합니다.
+      // 1. 상태를 '답변저장'으로 업데이트
       const updatePromises = selectedIds.map(id => {
         return supabase
           .from('inquiries')
@@ -132,7 +132,7 @@ export default function ChannelsWorkspacePage() {
       });
       await Promise.all(updatePromises);
       
-      // 2. 🌟 핵심: 어떤 ID들을 전송할지 API에 직접 알려줍니다!
+      // 2. 🌟 API 호출 시 선택한 ID를 같이 보냅니다.
       const res = await fetch('/api/reply', { 
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -141,7 +141,17 @@ export default function ChannelsWorkspacePage() {
       const result = await res.json();
 
       if (res.ok) {
-        alert(`✅ 사방넷 등록 성공! (${result.count}건)\n우측의 [쇼핑몰로 최종 답변 송신] 버튼을 눌러 발송을 완료해주세요.`);
+        // 🌟 콘솔창에 실제 응답 로그 찍기!
+        console.log("====================================");
+        console.log("📢 사방넷 서버 실제 응답 내용:");
+        console.log(result.sabangnetResponse);
+        console.log("====================================");
+
+        const responsePreview = result.sabangnetResponse 
+          ? result.sabangnetResponse.substring(0, 150) 
+          : "응답 없음";
+
+        alert(`✅ 1단계: 사방넷 임시등록 호출 완료 (${result.count}건)\n\n[사방넷 응답]\n${responsePreview}\n\n우측의 [쇼핑몰로 최종 답변 송신] 버튼을 눌러 발송을 완료해주세요.\n(자세한 에러는 F12 콘솔창 확인!)`);
       } else {
         alert(`❌ 사방넷 등록 실패: ${result.message}`);
       }
@@ -156,7 +166,7 @@ export default function ChannelsWorkspacePage() {
     }
   };
 
-  // 🌟 [버튼 2] 
+  // 🌟 [버튼 2] 로컬 봇 호출
   const handleTriggerBot = async () => {
     if (isTriggeringBot) return;
     setIsTriggeringBot(true);
@@ -166,7 +176,7 @@ export default function ChannelsWorkspacePage() {
       
       if (res.ok) {
         alert('🤖 송신 봇에게 전송 요청을 보냈습니다!\n로컬 PC의 봇이 사방넷에서 답변을 전송한 뒤 상태를 "처리완료"로 변경할 것입니다.');
-        fetchData(); // 상태 변경 확인을 위해 데이터 새로고침
+        fetchData();
       } else {
         const errorData = await res.json();
         alert(`❌ 봇 호출 실패: ${errorData.message}`);
@@ -179,13 +189,12 @@ export default function ChannelsWorkspacePage() {
     }
   };
 
-  // 🌟 뱃지(Chip) 색상 결정 함수
   const getStatusColor = (status: string) => {
     switch (status) {
       case '대기': return { color: '#f59e0b', bgcolor: 'rgba(245, 158, 11, 0.1)' };
       case '답변저장': return { color: '#3b82f6', bgcolor: 'rgba(59, 130, 246, 0.1)' };
-      case '전송요청': return { color: '#8b5cf6', bgcolor: 'rgba(139, 92, 246, 0.1)' }; // 봇이 확인하기 직전 상태
-      case '처리완료': return { color: '#10b981', bgcolor: 'rgba(16, 185, 129, 0.1)' }; // 봇이 완료한 상태
+      case '전송요청': return { color: '#8b5cf6', bgcolor: 'rgba(139, 92, 246, 0.1)' }; 
+      case '처리완료': return { color: '#10b981', bgcolor: 'rgba(16, 185, 129, 0.1)' }; 
       default: return { color: '#94a3b8', bgcolor: 'rgba(148, 163, 184, 0.1)' };
     }
   };
@@ -210,52 +219,21 @@ export default function ChannelsWorkspacePage() {
           </Tabs>
         </Box>
 
-        <Box sx={{ 
-          mb: 2, p: 2, 
-          bgcolor: 'rgba(30, 41, 59, 0.6)', 
-          borderRadius: '12px', 
-          border: '1px solid rgba(255, 255, 255, 0.1)', 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center' 
-        }}>
+        <Box sx={{ mb: 2, p: 2, bgcolor: 'rgba(30, 41, 59, 0.6)', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             {selectedIds.length > 0 ? (
               <>
-                <Typography sx={{ color: '#3b82f6', fontWeight: 700 }}>
-                  체크됨: {selectedIds.length}건
-                </Typography>
-                <Button
-                  variant="contained"
-                  color="primary"
-                  startIcon={<SendIcon />}
-                  onClick={handleBulkSubmit}
-                  disabled={isSubmitting}
-                  sx={{ fontWeight: 600, borderRadius: '8px', boxShadow: '0 4px 14px rgba(59, 130, 246, 0.4)' }}
-                >
+                <Typography sx={{ color: '#3b82f6', fontWeight: 700 }}>체크됨: {selectedIds.length}건</Typography>
+                <Button variant="contained" color="primary" startIcon={<SendIcon />} onClick={handleBulkSubmit} disabled={isSubmitting} sx={{ fontWeight: 600, borderRadius: '8px', boxShadow: '0 4px 14px rgba(59, 130, 246, 0.4)' }}>
                   {isSubmitting ? '사방넷 등록 중...' : '1. 작성한 답변 사방넷으로 임시등록'}
                 </Button>
               </>
             ) : (
-              <Typography variant="body2" sx={{ color: '#94a3b8' }}>
-                목록을 체크하여 사방넷에 답변을 등록하세요.
-              </Typography>
+              <Typography variant="body2" sx={{ color: '#94a3b8' }}>목록을 체크하여 사방넷에 답변을 등록하세요.</Typography>
             )}
           </Box>
 
-          <Button
-            variant="contained"
-            startIcon={isTriggeringBot ? <CircularProgress size={20} color="inherit" /> : <RocketLaunchIcon />}
-            onClick={handleTriggerBot}
-            disabled={isTriggeringBot}
-            sx={{ 
-              fontWeight: 700, 
-              borderRadius: '8px', 
-              bgcolor: '#8b5cf6', 
-              '&:hover': { bgcolor: '#7c3aed' },
-              boxShadow: '0 4px 14px rgba(139, 92, 246, 0.4)' 
-            }}
-          >
+          <Button variant="contained" startIcon={isTriggeringBot ? <CircularProgress size={20} color="inherit" /> : <RocketLaunchIcon />} onClick={handleTriggerBot} disabled={isTriggeringBot} sx={{ fontWeight: 700, borderRadius: '8px', bgcolor: '#8b5cf6', '&:hover': { bgcolor: '#7c3aed' }, boxShadow: '0 4px 14px rgba(139, 92, 246, 0.4)' }}>
             {isTriggeringBot ? '요청 전송 중...' : '2. 쇼핑몰로 최종 답변 송신 (봇 작동)'}
           </Button>
         </Box>
@@ -269,14 +247,7 @@ export default function ChannelsWorkspacePage() {
             <TableHead sx={{ bgcolor: 'rgba(15, 23, 42, 0.8)' }}>
               <TableRow>
                 <TableCell padding="checkbox" sx={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                  <Checkbox
-                    color="primary"
-                    indeterminate={selectedIds.length > 0 && selectedIds.length < paginatedData.length}
-                    checked={paginatedData.length > 0 && selectedIds.length === paginatedData.length}
-                    onChange={handleSelectAllClick}
-                    icon={<CheckBoxOutlineBlankIcon sx={{ color: '#64748b' }} />}
-                    checkedIcon={<CheckBoxIcon sx={{ color: '#3b82f6' }} />}
-                  />
+                  <Checkbox color="primary" indeterminate={selectedIds.length > 0 && selectedIds.length < paginatedData.length} checked={paginatedData.length > 0 && selectedIds.length === paginatedData.length} onChange={handleSelectAllClick} icon={<CheckBoxOutlineBlankIcon sx={{ color: '#64748b' }} />} checkedIcon={<CheckBoxIcon sx={{ color: '#3b82f6' }} />} />
                 </TableCell>
                 <TableCell sx={{ color: '#94a3b8', width: '200px', fontWeight: 600 }}>고객/주문 정보</TableCell>
                 <TableCell sx={{ color: '#94a3b8', width: '35%', fontWeight: 600 }}>원본 문의 내용</TableCell>
@@ -289,35 +260,16 @@ export default function ChannelsWorkspacePage() {
               ) : paginatedData.length > 0 ? (
                 paginatedData.map((row) => {
                   const isItemSelected = isSelected(row.id);
-                  const statusColors = getStatusColor(row.status); // 🌟 분리한 뱃지 색상 함수 적용
+                  const statusColors = getStatusColor(row.status); 
                   
                   return (
-                    <TableRow 
-                      key={row.id} 
-                      hover 
-                      selected={isItemSelected}
-                      sx={{ 
-                        '&:hover': { bgcolor: 'rgba(255,255,255,0.02)' },
-                        '&.Mui-selected': { bgcolor: 'rgba(59, 130, 246, 0.08)' },
-                        '&.Mui-selected:hover': { bgcolor: 'rgba(59, 130, 246, 0.12)' }
-                      }}
-                    >
+                    <TableRow key={row.id} hover selected={isItemSelected} sx={{ '&:hover': { bgcolor: 'rgba(255,255,255,0.02)' }, '&.Mui-selected': { bgcolor: 'rgba(59, 130, 246, 0.08)' }, '&.Mui-selected:hover': { bgcolor: 'rgba(59, 130, 246, 0.12)' } }}>
                       <TableCell padding="checkbox" sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)', verticalAlign: 'top', pt: 2.5 }}>
-                        <Checkbox
-                          color="primary"
-                          checked={isItemSelected}
-                          onChange={() => handleClick(row.id)}
-                          icon={<CheckBoxOutlineBlankIcon sx={{ color: '#64748b' }} />}
-                          checkedIcon={<CheckBoxIcon sx={{ color: '#3b82f6' }} />}
-                        />
+                        <Checkbox color="primary" checked={isItemSelected} onChange={() => handleClick(row.id)} icon={<CheckBoxOutlineBlankIcon sx={{ color: '#64748b' }} />} checkedIcon={<CheckBoxIcon sx={{ color: '#3b82f6' }} />} />
                       </TableCell>
                       <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)', verticalAlign: 'top', pt: 3 }}>
                         <Stack spacing={1}>
-                          <Chip label={row.status} size="small" sx={{
-                            fontWeight: 'bold', width: 'fit-content',
-                            color: statusColors.color,
-                            bgcolor: statusColors.bgcolor
-                          }}/>
+                          <Chip label={row.status} size="small" sx={{ fontWeight: 'bold', width: 'fit-content', color: statusColors.color, bgcolor: statusColors.bgcolor }}/>
                           <Typography variant="body2" sx={{ fontWeight: 700, color: '#f8fafc' }}>{row.customer_name}</Typography>
                           <Typography variant="caption" sx={{ color: '#94a3b8' }}>{row.channel}</Typography>
                           <Typography variant="caption" sx={{ color: '#64748b', fontFamily: 'monospace' }}>{row.order_number}</Typography>
@@ -326,29 +278,11 @@ export default function ChannelsWorkspacePage() {
                       </TableCell>
                       <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)', verticalAlign: 'top', pt: 3 }}>
                         <Box sx={{ bgcolor: 'rgba(15, 23, 42, 0.4)', p: 2, borderRadius: '8px', height: '100%' }}>
-                          <Typography variant="body2" sx={{ color: '#cbd5e1', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
-                            {row.content}
-                          </Typography>
+                          <Typography variant="body2" sx={{ color: '#cbd5e1', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{row.content}</Typography>
                         </Box>
                       </TableCell>
                       <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)', verticalAlign: 'top', pt: 3 }}>
-                        <TextField
-                          multiline
-                          fullWidth
-                          minRows={3}
-                          maxRows={8}
-                          value={replyTexts[row.id] !== undefined ? replyTexts[row.id] : ''}
-                          onChange={(e) => handleReplyChange(row.id, e.target.value)}
-                          placeholder="답변을 작성해주세요."
-                          sx={{
-                            '& .MuiOutlinedInput-root': {
-                              bgcolor: 'rgba(15, 23, 42, 0.8)', color: '#f8fafc', borderRadius: '8px', fontSize: '0.875rem',
-                              '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' },
-                              '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.2)' },
-                              '&.Mui-focused fieldset': { borderColor: '#3b82f6' },
-                            }
-                          }}
-                        />
+                        <TextField multiline fullWidth minRows={3} maxRows={8} value={replyTexts[row.id] !== undefined ? replyTexts[row.id] : ''} onChange={(e) => handleReplyChange(row.id, e.target.value)} placeholder="답변을 작성해주세요." sx={{ '& .MuiOutlinedInput-root': { bgcolor: 'rgba(15, 23, 42, 0.8)', color: '#f8fafc', borderRadius: '8px', fontSize: '0.875rem', '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' }, '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.2)' }, '&.Mui-focused fieldset': { borderColor: '#3b82f6' }, } }} />
                         {row.ai_draft && !row.admin_reply && (
                           <Typography variant="caption" sx={{ color: '#8b5cf6', display: 'flex', alignItems: 'center', gap: 0.5, mt: 1 }}>
                             <AutoAwesomeIcon sx={{ fontSize: 14 }} /> AI가 작성한 초안입니다.
@@ -363,17 +297,7 @@ export default function ChannelsWorkspacePage() {
               )}
             </TableBody>
           </Table>
-          <TablePagination
-            component="div"
-            count={filteredData.length}
-            page={page}
-            onPageChange={(e, newPage) => setPage(newPage)}
-            rowsPerPage={rowsPerPage}
-            onRowsPerPageChange={(e) => { setRowsPerPage(parseInt(e.target.value, 10)); setPage(0); }}
-            rowsPerPageOptions={[5, 10, 25, 50]}
-            labelRowsPerPage="페이지당 항목 수:"
-            sx={{ color: '#94a3b8', borderTop: '1px solid rgba(255,255,255,0.1)' }}
-          />
+          <TablePagination component="div" count={filteredData.length} page={page} onPageChange={(e, newPage) => setPage(newPage)} rowsPerPage={rowsPerPage} onRowsPerPageChange={(e) => { setRowsPerPage(parseInt(e.target.value, 10)); setPage(0); }} rowsPerPageOptions={[5, 10, 25, 50]} labelRowsPerPage="페이지당 항목 수:" sx={{ color: '#94a3b8', borderTop: '1px solid rgba(255,255,255,0.1)' }} />
         </TableContainer>
       </Container>
     </Box>
