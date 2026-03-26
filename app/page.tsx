@@ -32,8 +32,8 @@ import {
 const CHANNEL_MAP: Record<string, string> = {
   '스마트 스토어': '네이버',
   '스마트스토어': '네이버',
-  'ems 지마켓': '이베이',
-  'ems 옥션': '이베이',
+  'ESM지마켓': '이베이',
+  'ESM옥션': '이베이',
   '카카오톡스토어': '톡스토어',
   '카카오 지그재그': '지그재그',
 };
@@ -84,14 +84,14 @@ const getSabangnetOrderUrl = (orderNumber?: string) => {
   return `https://sbadmin15.sabangnet.co.kr/#/popup/views/pages/order/order-confirm?searchCondition=order_id&searchKeyword=${orderNumber}&svcAcntId=mw141500&mode=search&prdNmDiv=prod_nm&startDate=${startDate}&endDate=${endDate}&amtDiv=total_cost&menuNo=938`;
 };
 
-// 💡 [추가] 운송장 번호 포맷터 (4자리마다 하이픈 추가)
+// 운송장 번호 포맷터 (4자리마다 하이픈 추가)
 const formatTrackingNumber = (num?: string) => {
   if (!num) return '';
-  const cleaned = num.replace(/\D/g, ''); // 숫자 이외 제거
-  return cleaned.replace(/(\d{4})(?=\d)/g, '$1-').replace(/-$/, ''); // 마지막 하이픈 제거
+  const cleaned = num.replace(/\D/g, ''); 
+  return cleaned.replace(/(\d{4})(?=\d)/g, '$1-').replace(/-$/, ''); 
 };
 
-// 💡 [추가] 택배사 조회 링크 생성기 (채널별 분기)
+// 택배사 조회 링크 생성기
 const getTrackingUrl = (channel: string, trackingNum?: string) => {
   if (!trackingNum) return '#';
   const cleanNum = trackingNum.replace(/\D/g, '');
@@ -296,7 +296,7 @@ export default function IntegratedDashboardPage() {
             <Typography variant="caption" sx={{ color: '#64748b', ml: 1, letterSpacing: '1px' }}>INTEGRATED WORKSPACE</Typography>
           </Box>
           <Stack direction="row" spacing={2}>
-            <Button onClick={() => router.push('/status')} sx={{ color: '#cbd5e1', fontWeight: 600 }}>현황 및 수집(업로드)</Button>
+            <Button onClick={() => router.push('/status')} sx={{ color: '#cbd5e1', fontWeight: 600 }}>문의현황</Button>
           </Stack>
         </Container>
       </Box>
@@ -396,44 +396,53 @@ export default function IntegratedDashboardPage() {
                         <Checkbox checked={isMainSelected} onChange={() => handleClick(mainItem.id)} sx={{ color: '#64748b', '&.Mui-checked': { color: '#3b82f6' }, p: 0.5 }} />
                       </Box>
                       <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <Stack direction="row" spacing={1} alignItems="center">
-                            <Chip label={standardChannel} size="small" sx={{ bgcolor: 'rgba(255,255,255,0.1)', color: '#f8fafc', fontWeight: 600, borderRadius: '6px', height: '24px' }} />
-                            <Chip label={mainItem.status} size="small" sx={{ bgcolor: mainStatusColor.bg, color: mainStatusColor.color, fontWeight: 700, borderRadius: '6px', height: '24px' }} />
-                          </Stack>
-                          <Typography variant="caption" sx={{ color: '#94a3b8' }}>
-                            문의일시: {getDisplayTime(mainItem.inquiry_date, mainItem.collected_at)}
-                          </Typography>
-                        </Box>
                         
-                        <Box>
-                          <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#f8fafc', mb: 0.5 }}>
-                            {mainItem.customer_name} 
-                            <span style={{ color: '#64748b', fontWeight: 400, marginLeft: '8px' }}>
-                              | 주문번호: 
-                              {/* 🌟 사방넷 다이렉트 팝업 링크 🌟 */}
+                        {/* 🌟 수정된 상단 1줄 요약 영역 🌟 */}
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+                            {/* 1. 문의자 (고객명) */}
+                            <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#f8fafc' }}>
+                              {mainItem.customer_name}
+                            </Typography>
+
+                            <Divider orientation="vertical" flexItem sx={{ borderColor: 'rgba(255,255,255,0.2)', my: 0.5 }} />
+
+                            {/* 2. 주문번호 */}
+                            <Typography variant="body2" sx={{ color: '#94a3b8', display: 'flex', alignItems: 'center' }}>
+                              주문번호: 
                               {mainItem.order_number && mainItem.order_number !== '-' ? (
                                 <MuiLink 
                                   href={getSabangnetOrderUrl(mainItem.order_number)} 
                                   target="_blank" 
                                   rel="noopener noreferrer"
-                                  sx={{ 
-                                    color: '#3b82f6', ml: 0.5, textDecoration: 'none',
-                                    '&:hover': { textDecoration: 'underline' }
-                                  }}
+                                  sx={{ color: '#3b82f6', ml: 0.5, fontWeight: 600, textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
                                 >
                                   {mainItem.order_number}
                                 </MuiLink>
                               ) : (
                                 <span style={{ marginLeft: '4px' }}>-</span>
                               )}
-                            </span>
-                          </Typography>
+                            </Typography>
 
-                          {/* 💡 새로 추가된 사방넷 데이터 표기 영역 (한 줄 표기) */}
+                            {/* 3. 쇼핑몰 & 상태 */}
+                            <Stack direction="row" spacing={1} alignItems="center" sx={{ ml: 0.5 }}>
+                              <Chip label={standardChannel} size="small" sx={{ bgcolor: 'rgba(255,255,255,0.1)', color: '#f8fafc', fontWeight: 600, borderRadius: '4px', height: '22px', fontSize: '0.7rem' }} />
+                              <Chip label={mainItem.status} size="small" sx={{ bgcolor: mainStatusColor.bg, color: mainStatusColor.color, fontWeight: 700, borderRadius: '4px', height: '22px', fontSize: '0.7rem' }} />
+                            </Stack>
+                          </Box>
+
+                          {/* 우측 끝: 문의시간 */}
+                          <Typography variant="caption" sx={{ color: '#64748b' }}>
+                            문의 일시 : {getDisplayTime(mainItem.inquiry_date, mainItem.collected_at)}
+                          </Typography>
+                        </Box>
+                        {/* 🌟 요약 영역 끝 🌟 */}
+                        
+                        <Box>
+                          {/* 💡 사방넷 상세 데이터 표기 영역 (수령인 / 연락처 / 주소 / 송장) */}
                           {(mainItem.receiver_name || mainItem.receiver_tel || mainItem.tracking_number || mainItem.shipping_address) && (
                             <Box sx={{ 
-                              mt: 1, p: 1, px: 1.5, 
+                              mt: 0.5, p: 1, px: 1.5, 
                               bgcolor: 'rgba(15, 23, 42, 0.4)', 
                               borderRadius: '8px', 
                               border: '1px solid rgba(59, 130, 246, 0.1)', 
