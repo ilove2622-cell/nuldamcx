@@ -31,8 +31,7 @@ export async function POST(req: Request) {
     const response = await fetch(sabangnetApiUrl, { method: 'GET' });
     if (!response.ok) throw new Error(`사방넷 서버 오류: ${response.status}`);
 
-    const arrayBuffer = await response.arrayBuffer();
-    const decodedXml = iconv.decode(Buffer.from(arrayBuffer), 'euc-kr'); // 결과는 EUC-KR로 옴
+    const decodedXml = await response.text();
 
     const parser = new XMLParser({ ignoreAttributes: true, isArray: (name) => name === 'DATA' });
     const jsonObj = parser.parse(decodedXml);
