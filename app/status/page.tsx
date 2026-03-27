@@ -24,6 +24,7 @@ import {
   ListAlt as ListAltIcon,
   PieChart as PieChartIcon
 } from '@mui/icons-material';
+import router from 'next/router';
 
 // ==========================================
 // 🌟 1. 타입 정의
@@ -132,6 +133,26 @@ export default function StatusPage() {
     };
     fetchTrendData();
   }, [viewMode]);
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session || session.user.email !== 'cx@joinandjoin.com') {
+        router.replace('/login');
+      }
+    };
+    checkAuth();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT' || !session || session.user.email !== 'cx@joinandjoin.com') {
+        router.replace('/login');
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [router]);
 
   // ==========================================
   // 📡 4. 데이터 페칭 (상세 현황)

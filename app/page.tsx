@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
-// 💡 [수정] siteMapper 임포트 제거, 필요한 상수만 임포트
+// 💡 상수 및 정규화 함수 임포트
 import { CHANNEL_URL_MAP, STATUS_OPTIONS, MALL_OPTIONS, CHANNEL_MAP } from '@/lib/constants';
 
 // MUI Components
@@ -34,8 +34,6 @@ import {
 // 🌟 1. 상수 및 헬퍼 함수
 // ==========================================
 
-
-// 💡 siteMapper 대신 원래의 간단한 매핑 함수 사용
 const getStandardChannelName = (rawName: string) => CHANNEL_MAP[rawName] || rawName;
 
 // 어드민 접속 URL 가져오기
@@ -101,7 +99,7 @@ const formatTrackingNumber = (num?: string) => {
 const getTrackingUrl = (channel: string, trackingNum?: string) => {
   if (!trackingNum) return '#';
   const cleanNum = trackingNum.replace(/\D/g, '');
-  const standardChannel = getStandardChannelName(channel); // 💡 정규화 함수 변경
+  const standardChannel = getStandardChannelName(channel);
   
   if (standardChannel === '네이버' || standardChannel === '이베이') {
     return `https://trace.cjlogistics.com/next/tracking.html?wblNo=${cleanNum}`;
@@ -191,12 +189,32 @@ export default function IntegratedDashboardPage() {
 
   useEffect(() => { fetchDataAndCounts(); }, []);
 
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session || session.user.email !== 'cx@joinandjoin.com') {
+        router.replace('/login');
+      }
+    };
+    checkAuth();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT' || !session || session.user.email !== 'cx@joinandjoin.com') {
+        router.replace('/login');
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [router]);
+
   // ==========================================
   // 🎯 4. 필터링, 정렬, 그룹화
   // ==========================================
   const filteredData = useMemo(() => {
     return allData.filter(item => {
-      const standardChannel = getStandardChannelName(item.channel); // 💡 정규화 함수 변경
+      const standardChannel = getStandardChannelName(item.channel);
       if (filterStatus !== '전체' && item.status !== filterStatus) return false;
       if (filterMall !== '전체') {
         if (filterMall === '기타') {
@@ -439,7 +457,7 @@ export default function IntegratedDashboardPage() {
               const expanded = !!expandedGroups[groupKey];
               
               const isMainSelected = selectedIds.includes(mainItem.id);
-              const standardChannel = getStandardChannelName(mainItem.channel); // 💡 정규화 함수 변경 적용
+              const standardChannel = getStandardChannelName(mainItem.channel);
               const mainStatusColor = getStatusColor(mainItem.status);
               const channelAdminUrl = getChannelUrl(standardChannel);
 
@@ -460,7 +478,6 @@ export default function IntegratedDashboardPage() {
                             </Typography>
                             <Divider orientation="vertical" flexItem sx={{ borderColor: 'rgba(255,255,255,0.2)', my: 0.5 }} />
                             
-                            {/* 💡 주문번호와 상품명이 함께 표시되는 부분 */}
                             <Typography variant="body2" sx={{ color: '#94a3b8', display: 'flex', alignItems: 'center', flexWrap: 'wrap' }}>
                               주문번호: 
                               {mainItem.order_number && mainItem.order_number !== '-' ? (
@@ -576,7 +593,8 @@ export default function IntegratedDashboardPage() {
                             multiline fullWidth minRows={2} maxRows={6} size="small" 
                             value={replyTexts[mainItem.id] !== undefined ? replyTexts[mainItem.id] : ''} 
                             onChange={(e) => handleReplyChange(mainItem.id, e.target.value)} 
-                            placeholder="답변 작성" 
+                            placeholder={mainItem.status === '처리완료' ? "처리 완료된 문의입니다." : "답변 작성"}
+                            disabled={mainItem.status === '처리완료'}
                             sx={{ 
                               '& .MuiOutlinedInput-root': { 
                                 bgcolor: 'rgba(15, 23, 42, 0.8)', color: '#f8fafc', borderRadius: '8px', fontSize: '0.85rem', p: 1.5, pr: 12,
@@ -590,7 +608,7 @@ export default function IntegratedDashboardPage() {
                           <Button
                             size="small"
                             variant="contained"
-                            disabled={isGeneratingAI[mainItem.id]}
+                            disabled={isGeneratingAI[mainItem.id] || mainItem.status === '처리완료'}
                             onClick={() => handleGenerateAI(mainItem.id)}
                             startIcon={isGeneratingAI[mainItem.id] ? <CircularProgress size={12} color="inherit" /> : <SmartToyIcon sx={{ fontSize: 16 }} />}
                             sx={{
@@ -631,7 +649,7 @@ export default function IntegratedDashboardPage() {
                               {subItems.map(subItem => {
                                 const isSubSelected = selectedIds.includes(subItem.id);
                                 const subStatusColor = getStatusColor(subItem.status);
-                                const subChannelAdminUrl = getChannelUrl(getStandardChannelName(subItem.channel)); // 💡 정규화 함수 변경 적용
+                                const subChannelAdminUrl = getChannelUrl(getStandardChannelName(subItem.channel)); 
 
                                 return (
                                   <Box key={subItem.id} sx={{ display: 'flex', gap: 1.5 }}>
@@ -653,7 +671,8 @@ export default function IntegratedDashboardPage() {
                                           fullWidth minRows={1} maxRows={4} size="small" 
                                           value={replyTexts[subItem.id] !== undefined ? replyTexts[subItem.id] : ''} 
                                           onChange={(e) => handleReplyChange(subItem.id, e.target.value)} 
-                                          placeholder="답변 작성" 
+                                          placeholder={subItem.status === '처리완료' ? "처리 완료된 문의입니다." : "답변 작성"}
+                                          disabled={subItem.status === '처리완료'}
                                           sx={{ 
                                             '& .MuiOutlinedInput-root': { 
                                               bgcolor: 'rgba(15, 23, 42, 0.4)', color: '#94a3b8', borderRadius: '8px', fontSize: '0.8rem', p: 1, pr: 12,
@@ -663,7 +682,7 @@ export default function IntegratedDashboardPage() {
                                         />
                                         <Button
                                           size="small"
-                                          disabled={isGeneratingAI[subItem.id]}
+                                          disabled={isGeneratingAI[subItem.id] || subItem.status === '처리완료'}
                                           onClick={() => handleGenerateAI(subItem.id)}
                                           startIcon={isGeneratingAI[subItem.id] ? <CircularProgress size={10} color="inherit" /> : <SmartToyIcon sx={{ fontSize: 14 }} />}
                                           sx={{
