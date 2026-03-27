@@ -322,7 +322,7 @@ export default function IntegratedDashboardPage() {
           customerName: item.customer_name || '-',
           tel: item.receiver_tel || '-',
           address: item.shipping_address || '-', 
-          trackingNumber: item.tracking_number || '-', 
+          trackingNumber: item.tracking_number ? formatTrackingNumber(item.tracking_number) : '-',
         })
       });
       const data = await res.json();
@@ -345,7 +345,6 @@ export default function IntegratedDashboardPage() {
     }
   };
 
-  
   const handleGenerateAI = async (id: string) => {
     setIsGeneratingAI(prev => ({ ...prev, [id]: true }));
     try {

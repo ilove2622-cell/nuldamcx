@@ -4,7 +4,6 @@ import { google } from 'googleapis';
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    
     const { channel, orderNumber, customerName, tel, address, trackingNumber } = body;
 
     const auth = new google.auth.GoogleAuth({
@@ -30,28 +29,25 @@ export async function POST(req: Request) {
     });
     
     const numRows = getRes.data.values ? getRes.data.values.length : 0;
-    
     const nextRow = Math.max(numRows + 1, 4); 
 
     const rowData = [
-      "",               // A열: No (비워둠)
       channel,          // B열: 주문사이트
       orderNumber,      // C열: 주문번호
       customerName,     // D열: 성함
       tel,              // E열: 연락처
       address,          // F열: 주소
-      "1",              // G열: 건수 (무조건 1로 고정)
-      "",               // H열: 상품명 (비워둠)
-      "",               // I열: 문의내용 (비워둠)
-      trackingNumber,   // J열: 특이사항 (운송장 번호 꽂아넣기)
+      "1",              // G열: 건수
+      "",               // H열: 상품명
+      "",               // I열: 문의내용
+      trackingNumber,   // J열: 특이사항 (운송장 번호)
       "",               // K열: 비고
       ""                // L열: 담당자
     ];
 
-    
     const response = await sheets.spreadsheets.values.update({
       spreadsheetId,
-      range: `${tabName}!A${nextRow}:L${nextRow}`, 
+      range: `${tabName}!B${nextRow}:L${nextRow}`, 
       valueInputOption: 'USER_ENTERED',
       requestBody: {
         values: [rowData],
