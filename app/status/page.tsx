@@ -72,7 +72,7 @@ export default function StatusPage() {
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
   // ==========================================
-  // 📡 3. 데이터 페칭 (트렌드 차트 & 보안)
+  // 📡 3. 데이터 페칭 (트렌드 차트 - 총합 반영)
   // ==========================================
   useEffect(() => {
     const fetchTrendData = async () => {
@@ -91,38 +91,66 @@ export default function StatusPage() {
         startStr = `${getLocalYYYYMMDD(past6Months)} 00:00:00`;
       }
 
-      const { data, error } = await supabase
+      // 💡 [수정] 1. 봇이 수집한 '자동 건수' 가져오기
+      const { data: autoData, error: autoError } = await supabase
         .from('inquiries')
         .select('inquiry_date')
         .gte('inquiry_date', startStr)
         .lte('inquiry_date', endStr);
 
-      if (!error && data) {
-        const countMap: Record<string, number> = {};
-        data.forEach(item => {
+      // 💡 [수정] 2. 사람이 추가한 '수기 건수' 가져오기
+      const { data: manualData, error: manualError } = await supabase
+        .from('daily_stats')
+        .select('date, stats')
+        .gte('date', startStr.split(' ')[0])
+        .lte('date', endStr.split(' ')[0]);
+
+      // 3. 날짜별 자동 건수 합산
+      const countMap: Record<string, number> = {};
+      if (!autoError && autoData) {
+        autoData.forEach(item => {
           const dateOnly = item.inquiry_date.split(' ')[0].split('T')[0]; 
           const key = viewMode === 'daily' ? dateOnly : dateOnly.substring(0, 7);
           countMap[key] = (countMap[key] || 0) + 1;
         });
-
-        const newTrend: TrendData[] = [];
-        if (viewMode === 'daily') {
-          for (let i = 13; i >= 0; i--) {
-            const d = new Date();
-            d.setDate(today.getDate() - i);
-            const dStr = getLocalYYYYMMDD(d);
-            newTrend.push({ id: dStr, label: `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`, count: countMap[dStr] || 0 });
-          }
-        } else {
-          for (let i = 5; i >= 0; i--) {
-            const d = new Date();
-            d.setMonth(today.getMonth() - i);
-            const mStr = getLocalYYYYMMDD(d).substring(0, 7);
-            newTrend.push({ id: mStr, label: `${d.getMonth() + 1}월`, count: countMap[mStr] || 0 });
-          }
-        }
-        setTrendData(newTrend);
       }
+
+      // 4. 날짜별 수기 건수 합산
+      const manualCountMap: Record<string, number> = {};
+      if (!manualError && manualData) {
+        manualData.forEach(item => {
+          const dateOnly = item.date;
+          const key = viewMode === 'daily' ? dateOnly : dateOnly.substring(0, 7);
+          
+          let dayManualTotal = 0;
+          if (item.stats && Array.isArray(item.stats)) {
+            // 해당 날짜의 채널별 수기 건수(manualCount)를 모두 더함
+            dayManualTotal = item.stats.reduce((acc: number, stat: any) => acc + (stat.manualCount || 0), 0);
+          }
+          manualCountMap[key] = (manualCountMap[key] || 0) + dayManualTotal;
+        });
+      }
+
+      // 💡 [수정] 5. 자동 건수 + 수기 건수를 더해서 최종 그래프 데이터 만들기!
+      const newTrend: TrendData[] = [];
+      if (viewMode === 'daily') {
+        for (let i = 13; i >= 0; i--) {
+          const d = new Date();
+          d.setDate(today.getDate() - i);
+          const dStr = getLocalYYYYMMDD(d);
+          const total = (countMap[dStr] || 0) + (manualCountMap[dStr] || 0); // 💡 합체!
+          newTrend.push({ id: dStr, label: `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`, count: total });
+        }
+      } else {
+        for (let i = 5; i >= 0; i--) {
+          const d = new Date();
+          d.setMonth(today.getMonth() - i);
+          const mStr = getLocalYYYYMMDD(d).substring(0, 7);
+          const total = (countMap[mStr] || 0) + (manualCountMap[mStr] || 0); // 💡 합체!
+          newTrend.push({ id: mStr, label: `${d.getMonth() + 1}월`, count: total });
+        }
+      }
+      setTrendData(newTrend);
     };
     fetchTrendData();
   }, [viewMode]);
@@ -238,7 +266,7 @@ export default function StatusPage() {
         });
 
         if (error) throw error;
-        alert('✅ 수기 데이터가 안전하게 저장되었습니다!');
+        alert('✅ 수기 데이터가 안전하게 저장되었습니다!\n(새로고침을 하거나 날짜를 다시 누르면 그래프에 반영됩니다.)');
       } catch (error) {
         console.error('저장 에러:', error);
         alert('❌ 저장에 실패했습니다.');
@@ -412,12 +440,10 @@ export default function StatusPage() {
                             variant="standard" value={callStats.inflow === 0 ? '' : callStats.inflow} placeholder="0" type="number"
                             onChange={(e) => setCallStats({...callStats, inflow: Number(e.target.value)})}
                             onKeyDown={handleKeyDown} 
-                            // 💡 [추가] 마우스 휠 스크롤 방지
                             onWheel={(e) => (e.target as HTMLElement).blur()}
                             InputProps={{ disableUnderline: true, style: { fontSize: '1.5rem', fontWeight: 800, color: '#f8fafc' } }}
                             sx={{ 
                               width: '80px',
-                              // 💡 [추가] 보기 싫은 위아래 화살표 싹 숨기기
                               '& input[type=number]::-webkit-inner-spin-button, & input[type=number]::-webkit-outer-spin-button': { WebkitAppearance: 'none', margin: 0 },
                               '& input[type=number]': { MozAppearance: 'textfield' }
                             }}
@@ -435,12 +461,10 @@ export default function StatusPage() {
                             variant="standard" value={callStats.response === 0 ? '' : callStats.response} placeholder="0" type="number"
                             onChange={(e) => setCallStats({...callStats, response: Number(e.target.value)})}
                             onKeyDown={handleKeyDown} 
-                            // 💡 [추가] 마우스 휠 스크롤 방지
                             onWheel={(e) => (e.target as HTMLElement).blur()}
                             InputProps={{ disableUnderline: true, style: { fontSize: '1.5rem', fontWeight: 800, color: '#10b981' } }}
                             sx={{ 
                               width: '80px',
-                              // 💡 [추가] 보기 싫은 위아래 화살표 싹 숨기기
                               '& input[type=number]::-webkit-inner-spin-button, & input[type=number]::-webkit-outer-spin-button': { WebkitAppearance: 'none', margin: 0 },
                               '& input[type=number]': { MozAppearance: 'textfield' }
                             }}
@@ -474,44 +498,37 @@ export default function StatusPage() {
                           
                           return (
                             <TableRow key={stat.name} sx={{ '&:last-child td, &:last-child th': { border: 0 }, '&:hover': { bgcolor: 'rgba(255,255,255,0.02)' } }}>
-                              {/* 1. 채널명 */}
                               <TableCell sx={{ py: 1.5, borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
                                 <Typography variant="caption" sx={{ fontWeight: 600, color: '#e2e8f0' }}>{stat.name}</Typography>
                               </TableCell>
                               
-                              {/* 2. 자동 건수 (수정 불가) */}
                               <TableCell align="center" sx={{ py: 1.5, borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
                                 <Typography variant="caption" sx={{ fontWeight: 700, color: stat.autoCount > 0 ? '#94a3b8' : 'rgba(148,163,184,0.3)' }}>{stat.autoCount}</Typography>
                               </TableCell>
                               
-                              {/* 3. 수기 추가 건수 (수정 가능) */}
                               <TableCell align="center" sx={{ py: 1.5, borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
                                 <TextField
                                   variant="outlined" size="small" type="number" placeholder="0"
                                   value={stat.manualCount === 0 ? '' : stat.manualCount} 
                                   onChange={(e) => handleStatChange(index, 'manualCount', e.target.value)}
                                   onKeyDown={handleKeyDown} 
-                                  // 💡 [추가] 마우스 휠 스크롤 방지
                                   onWheel={(e) => (e.target as HTMLElement).blur()}
                                   inputProps={{ style: { textAlign: 'center', fontWeight: 800, fontSize: '0.8rem', color: '#3b82f6', padding: '4px 6px' } }}
                                   sx={{ 
                                     width: '55px', 
                                     '& .MuiOutlinedInput-root': { bgcolor: 'rgba(59, 130, 246, 0.1)', borderRadius: '6px', '& fieldset': { borderColor: 'transparent' }, '&:hover fieldset': { borderColor: '#3b82f6' } },
-                                    // 💡 [추가] 보기 싫은 위아래 화살표 싹 숨기기
                                     '& input[type=number]::-webkit-inner-spin-button, & input[type=number]::-webkit-outer-spin-button': { WebkitAppearance: 'none', margin: 0 },
                                     '& input[type=number]': { MozAppearance: 'textfield' }
                                   }}
                                 />
                               </TableCell>
                               
-                              {/* 4. 총 합계 */}
                               <TableCell align="center" sx={{ py: 1.5, borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
                                 <Typography variant="caption" sx={{ fontWeight: 800, color: rowTotal > 0 ? '#10b981' : 'rgba(16,185,129,0.3)', fontSize: '0.8rem' }}>
                                   {rowTotal}
                                 </Typography>
                               </TableCell>
 
-                              {/* 5. 이슈 기재 */}
                               <TableCell sx={{ py: 1.5, borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
                                 <TextField
                                   fullWidth variant="outlined" size="small" placeholder="이슈 입력 후 엔터"
