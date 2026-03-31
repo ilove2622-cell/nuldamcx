@@ -1,8 +1,7 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
-// 💡 [수정] next/router 삭제하고 next/navigation에서 useRouter 가져오기
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
@@ -14,7 +13,7 @@ import { normalizeSiteName } from '@/lib/siteMapper';
 import {
   Box, Container, Typography, IconButton, TextField, Stack,
   Card, CardContent, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper,
-  Chip, Fade, ToggleButton, ToggleButtonGroup, CircularProgress // 💡 CircularProgress 추가
+  Chip, Fade, ToggleButton, ToggleButtonGroup, CircularProgress
 } from '@mui/material';
 
 // MUI Icons
@@ -24,26 +23,25 @@ import {
   HeadsetMic as HeadsetIcon,
   BarChart as BarChartIcon,
   ListAlt as ListAltIcon,
-  PieChart as PieChartIcon
+  AddCircleOutline as AddIcon
 } from '@mui/icons-material';
 
-
 // ==========================================
-// 🌟 1. 타입 정의
+// 🌟 1. 타입 정의 (수기/자동 분리)
 // ==========================================
 interface StatData {
   name: string;
-  count: number;
-  issue: string; // 수기 입력용
+  autoCount: number;   // 💡 [추가] 봇이 물어온 자동 수집 건수
+  manualCount: number; // 💡 [추가] 담당자가 수기로 입력한 건수
+  issue: string;
 }
 
 interface TrendData {
-  id: string;   // 일별: YYYY-MM-DD, 월별: YYYY-MM
-  label: string; // 일별: MM-DD, 월별: M월
+  id: string;   
+  label: string; 
   count: number;
 }
 
-// 현지 시간 기준 YYYY-MM-DD 생성 헬퍼
 const getLocalYYYYMMDD = (d: Date) => {
   const yyyy = d.getFullYear();
   const mm = String(d.getMonth() + 1).padStart(2, '0');
@@ -55,7 +53,7 @@ const getLocalYYYYMMDD = (d: Date) => {
 // 🌟 2. 메인 컴포넌트
 // ==========================================
 export default function StatusPage() {
-  const router = useRouter(); // 💡 라우터 초기화
+  const router = useRouter(); 
   
   const todayDate = getLocalYYYYMMDD(new Date());
   const thisMonth = todayDate.substring(0, 7);
@@ -65,18 +63,18 @@ export default function StatusPage() {
   const [targetMonth, setTargetMonth] = useState(thisMonth);
   
   const [trendData, setTrendData] = useState<TrendData[]>([]);
+  
+  // 💡 [초기값 수정] autoCount와 manualCount로 나눔
   const [currentStats, setCurrentStats] = useState<StatData[]>(
-    DISPLAY_CHANNELS.map(name => ({ name, count: 0, issue: '' }))
+    DISPLAY_CHANNELS.map(name => ({ name, autoCount: 0, manualCount: 0, issue: '' }))
   );
   
   const [callStats, setCallStats] = useState({ inflow: 0, response: 0 });
   const [loading, setLoading] = useState(true);
-  
-  // 💡 [핵심] 인증 확인 상태 추가
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
   // ==========================================
-  // 📡 3. 데이터 페칭 (트렌드 차트)
+  // 📡 3. 데이터 페칭 (트렌드 차트 & 보안)
   // ==========================================
   useEffect(() => {
     const fetchTrendData = async () => {
@@ -103,36 +101,26 @@ export default function StatusPage() {
 
       if (!error && data) {
         const countMap: Record<string, number> = {};
-        
         data.forEach(item => {
-          const dateOnly = item.inquiry_date.split(' ')[0].split('T')[0]; // YYYY-MM-DD
-          const key = viewMode === 'daily' ? dateOnly : dateOnly.substring(0, 7); // YYYY-MM-DD or YYYY-MM
+          const dateOnly = item.inquiry_date.split(' ')[0].split('T')[0]; 
+          const key = viewMode === 'daily' ? dateOnly : dateOnly.substring(0, 7);
           countMap[key] = (countMap[key] || 0) + 1;
         });
 
         const newTrend: TrendData[] = [];
-        
         if (viewMode === 'daily') {
           for (let i = 13; i >= 0; i--) {
             const d = new Date();
             d.setDate(today.getDate() - i);
             const dStr = getLocalYYYYMMDD(d);
-            newTrend.push({
-              id: dStr,
-              label: `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`,
-              count: countMap[dStr] || 0
-            });
+            newTrend.push({ id: dStr, label: `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`, count: countMap[dStr] || 0 });
           }
         } else {
           for (let i = 5; i >= 0; i--) {
             const d = new Date();
             d.setMonth(today.getMonth() - i);
             const mStr = getLocalYYYYMMDD(d).substring(0, 7);
-            newTrend.push({
-              id: mStr,
-              label: `${d.getMonth() + 1}월`,
-              count: countMap[mStr] || 0
-            });
+            newTrend.push({ id: mStr, label: `${d.getMonth() + 1}월`, count: countMap[mStr] || 0 });
           }
         }
         setTrendData(newTrend);
@@ -141,80 +129,99 @@ export default function StatusPage() {
     fetchTrendData();
   }, [viewMode]);
 
-  // 💡 [수정] 보안 검증 로직에 isCheckingAuth 적용
   useEffect(() => {
     const checkAuth = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session || session?.user?.email !== 'cx@joinandjoin.com') {
         router.replace('/login');
       } else {
-        setIsCheckingAuth(false); // 인증 성공 시에만 화면 열어줌
+        setIsCheckingAuth(false);
       }
     };
     checkAuth();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_OUT' || !session || session?.user?.email !== 'cx@joinandjoin.com') {
-        router.replace('/login');
-      }
+      if (event === 'SIGNED_OUT' || !session || session?.user?.email !== 'cx@joinandjoin.com') router.replace('/login');
     });
 
-    return () => {
-      subscription.unsubscribe();
-    };
+    return () => subscription.unsubscribe();
   }, [router]);
 
   // ==========================================
-  // 📡 4. 데이터 페칭 (상세 현황)
+  // 📡 4. 상세 데이터 및 [수기/자동] 병합 페칭
   // ==========================================
-  useEffect(() => {
-    const fetchDetails = async () => {
-      setLoading(true);
-      let startStr = '';
-      let endStr = '';
+  const fetchDetails = useCallback(async () => {
+    setLoading(true);
+    let startStr = '';
+    let endStr = '';
 
-      if (viewMode === 'daily') {
-        startStr = `${targetDate} 00:00:00`;
-        endStr = `${targetDate} 23:59:59`;
-      } else {
-        const [yyyy, mm] = targetMonth.split('-');
-        const lastDay = new Date(Number(yyyy), Number(mm), 0).getDate();
-        startStr = `${targetMonth}-01 00:00:00`;
-        endStr = `${targetMonth}-${lastDay} 23:59:59`;
+    if (viewMode === 'daily') {
+      startStr = `${targetDate} 00:00:00`;
+      endStr = `${targetDate} 23:59:59`;
+    } else {
+      const [yyyy, mm] = targetMonth.split('-');
+      const lastDay = new Date(Number(yyyy), Number(mm), 0).getDate();
+      startStr = `${targetMonth}-01 00:00:00`;
+      endStr = `${targetMonth}-${lastDay} 23:59:59`;
+    }
+
+    // 1. 자동 집계 데이터 가져오기 (고정값)
+    const { data, error } = await supabase.from('inquiries').select('channel').gte('inquiry_date', startStr).lte('inquiry_date', endStr);
+    const autoCounts: Record<string, number> = {};
+    if (!error && data) {
+      data.forEach(row => {
+        const ch = normalizeSiteName(row.channel);
+        autoCounts[ch] = (autoCounts[ch] || 0) + 1;
+      });
+    }
+
+    // 2. DB에 저장된 수기 데이터(daily_stats) 가져오기
+    let savedManualData = null;
+    if (viewMode === 'daily') {
+      const { data: manualData } = await supabase.from('daily_stats').select('*').eq('date', targetDate).maybeSingle();
+      savedManualData = manualData;
+    }
+
+    // 💡 3. 자동/수기 분리 병합 
+    setCurrentStats(DISPLAY_CHANNELS.map(name => {
+      const finalAutoCount = autoCounts[name] || 0;
+      let finalManualCount = 0;
+      let finalIssue = '';
+
+      if (savedManualData?.stats) {
+        const saved = savedManualData.stats.find((s: any) => s.name === name);
+        if (saved) {
+          finalManualCount = saved.manualCount || 0; // 💡 수기 데이터만 따로 빼옴
+          finalIssue = saved.issue || '';
+        }
       }
+      return { name, autoCount: finalAutoCount, manualCount: finalManualCount, issue: finalIssue };
+    }));
 
-      const { data, error } = await supabase
-        .from('inquiries')
-        .select('channel')
-        .gte('inquiry_date', startStr)
-        .lte('inquiry_date', endStr);
+    if (savedManualData) {
+      setCallStats({ inflow: savedManualData.inflow || 0, response: savedManualData.response || 0 });
+    } else {
+      setCallStats({ inflow: 0, response: 0 });
+    }
 
-      if (!error && data) {
-        const counts: Record<string, number> = {};
-        data.forEach(row => {
-          const ch = normalizeSiteName(row.channel);
-          counts[ch] = (counts[ch] || 0) + 1;
-        });
-
-        setCurrentStats(DISPLAY_CHANNELS.map(name => ({
-          name,
-          count: counts[name] || 0,
-          issue: '' 
-        })));
-      }
-      setLoading(false);
-    };
-    fetchDetails();
+    setLoading(false);
   }, [viewMode, targetDate, targetMonth]);
 
+  useEffect(() => {
+    fetchDetails();
+  }, [fetchDetails]);
+
 
   // ==========================================
-  // ⚙️ 5. 계산 및 핸들러
+  // ⚙️ 5. 핸들러 (수기 입력 & DB 저장)
   // ==========================================
-  const handleStatChange = (index: number, field: 'count' | 'issue', value: string) => {
+  const handleStatChange = (index: number, field: 'manualCount' | 'issue', value: string) => {
     const newStats = [...currentStats];
-    if (field === 'count') newStats[index].count = Number(value) || 0;
-    else newStats[index].issue = value;
+    if (field === 'manualCount') {
+      newStats[index].manualCount = value === '' ? 0 : Number(value);
+    } else {
+      newStats[index].issue = value;
+    }
     setCurrentStats(newStats);
   };
 
@@ -222,20 +229,43 @@ export default function StatusPage() {
     if (newView !== null) setViewMode(newView);
   };
 
-  const totalCount = currentStats.reduce((acc, cur) => acc + cur.count, 0);
+  const handleKeyDown = async (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault(); 
+      if (viewMode !== 'daily') return;
+
+      try {
+        const { error } = await supabase.from('daily_stats').upsert({
+          date: targetDate,
+          inflow: callStats.inflow,
+          response: callStats.response,
+          stats: currentStats // 💡 autoCount, manualCount 분리된 채로 DB에 저장됨
+        });
+
+        if (error) throw error;
+        alert('✅ 수기 데이터가 안전하게 저장되었습니다!');
+      } catch (error) {
+        console.error('저장 에러:', error);
+        alert('❌ 저장에 실패했습니다.');
+      }
+    }
+  };
+
+  // 💡 [수정] 합계 계산 = 자동 수집 + 수기 추가
+  const totalCount = currentStats.reduce((acc, cur) => acc + cur.autoCount + cur.manualCount, 0);
   const maxTrendCount = Math.max(...trendData.map(d => d.count), 1);
   
-  // 비중 차트를 위해 건수가 있는 채널만 내림차순 정렬
   const sortedChannels = useMemo(() => {
-    return [...currentStats].filter(s => s.count > 0).sort((a, b) => b.count - a.count);
+    return [...currentStats]
+      .filter(s => (s.autoCount + s.manualCount) > 0)
+      .sort((a, b) => (b.autoCount + b.manualCount) - (a.autoCount + a.manualCount));
   }, [currentStats]);
-  const maxChannelCount = sortedChannels.length > 0 ? sortedChannels[0].count : 1;
+  
+  const maxChannelCount = sortedChannels.length > 0 ? (sortedChannels[0].autoCount + sortedChannels[0].manualCount) : 1;
 
   // ==========================================
   // 🎨 6. 렌더링
   // ==========================================
-  
-  // 💡 [핵심] 인증 완료 전까지는 절대 화면 안 보여주고 뺑글뺑글 로딩만!
   if (isCheckingAuth) {
     return (
       <Box sx={{ minHeight: '100vh', bgcolor: '#0f172a', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
@@ -247,7 +277,6 @@ export default function StatusPage() {
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: '#0f172a', color: '#f8fafc', display: 'flex', flexDirection: 'column' }}>
       
-      {/* 🌟 헤더 영역 */}
       <Box component="header" sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(10px)', bgcolor: 'rgba(15, 23, 42, 0.8)', position: 'sticky', top: 0, zIndex: 50 }}>
         <Container maxWidth="lg" sx={{ py: 1.5 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -262,15 +291,10 @@ export default function StatusPage() {
               </Typography>
             </Box>
             
-            {/* 일별/월별 토글 버튼 */}
             <ToggleButtonGroup
-              value={viewMode}
-              exclusive
-              onChange={handleViewModeChange}
-              size="small"
+              value={viewMode} exclusive onChange={handleViewModeChange} size="small"
               sx={{ 
-                bgcolor: 'rgba(15, 23, 42, 0.6)', 
-                border: '1px solid rgba(255,255,255,0.05)',
+                bgcolor: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255,255,255,0.05)',
                 '& .MuiToggleButton-root': { 
                   color: '#64748b', border: 'none', px: 2, py: 0.5, fontSize: '0.8rem', fontWeight: 600,
                   '&.Mui-selected': { color: '#fff', bgcolor: '#3b82f6', '&:hover': { bgcolor: '#2563eb' } }
@@ -288,9 +312,6 @@ export default function StatusPage() {
         <Fade in={true} timeout={500}>
           <Box>
             
-            {/* ======================================= */}
-            {/* 1. 상단: 트렌드 차트 (날짜/월 선택기 역할) */}
-            {/* ======================================= */}
             <Card elevation={0} sx={{ bgcolor: 'rgba(30, 41, 59, 0.4)', border: '1px solid rgba(255, 255, 255, 0.05)', borderRadius: '12px', mb: 3 }}>
               <Box sx={{ p: 2, px: 3, borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -314,8 +335,7 @@ export default function StatusPage() {
                         onClick={() => viewMode === 'daily' ? setTargetDate(item.id) : setTargetMonth(item.id)}
                         sx={{ 
                           flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', alignItems: 'center', cursor: 'pointer',
-                          height: '100%',
-                          opacity: isSelected ? 1 : 0.6, transition: '0.2s',
+                          height: '100%', opacity: isSelected ? 1 : 0.6, transition: '0.2s',
                           '&:hover': { opacity: 1, '& .bar': { bgcolor: isSelected ? '#3b82f6' : 'rgba(59, 130, 246, 0.5)' } }
                         }}
                       >
@@ -325,15 +345,13 @@ export default function StatusPage() {
                         
                         <Box className="bar" sx={{ 
                           width: '100%', maxWidth: viewMode === 'daily' ? '40px' : '60px', 
-                          height: `${heightPercent}%`, 
-                          bgcolor: isSelected ? '#3b82f6' : 'rgba(255,255,255,0.1)', 
+                          height: `${heightPercent}%`, bgcolor: isSelected ? '#3b82f6' : 'rgba(255,255,255,0.1)', 
                           borderRadius: '4px 4px 0 0', transition: 'height 0.5s ease, background-color 0.2s'
                         }} />
                         
                         <Typography variant="caption" sx={{ mt: 1, fontWeight: 600, color: isSelected ? '#f8fafc' : '#64748b', fontSize: '0.7rem' }}>
                           {item.label}
                         </Typography>
-                        
                         <Box sx={{ width: '20px', height: '2px', bgcolor: isSelected ? '#3b82f6' : 'transparent', mt: 0.5, borderRadius: '2px' }} />
                       </Box>
                     );
@@ -342,44 +360,42 @@ export default function StatusPage() {
               </CardContent>
             </Card>
 
-            {/* ======================================= */}
-            {/* 2. 하단: 좌측(통계 비중) / 우측(수기 작성 폼 - 일별 전용) */}
-            {/* ======================================= */}
             <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 3 }}>
               
-              {/* 👉 좌측 패널: 쇼핑몰별 비중 (항상 표시) */}
+              {/* 👉 좌측 패널: 쇼핑몰별 비중 (통합 합계) */}
               <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
                 <Card elevation={0} sx={{ bgcolor: 'rgba(30, 41, 59, 0.4)', border: '1px solid rgba(255, 255, 255, 0.05)', borderRadius: '12px', flex: 1, minHeight: '300px' }}>
                   <Box sx={{ p: 2, px: 3, borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#f8fafc' }}>
-                      {viewMode === 'daily' ? targetDate : targetMonth} 쇼핑몰 비중
+                      {viewMode === 'daily' ? targetDate : targetMonth} 통합 비중
                     </Typography>
-                    <Chip label={`DB 합계: ${totalCount}건`} size="small" sx={{ bgcolor: 'rgba(16, 185, 129, 0.15)', color: '#10b981', fontWeight: 800 }} />
+                    <Chip label={`총 합계: ${totalCount}건`} size="small" sx={{ bgcolor: 'rgba(16, 185, 129, 0.15)', color: '#10b981', fontWeight: 800 }} />
                   </Box>
                   <CardContent sx={{ p: '20px !important' }}>
                     {sortedChannels.length > 0 ? (
                       <Stack spacing={2}>
-                        {sortedChannels.map((stat) => (
-                          <Box key={stat.name} sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                            <Typography variant="caption" sx={{ width: '90px', fontWeight: 600, color: '#cbd5e1', textAlign: 'right', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                              {stat.name}
-                            </Typography>
-                            <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                              <Box sx={{ flex: 1, bgcolor: 'rgba(15, 23, 42, 0.5)', borderRadius: '6px', height: '14px', position: 'relative', overflow: 'hidden' }}>
-                                <Box 
-                                  sx={{ 
-                                    position: 'absolute', top: 0, left: 0, height: '100%',
-                                    bgcolor: '#60a5fa', width: `${(stat.count / maxChannelCount) * 100}%`,
-                                    transition: 'width 0.8s cubic-bezier(0.4, 0, 0.2, 1)', borderRadius: '6px'
-                                  }} 
-                                />
-                              </Box>
-                              <Typography variant="caption" sx={{ width: '30px', fontWeight: 700, color: '#60a5fa' }}>
-                                {stat.count}
+                        {sortedChannels.map((stat) => {
+                          const itemTotal = stat.autoCount + stat.manualCount;
+                          return (
+                            <Box key={stat.name} sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                              <Typography variant="caption" sx={{ width: '90px', fontWeight: 600, color: '#cbd5e1', textAlign: 'right', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {stat.name}
                               </Typography>
+                              <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                <Box sx={{ flex: 1, bgcolor: 'rgba(15, 23, 42, 0.5)', borderRadius: '6px', height: '14px', position: 'relative', overflow: 'hidden' }}>
+                                  <Box 
+                                    sx={{ 
+                                      position: 'absolute', top: 0, left: 0, height: '100%',
+                                      bgcolor: '#60a5fa', width: `${(itemTotal / maxChannelCount) * 100}%`,
+                                      transition: 'width 0.8s cubic-bezier(0.4, 0, 0.2, 1)', borderRadius: '6px'
+                                    }} 
+                                  />
+                                </Box>
+                                <Typography variant="caption" sx={{ width: '30px', fontWeight: 700, color: '#60a5fa' }}>{itemTotal}</Typography>
+                              </Box>
                             </Box>
-                          </Box>
-                        ))}
+                          );
+                        })}
                       </Stack>
                     ) : (
                       <Box sx={{ py: 6, textAlign: 'center' }}>
@@ -390,18 +406,18 @@ export default function StatusPage() {
                 </Card>
               </Box>
 
-              {/* 👉 우측 패널: 수기 작성 (일별 모드에서만 표시) */}
+              {/* 👉 우측 패널: 수기 작성 (일별 모드 전용) */}
               {viewMode === 'daily' && (
                 <Box sx={{ flex: 1.5, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  
                   <Box sx={{ display: 'flex', gap: 2 }}>
                     <Card elevation={0} sx={{ flex: 1, bgcolor: 'rgba(30, 41, 59, 0.4)', border: '1px solid rgba(255, 255, 255, 0.05)', borderRadius: '12px' }}>
                       <CardContent sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: '16px !important' }}>
                         <Box>
-                          <Typography variant="caption" sx={{ fontWeight: 600, mb: 0.5, color: '#94a3b8', display: 'block' }}>📞 총 유입호 (수기 입력)</Typography>
+                          <Typography variant="caption" sx={{ fontWeight: 600, mb: 0.5, color: '#94a3b8', display: 'block' }}>📞 총 유입호 (입력 후 엔터)</Typography>
                           <TextField
-                            variant="standard" value={callStats.inflow} type="number"
+                            variant="standard" value={callStats.inflow === 0 ? '' : callStats.inflow} placeholder="0" type="number"
                             onChange={(e) => setCallStats({...callStats, inflow: Number(e.target.value)})}
+                            onKeyDown={handleKeyDown} 
                             InputProps={{ disableUnderline: true, style: { fontSize: '1.5rem', fontWeight: 800, color: '#f8fafc' } }}
                             sx={{ width: '80px' }}
                           />
@@ -413,10 +429,11 @@ export default function StatusPage() {
                     <Card elevation={0} sx={{ flex: 1, bgcolor: 'rgba(30, 41, 59, 0.4)', border: '1px solid rgba(255, 255, 255, 0.05)', borderRadius: '12px' }}>
                       <CardContent sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: '16px !important' }}>
                         <Box>
-                          <Typography variant="caption" sx={{ fontWeight: 600, mb: 0.5, color: '#94a3b8', display: 'block' }}>🗣️ 총 응대콜 (수기 입력)</Typography>
+                          <Typography variant="caption" sx={{ fontWeight: 600, mb: 0.5, color: '#94a3b8', display: 'block' }}>🗣️ 총 응대콜 (입력 후 엔터)</Typography>
                           <TextField
-                            variant="standard" value={callStats.response} type="number"
+                            variant="standard" value={callStats.response === 0 ? '' : callStats.response} placeholder="0" type="number"
                             onChange={(e) => setCallStats({...callStats, response: Number(e.target.value)})}
+                            onKeyDown={handleKeyDown} 
                             InputProps={{ disableUnderline: true, style: { fontSize: '1.5rem', fontWeight: 800, color: '#10b981' } }}
                             sx={{ width: '80px' }}
                           />
@@ -430,44 +447,71 @@ export default function StatusPage() {
                     <Box sx={{ p: 2, px: 3, borderBottom: '1px solid rgba(255,255,255,0.05)', bgcolor: 'rgba(15, 23, 42, 0.6)', position: 'sticky', top: 0, zIndex: 2 }}>
                       <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: 1 }}>
                         <ListAltIcon fontSize="small" sx={{ color: '#8b5cf6' }} /> 채널별 수기 조정 및 특이사항
+                        <Typography variant="caption" sx={{ color: '#94a3b8', ml: 1, fontWeight: 400 }}>(입력 후 엔터 저장)</Typography>
                       </Typography>
                     </Box>
                     <Table size="small" stickyHeader>
+                      {/* 💡 [테이블 헤더 분리] 자동/수기/합계 명확하게 표시 */}
                       <TableHead>
                         <TableRow>
-                          <TableCell width="25%" sx={{ bgcolor: 'rgba(15,23,42,0.9)', color: '#94a3b8', fontSize: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>채널명</TableCell>
-                          <TableCell width="25%" align="center" sx={{ bgcolor: 'rgba(15,23,42,0.9)', color: '#94a3b8', fontSize: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>수기 건수</TableCell>
-                          <TableCell width="50%" sx={{ bgcolor: 'rgba(15,23,42,0.9)', color: '#94a3b8', fontSize: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>특이사항 기재</TableCell>
+                          <TableCell width="18%" sx={{ bgcolor: 'rgba(15,23,42,0.9)', color: '#94a3b8', fontSize: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>채널명</TableCell>
+                          <TableCell width="12%" align="center" sx={{ bgcolor: 'rgba(15,23,42,0.9)', color: '#94a3b8', fontSize: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>자동</TableCell>
+                          <TableCell width="16%" align="center" sx={{ bgcolor: 'rgba(15,23,42,0.9)', color: '#3b82f6', fontSize: '0.75rem', fontWeight: 700, borderBottom: '1px solid rgba(255,255,255,0.05)' }}>+ 수기</TableCell>
+                          <TableCell width="12%" align="center" sx={{ bgcolor: 'rgba(15,23,42,0.9)', color: '#10b981', fontSize: '0.75rem', fontWeight: 700, borderBottom: '1px solid rgba(255,255,255,0.05)' }}>총합</TableCell>
+                          <TableCell width="42%" sx={{ bgcolor: 'rgba(15,23,42,0.9)', color: '#94a3b8', fontSize: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>특이사항 기재</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
-                        {currentStats.map((stat, index) => (
-                          <TableRow key={stat.name} sx={{ '&:last-child td, &:last-child th': { border: 0 }, '&:hover': { bgcolor: 'rgba(255,255,255,0.02)' } }}>
-                            <TableCell sx={{ py: 1, borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
-                              <Typography variant="caption" sx={{ fontWeight: 600, color: '#e2e8f0' }}>{stat.name}</Typography>
-                            </TableCell>
-                            <TableCell align="center" sx={{ py: 1, borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
-                              <TextField
-                                variant="outlined" size="small" type="number"
-                                value={stat.count} onChange={(e) => handleStatChange(index, 'count', e.target.value)}
-                                inputProps={{ style: { textAlign: 'center', fontWeight: 700, fontSize: '0.8rem', color: Number(stat.count) > 0 ? '#3b82f6' : '#cbd5e1', padding: '4px 8px' } }}
-                                sx={{ width: '70px', '& .MuiOutlinedInput-root': { bgcolor: 'rgba(15,23,42,0.6)', borderRadius: '6px', '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' }, '&:hover fieldset': { borderColor: '#3b82f6' } } }}
-                              />
-                            </TableCell>
-                            <TableCell sx={{ py: 1, borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
-                              <TextField
-                                fullWidth variant="outlined" size="small" placeholder="이슈 입력..."
-                                value={stat.issue} onChange={(e) => handleStatChange(index, 'issue', e.target.value)}
-                                inputProps={{ style: { fontSize: '0.8rem', padding: '4px 10px' } }}
-                                sx={{ '& .MuiOutlinedInput-root': { borderRadius: '6px', bgcolor: 'rgba(15,23,42,0.4)', color: '#cbd5e1', '& fieldset': { borderColor: 'transparent' }, '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.1)' }, '&.Mui-focused fieldset': { borderColor: '#3b82f6' } } }}
-                              />
-                            </TableCell>
-                          </TableRow>
-                        ))}
+                        {currentStats.map((stat, index) => {
+                          const rowTotal = stat.autoCount + stat.manualCount;
+                          
+                          return (
+                            <TableRow key={stat.name} sx={{ '&:last-child td, &:last-child th': { border: 0 }, '&:hover': { bgcolor: 'rgba(255,255,255,0.02)' } }}>
+                              {/* 1. 채널명 */}
+                              <TableCell sx={{ py: 1.5, borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
+                                <Typography variant="caption" sx={{ fontWeight: 600, color: '#e2e8f0' }}>{stat.name}</Typography>
+                              </TableCell>
+                              
+                              {/* 2. 자동 건수 (수정 불가) */}
+                              <TableCell align="center" sx={{ py: 1.5, borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
+                                <Typography variant="caption" sx={{ fontWeight: 700, color: stat.autoCount > 0 ? '#94a3b8' : 'rgba(148,163,184,0.3)' }}>{stat.autoCount}</Typography>
+                              </TableCell>
+                              
+                              {/* 3. 수기 추가 건수 (수정 가능) */}
+                              <TableCell align="center" sx={{ py: 1.5, borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
+                                <TextField
+                                  variant="outlined" size="small" type="number" placeholder="0"
+                                  value={stat.manualCount === 0 ? '' : stat.manualCount} 
+                                  onChange={(e) => handleStatChange(index, 'manualCount', e.target.value)}
+                                  onKeyDown={handleKeyDown} 
+                                  inputProps={{ style: { textAlign: 'center', fontWeight: 800, fontSize: '0.8rem', color: '#3b82f6', padding: '4px 6px' } }}
+                                  sx={{ width: '55px', '& .MuiOutlinedInput-root': { bgcolor: 'rgba(59, 130, 246, 0.1)', borderRadius: '6px', '& fieldset': { borderColor: 'transparent' }, '&:hover fieldset': { borderColor: '#3b82f6' } } }}
+                                />
+                              </TableCell>
+                              
+                              {/* 4. 총 합계 */}
+                              <TableCell align="center" sx={{ py: 1.5, borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
+                                <Typography variant="caption" sx={{ fontWeight: 800, color: rowTotal > 0 ? '#10b981' : 'rgba(16,185,129,0.3)', fontSize: '0.8rem' }}>
+                                  {rowTotal}
+                                </Typography>
+                              </TableCell>
+
+                              {/* 5. 이슈 기재 */}
+                              <TableCell sx={{ py: 1.5, borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
+                                <TextField
+                                  fullWidth variant="outlined" size="small" placeholder="이슈 입력 후 엔터"
+                                  value={stat.issue} onChange={(e) => handleStatChange(index, 'issue', e.target.value)}
+                                  onKeyDown={handleKeyDown} 
+                                  inputProps={{ style: { fontSize: '0.8rem', padding: '4px 10px' } }}
+                                  sx={{ '& .MuiOutlinedInput-root': { borderRadius: '6px', bgcolor: 'rgba(15,23,42,0.4)', color: '#cbd5e1', '& fieldset': { borderColor: 'transparent' }, '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.1)' }, '&.Mui-focused fieldset': { borderColor: '#3b82f6' } } }}
+                                />
+                              </TableCell>
+                            </TableRow>
+                          )
+                        })}
                       </TableBody>
                     </Table>
                   </TableContainer>
-
                 </Box>
               )}
             </Box>
