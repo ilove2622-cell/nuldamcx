@@ -72,7 +72,7 @@ export default function StatusPage() {
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
   // ==========================================
-  // 📡 3. 데이터 페칭 (트렌드 차트 - 총합 반영)
+  // 📡 3. 데이터 페칭 (트렌드 차트 - 총합 반영 + 월별 버그 픽스)
   // ==========================================
   useEffect(() => {
     const fetchTrendData = async () => {
@@ -81,24 +81,22 @@ export default function StatusPage() {
       let endStr = `${getLocalYYYYMMDD(today)} 23:59:59`;
 
       if (viewMode === 'daily') {
-        const past14Days = new Date();
-        past14Days.setDate(today.getDate() - 13);
+        const past14Days = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 13);
         startStr = `${getLocalYYYYMMDD(past14Days)} 00:00:00`;
       } else {
-        const past6Months = new Date();
-        past6Months.setMonth(today.getMonth() - 5);
-        past6Months.setDate(1);
+        // 💡 [버그 픽스] 월말(31일) 오버플로우 방지를 위해 1일 기준으로 세팅
+        const past6Months = new Date(today.getFullYear(), today.getMonth() - 5, 1);
         startStr = `${getLocalYYYYMMDD(past6Months)} 00:00:00`;
       }
 
-      // 💡 [수정] 1. 봇이 수집한 '자동 건수' 가져오기
+      // 1. 자동 수집 건수 가져오기
       const { data: autoData, error: autoError } = await supabase
         .from('inquiries')
         .select('inquiry_date')
         .gte('inquiry_date', startStr)
         .lte('inquiry_date', endStr);
 
-      // 💡 [수정] 2. 사람이 추가한 '수기 건수' 가져오기
+      // 2. 수기 저장 건수 가져오기
       const { data: manualData, error: manualError } = await supabase
         .from('daily_stats')
         .select('date, stats')
@@ -124,29 +122,27 @@ export default function StatusPage() {
           
           let dayManualTotal = 0;
           if (item.stats && Array.isArray(item.stats)) {
-            // 해당 날짜의 채널별 수기 건수(manualCount)를 모두 더함
             dayManualTotal = item.stats.reduce((acc: number, stat: any) => acc + (stat.manualCount || 0), 0);
           }
           manualCountMap[key] = (manualCountMap[key] || 0) + dayManualTotal;
         });
       }
 
-      // 💡 [수정] 5. 자동 건수 + 수기 건수를 더해서 최종 그래프 데이터 만들기!
+      // 5. 자동 + 수기 합산하여 트렌드 데이터 생성
       const newTrend: TrendData[] = [];
       if (viewMode === 'daily') {
         for (let i = 13; i >= 0; i--) {
-          const d = new Date();
-          d.setDate(today.getDate() - i);
+          const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() - i);
           const dStr = getLocalYYYYMMDD(d);
-          const total = (countMap[dStr] || 0) + (manualCountMap[dStr] || 0); // 💡 합체!
+          const total = (countMap[dStr] || 0) + (manualCountMap[dStr] || 0); 
           newTrend.push({ id: dStr, label: `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`, count: total });
         }
       } else {
         for (let i = 5; i >= 0; i--) {
-          const d = new Date();
-          d.setMonth(today.getMonth() - i);
+          // 💡 [버그 픽스] 월 중복 방지를 위해 1일 기준으로 세팅
+          const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
           const mStr = getLocalYYYYMMDD(d).substring(0, 7);
-          const total = (countMap[mStr] || 0) + (manualCountMap[mStr] || 0); // 💡 합체!
+          const total = (countMap[mStr] || 0) + (manualCountMap[mStr] || 0); 
           newTrend.push({ id: mStr, label: `${d.getMonth() + 1}월`, count: total });
         }
       }
@@ -155,6 +151,9 @@ export default function StatusPage() {
     fetchTrendData();
   }, [viewMode]);
 
+  // ==========================================
+  // 🔒 보안 검증 (화면 차단 트릭)
+  // ==========================================
   useEffect(() => {
     const checkAuth = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -233,7 +232,6 @@ export default function StatusPage() {
   useEffect(() => {
     fetchDetails();
   }, [fetchDetails]);
-
 
   // ==========================================
   // ⚙️ 5. 핸들러 (수기 입력 & DB 저장)
@@ -334,6 +332,7 @@ export default function StatusPage() {
         <Fade in={true} timeout={500}>
           <Box>
             
+            {/* 📈 상단: 트렌드 차트 */}
             <Card elevation={0} sx={{ bgcolor: 'rgba(30, 41, 59, 0.4)', border: '1px solid rgba(255, 255, 255, 0.05)', borderRadius: '12px', mb: 3 }}>
               <Box sx={{ p: 2, px: 3, borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: 1 }}>
