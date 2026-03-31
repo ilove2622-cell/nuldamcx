@@ -22,8 +22,7 @@ import {
   PhoneInTalk as PhoneIcon,
   HeadsetMic as HeadsetIcon,
   BarChart as BarChartIcon,
-  ListAlt as ListAltIcon,
-  AddCircleOutline as AddIcon
+  ListAlt as ListAltIcon
 } from '@mui/icons-material';
 
 // ==========================================
@@ -31,8 +30,8 @@ import {
 // ==========================================
 interface StatData {
   name: string;
-  autoCount: number;   // 💡 [추가] 봇이 물어온 자동 수집 건수
-  manualCount: number; // 💡 [추가] 담당자가 수기로 입력한 건수
+  autoCount: number;   
+  manualCount: number; 
   issue: string;
 }
 
@@ -64,7 +63,6 @@ export default function StatusPage() {
   
   const [trendData, setTrendData] = useState<TrendData[]>([]);
   
-  // 💡 [초기값 수정] autoCount와 manualCount로 나눔
   const [currentStats, setCurrentStats] = useState<StatData[]>(
     DISPLAY_CHANNELS.map(name => ({ name, autoCount: 0, manualCount: 0, issue: '' }))
   );
@@ -165,7 +163,6 @@ export default function StatusPage() {
       endStr = `${targetMonth}-${lastDay} 23:59:59`;
     }
 
-    // 1. 자동 집계 데이터 가져오기 (고정값)
     const { data, error } = await supabase.from('inquiries').select('channel').gte('inquiry_date', startStr).lte('inquiry_date', endStr);
     const autoCounts: Record<string, number> = {};
     if (!error && data) {
@@ -175,14 +172,12 @@ export default function StatusPage() {
       });
     }
 
-    // 2. DB에 저장된 수기 데이터(daily_stats) 가져오기
     let savedManualData = null;
     if (viewMode === 'daily') {
       const { data: manualData } = await supabase.from('daily_stats').select('*').eq('date', targetDate).maybeSingle();
       savedManualData = manualData;
     }
 
-    // 💡 3. 자동/수기 분리 병합 
     setCurrentStats(DISPLAY_CHANNELS.map(name => {
       const finalAutoCount = autoCounts[name] || 0;
       let finalManualCount = 0;
@@ -191,7 +186,7 @@ export default function StatusPage() {
       if (savedManualData?.stats) {
         const saved = savedManualData.stats.find((s: any) => s.name === name);
         if (saved) {
-          finalManualCount = saved.manualCount || 0; // 💡 수기 데이터만 따로 빼옴
+          finalManualCount = saved.manualCount || 0; 
           finalIssue = saved.issue || '';
         }
       }
@@ -239,7 +234,7 @@ export default function StatusPage() {
           date: targetDate,
           inflow: callStats.inflow,
           response: callStats.response,
-          stats: currentStats // 💡 autoCount, manualCount 분리된 채로 DB에 저장됨
+          stats: currentStats 
         });
 
         if (error) throw error;
@@ -251,7 +246,6 @@ export default function StatusPage() {
     }
   };
 
-  // 💡 [수정] 합계 계산 = 자동 수집 + 수기 추가
   const totalCount = currentStats.reduce((acc, cur) => acc + cur.autoCount + cur.manualCount, 0);
   const maxTrendCount = Math.max(...trendData.map(d => d.count), 1);
   
@@ -418,8 +412,15 @@ export default function StatusPage() {
                             variant="standard" value={callStats.inflow === 0 ? '' : callStats.inflow} placeholder="0" type="number"
                             onChange={(e) => setCallStats({...callStats, inflow: Number(e.target.value)})}
                             onKeyDown={handleKeyDown} 
+                            // 💡 [추가] 마우스 휠 스크롤 방지
+                            onWheel={(e) => (e.target as HTMLElement).blur()}
                             InputProps={{ disableUnderline: true, style: { fontSize: '1.5rem', fontWeight: 800, color: '#f8fafc' } }}
-                            sx={{ width: '80px' }}
+                            sx={{ 
+                              width: '80px',
+                              // 💡 [추가] 보기 싫은 위아래 화살표 싹 숨기기
+                              '& input[type=number]::-webkit-inner-spin-button, & input[type=number]::-webkit-outer-spin-button': { WebkitAppearance: 'none', margin: 0 },
+                              '& input[type=number]': { MozAppearance: 'textfield' }
+                            }}
                           />
                         </Box>
                         <Box sx={{ bgcolor: 'rgba(59, 130, 246, 0.15)', p: 1, borderRadius: '8px', color: '#3b82f6' }}><PhoneIcon fontSize="small" /></Box>
@@ -434,8 +435,15 @@ export default function StatusPage() {
                             variant="standard" value={callStats.response === 0 ? '' : callStats.response} placeholder="0" type="number"
                             onChange={(e) => setCallStats({...callStats, response: Number(e.target.value)})}
                             onKeyDown={handleKeyDown} 
+                            // 💡 [추가] 마우스 휠 스크롤 방지
+                            onWheel={(e) => (e.target as HTMLElement).blur()}
                             InputProps={{ disableUnderline: true, style: { fontSize: '1.5rem', fontWeight: 800, color: '#10b981' } }}
-                            sx={{ width: '80px' }}
+                            sx={{ 
+                              width: '80px',
+                              // 💡 [추가] 보기 싫은 위아래 화살표 싹 숨기기
+                              '& input[type=number]::-webkit-inner-spin-button, & input[type=number]::-webkit-outer-spin-button': { WebkitAppearance: 'none', margin: 0 },
+                              '& input[type=number]': { MozAppearance: 'textfield' }
+                            }}
                           />
                         </Box>
                         <Box sx={{ bgcolor: 'rgba(16, 185, 129, 0.15)', p: 1, borderRadius: '8px', color: '#10b981' }}><HeadsetIcon fontSize="small" /></Box>
@@ -451,7 +459,6 @@ export default function StatusPage() {
                       </Typography>
                     </Box>
                     <Table size="small" stickyHeader>
-                      {/* 💡 [테이블 헤더 분리] 자동/수기/합계 명확하게 표시 */}
                       <TableHead>
                         <TableRow>
                           <TableCell width="18%" sx={{ bgcolor: 'rgba(15,23,42,0.9)', color: '#94a3b8', fontSize: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>채널명</TableCell>
@@ -484,8 +491,16 @@ export default function StatusPage() {
                                   value={stat.manualCount === 0 ? '' : stat.manualCount} 
                                   onChange={(e) => handleStatChange(index, 'manualCount', e.target.value)}
                                   onKeyDown={handleKeyDown} 
+                                  // 💡 [추가] 마우스 휠 스크롤 방지
+                                  onWheel={(e) => (e.target as HTMLElement).blur()}
                                   inputProps={{ style: { textAlign: 'center', fontWeight: 800, fontSize: '0.8rem', color: '#3b82f6', padding: '4px 6px' } }}
-                                  sx={{ width: '55px', '& .MuiOutlinedInput-root': { bgcolor: 'rgba(59, 130, 246, 0.1)', borderRadius: '6px', '& fieldset': { borderColor: 'transparent' }, '&:hover fieldset': { borderColor: '#3b82f6' } } }}
+                                  sx={{ 
+                                    width: '55px', 
+                                    '& .MuiOutlinedInput-root': { bgcolor: 'rgba(59, 130, 246, 0.1)', borderRadius: '6px', '& fieldset': { borderColor: 'transparent' }, '&:hover fieldset': { borderColor: '#3b82f6' } },
+                                    // 💡 [추가] 보기 싫은 위아래 화살표 싹 숨기기
+                                    '& input[type=number]::-webkit-inner-spin-button, & input[type=number]::-webkit-outer-spin-button': { WebkitAppearance: 'none', margin: 0 },
+                                    '& input[type=number]': { MozAppearance: 'textfield' }
+                                  }}
                                 />
                               </TableCell>
                               
