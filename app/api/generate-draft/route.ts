@@ -18,7 +18,7 @@ export async function POST(req: Request) {
     }
 
     // 1. 고객 문의 내용을 벡터(숫자 배열)로 변환
-    const embeddingModel = genAI.getGenerativeModel({ model: 'text-embedding-004' });
+    const embeddingModel = genAI.getGenerativeModel({ model: 'gemini-embedding-001' });
     const embeddingResult = await embeddingModel.embedContent(inquiryContent);
     const queryEmbedding = embeddingResult.embedding.values;
 

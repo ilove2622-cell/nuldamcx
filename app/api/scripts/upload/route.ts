@@ -16,7 +16,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: '데이터 형식이 올바르지 않습니다.' }, { status: 400 });
     }
 
-    const embeddingModel = genAI.getGenerativeModel({ model: "text-embedding-004" });
+    const embeddingModel = genAI.getGenerativeModel({ model: "gemini-embedding-001" });
 
     const results = await Promise.all(data.map(async (row: any) => {
       const { title, content } = row;
