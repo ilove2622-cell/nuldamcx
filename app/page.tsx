@@ -371,7 +371,7 @@ export default function IntegratedDashboardPage() {
       formData.append('file', file);
 
       // (참고: 서버에 업로드를 처리할 엔드포인트가 필요합니다. 예: /api/scripts/upload-excel)
-      const res = await fetch('/api/scripts/upload-excel', {
+      const res = await fetch('/api/scripts/upload', {
         method: 'POST',
         body: formData,
       });
