@@ -45,7 +45,7 @@ export async function POST(req: Request) {
 
       // 임베딩 추출
       const embeddingResult = await embeddingModel.embedContent(String(content));
-      const embedding = embeddingResult.embedding.values;
+      const embedding = embeddingResult.embedding.values.slice(0, 768);
 
       // Supabase 저장
       const { error } = await supabase
