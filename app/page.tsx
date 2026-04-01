@@ -296,7 +296,11 @@ export default function IntegratedDashboardPage() {
   };
 
   const handleCollectAll = async () => { setIsCollectingAll(true); try { await fetch("/api/collect", { method: "POST" }); fetchDataAndCounts(); } finally { setIsCollectingAll(false); } };
+
+
   const handleBulkSubmit = async () => { setIsSubmitting(true); try { await Promise.all(selectedIds.map(id => supabase.from('inquiries').update({ admin_reply: replyTexts[id], status: '답변저장' }).eq('id', id))); await fetch('/api/reply', { method: 'POST', body: JSON.stringify({ ids: selectedIds }) }); fetchDataAndCounts(); } finally { setIsSubmitting(false); } };
+
+  
   const handleTriggerBot = async () => { setIsTriggeringBot(true); try { await fetch('/api/trigger-bot', { method: 'POST' }); fetchDataAndCounts(); } finally { setIsTriggeringBot(false); } };
 
   const handleForceComplete = async (id: string) => {
@@ -420,6 +424,7 @@ export default function IntegratedDashboardPage() {
   const handleBulkGenerateAI = async () => {
     if (selectedIds.length === 0) return;
     
+    // '대기' 또는 '신규' 상태인 문의만 필터링
     const validIds = selectedIds.filter(id => {
       const target = allData.find(item => item.id === id);
       return target && (target.status === '대기' || target.status === '신규');
@@ -437,9 +442,10 @@ export default function IntegratedDashboardPage() {
     setIsGeneratingAI(prev => ({ ...prev, ...loadingState }));
 
     try {
-      const generatePromises = validIds.map(async (id) => {
+      // 🚨 기존의 Promise.all(동시 다발적 요청)을 삭제하고 for...of 루프(순차적 요청)로 변경!
+      for (const id of validIds) {
         const targetInquiry = allData.find(item => item.id === id);
-        if (!targetInquiry) return { id, draft: "", success: false };
+        if (!targetInquiry) continue;
 
         try {
           const response = await fetch('/api/generate-draft', {
@@ -450,26 +456,23 @@ export default function IntegratedDashboardPage() {
           const data = await response.json();
 
           if (response.ok) {
-            return { id, draft: data.draft, success: true };
+            // 성공하면 바로 화면에 반영
+            setReplyTexts(prev => ({ ...prev, [id]: data.draft }));
           } else {
-            return { id, draft: `생성 실패: ${data.error}`, success: false };
+            setReplyTexts(prev => ({ ...prev, [id]: `생성 실패: ${data.error}` }));
           }
         } catch (err) {
-          return { id, draft: "네트워크 오류", success: false };
+          setReplyTexts(prev => ({ ...prev, [id]: "네트워크 오류" }));
         }
-      });
 
-      const results = await Promise.all(generatePromises);
+        // 개별 건 로딩 상태 해제
+        setIsGeneratingAI(prev => ({ ...prev, [id]: false }));
 
-      const newReplies: Record<string, string> = {};
-      results.forEach(res => {
-        if (res.success || res.draft) { 
-          newReplies[res.id] = res.draft;
-        }
-      });
+        // 💡 가장 중요한 부분: 구글 무료 플랜 1분 15건 제한을 피하기 위해 1건 처리 후 4.5초 대기 (4500ms)
+        // 만약 유료 플랜으로 업그레이드 하신다면 이 대기 코드는 지우셔도 됩니다!
+        await new Promise(resolve => setTimeout(resolve, 4500));
+      }
 
-      setReplyTexts(prev => ({ ...prev, ...newReplies }));
-      
     } catch (error) {
       console.error("AI 일괄 생성 실패:", error);
       alert("일괄 생성 중 오류가 발생했습니다.");
@@ -481,7 +484,7 @@ export default function IntegratedDashboardPage() {
       setIsGeneratingAI(prev => ({ ...prev, ...doneState }));
     }
   };
-
+  
   // ==========================================
   // 🎨 6. 화면 렌더링 (UI)
   // ==========================================
