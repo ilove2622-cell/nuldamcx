@@ -51,7 +51,7 @@ export async function POST(req: Request) {
 
     // 5. Gemini 1.5 Flash 모델 호출 (답변 생성)
     const model = genAI.getGenerativeModel({ 
-      model: 'gemini-1.5-flash',
+      model: 'gemini-2.0-flash',
       systemInstruction: systemInstruction 
     });
 
