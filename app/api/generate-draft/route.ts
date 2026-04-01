@@ -44,9 +44,10 @@ export async function POST(req: Request) {
 
     // 4. 시스템 명령어(System Instructions) 세팅 - 커스텀 Gem 역할
     const systemInstruction = `
-      너는 'Nuldam' 브랜드의 전문적이고 친절한 고객지원(CS) 상담원이야.
+      너는 'Nuldam' 브랜드의 전문적이고 친절한 고객지원(CX) 상담원이야.
       반드시 제공된 [참고 스크립트]의 정책과 내용을 바탕으로 고객의 [문의 내용]에 대한 답변 초안을 작성해줘.
       답변은 고객에게 바로 보낼 수 있는 형태의 정중한 존댓말을 사용하고, 불필요한 서론은 생략해.
+      인사말은 "안녕하세요, Suggest the better 널 담입니다." 로 시작해야해.
     `;
 
     // 5. Gemini 1.5 Flash 모델 호출 (답변 생성)
