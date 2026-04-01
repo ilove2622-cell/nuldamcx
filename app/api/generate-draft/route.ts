@@ -20,7 +20,7 @@ export async function POST(req: Request) {
     // 1. 고객 문의 내용을 벡터(숫자 배열)로 변환
     const embeddingModel = genAI.getGenerativeModel({ model: 'gemini-embedding-001' });
     const embeddingResult = await embeddingModel.embedContent(inquiryContent);
-    const queryEmbedding = embeddingResult.embedding.values;
+    const queryEmbedding = embeddingResult.embedding.values.slice(0, 768);
 
     // 2. Supabase에서 유사도 검색 (match_scripts 함수 호출)
     // match_threshold: 0.5 (유사도 기준, 필요에 따라 조절), match_count: 2 (가장 비슷한 스크립트 2개)
