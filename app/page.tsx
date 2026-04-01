@@ -31,7 +31,7 @@ import {
   CheckCircleOutline as CheckCircleIcon,
   Launch as LaunchIcon,
   Link as LinkIcon,
-  UploadFile as UploadFileIcon // 💡 엑셀 업로드 아이콘 추가
+  UploadFile as UploadFileIcon
 } from '@mui/icons-material';
 
 // ==========================================
@@ -159,7 +159,7 @@ export default function IntegratedDashboardPage() {
   const [isGeneratingAI, setIsGeneratingAI] = useState<Record<string, boolean>>({});
   const [isGeneratingBulkAI, setIsGeneratingBulkAI] = useState(false);
   
-  const [isUploadingScript, setIsUploadingScript] = useState(false); // 💡 스크립트 엑셀 업로드 상태
+  const [isUploadingScript, setIsUploadingScript] = useState(false);
 
   const [linkAnchorEl, setLinkAnchorEl] = useState<null | HTMLElement>(null);
   const [isSavingSheet, setIsSavingSheet] = useState<Record<string, boolean>>({});
@@ -309,10 +309,10 @@ export default function IntegratedDashboardPage() {
     }
   };
 
+  // 💡 [그대로 유지] 개별 시트/텍스트 데이터 저장: /api/scripts/upload (JSON)
   const handleSaveToSheet = async (item: DBInquiry) => {
     setIsSavingSheet(prev => ({ ...prev, [item.id]: true }));
     try {
-      // 1. 시트에 고객/배송 정보 저장
       const resSheet = await fetch('/api/sheet', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -327,7 +327,6 @@ export default function IntegratedDashboardPage() {
       });
       const dataSheet = await resSheet.json();
 
-      // 2. 스크립트 업로드
       const currentScript = replyTexts[item.id] || item.admin_reply || item.ai_draft || '';
       if (currentScript.trim()) {
         await fetch('/api/scripts/upload', {
@@ -360,7 +359,7 @@ export default function IntegratedDashboardPage() {
     }
   };
 
-  // 💡 [추가] 엑셀 파일 업로드 핸들러
+  // 💡 [수정 완료] 엑셀 파일(FormData) 전용 API 경로로 변경: /api/scripts/upload-excel
   const handleExcelUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -370,8 +369,8 @@ export default function IntegratedDashboardPage() {
       const formData = new FormData();
       formData.append('file', file);
 
-      // (참고: 서버에 업로드를 처리할 엔드포인트가 필요합니다. 예: /api/scripts/upload-excel)
-      const res = await fetch('/api/scripts/upload', {
+      // 🚨 이곳이 수정된 핵심 포인트입니다!
+      const res = await fetch('/api/scripts/upload-excel', {
         method: 'POST',
         body: formData,
       });
@@ -379,17 +378,14 @@ export default function IntegratedDashboardPage() {
       const data = await res.json();
       if (res.ok && data.success) {
         alert('✅ 엑셀 스크립트가 성공적으로 업로드되었습니다!');
-        // 업로드 후 데이터 갱신이 필요하다면 아래 주석 해제
-        // fetchDataAndCounts();
       } else {
         alert('❌ 업로드 실패: ' + (data.error || '알 수 없는 오류'));
       }
     } catch (error) {
       console.error('엑셀 업로드 에러:', error);
-      alert('❌ 네트워크 오류가 발생했습니다.');
+      alert('❌ 네트워크 오류가 발생했습니다. 백엔드에 upload-excel 폴더가 있는지 확인해주세요!');
     } finally {
       setIsUploadingScript(false);
-      // 같은 파일을 다시 선택할 수 있도록 input 초기화
       event.target.value = '';
     }
   };
@@ -424,7 +420,6 @@ export default function IntegratedDashboardPage() {
   const handleBulkGenerateAI = async () => {
     if (selectedIds.length === 0) return;
     
-    // 💡 [수정] '대기' 또는 '신규' 상태인 문의만 필터링 (처리완료 제외)
     const validIds = selectedIds.filter(id => {
       const target = allData.find(item => item.id === id);
       return target && (target.status === '대기' || target.status === '신규');
@@ -635,7 +630,6 @@ export default function IntegratedDashboardPage() {
             <Typography variant="body2" sx={{ color: '#f8fafc', fontWeight: 600 }}>전체 선택 <span style={{ color: '#3b82f6' }}>({selectedIds.length}건)</span></Typography>
           </Box>
           <Stack direction="row" spacing={1}>
-            {/* 💡 스크립트 엑셀 추가 버튼 (숨겨진 파일 input 포함) */}
             <Button
               component="label"
               size="small"
