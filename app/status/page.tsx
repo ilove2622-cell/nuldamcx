@@ -13,7 +13,7 @@ import { normalizeSiteName } from '@/lib/siteMapper';
 import {
   Box, Container, Typography, IconButton, TextField, Stack,
   Card, CardContent, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper,
-  Chip, Fade, ToggleButton, ToggleButtonGroup, CircularProgress
+  Chip, Fade, ToggleButton, ToggleButtonGroup, CircularProgress, Button
 } from '@mui/material';
 
 // MUI Icons
@@ -71,6 +71,9 @@ export default function StatusPage() {
   const [loading, setLoading] = useState(true);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
+  // 💡 [추가] 시트 내보내기 로딩 상태
+  const [isExporting, setIsExporting] = useState(false);
+
   // ==========================================
   // 📡 3. 데이터 페칭 (트렌드 차트 - 총합 반영 + 월별 버그 픽스)
   // ==========================================
@@ -84,7 +87,6 @@ export default function StatusPage() {
         const past14Days = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 13);
         startStr = `${getLocalYYYYMMDD(past14Days)} 00:00:00`;
       } else {
-        // 💡 [버그 픽스] 월말(31일) 오버플로우 방지를 위해 1일 기준으로 세팅
         const past6Months = new Date(today.getFullYear(), today.getMonth() - 5, 1);
         startStr = `${getLocalYYYYMMDD(past6Months)} 00:00:00`;
       }
@@ -139,7 +141,6 @@ export default function StatusPage() {
         }
       } else {
         for (let i = 5; i >= 0; i--) {
-          // 💡 [버그 픽스] 월 중복 방지를 위해 1일 기준으로 세팅
           const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
           const mStr = getLocalYYYYMMDD(d).substring(0, 7);
           const total = (countMap[mStr] || 0) + (manualCountMap[mStr] || 0); 
@@ -234,7 +235,7 @@ export default function StatusPage() {
   }, [fetchDetails]);
 
   // ==========================================
-  // ⚙️ 5. 핸들러 (수기 입력 & DB 저장)
+  // ⚙️ 5. 핸들러 (수기 입력 & DB 저장 & 시트 내보내기)
   // ==========================================
   const handleStatChange = (index: number, field: 'manualCount' | 'issue', value: string) => {
     const newStats = [...currentStats];
@@ -269,6 +270,42 @@ export default function StatusPage() {
         console.error('저장 에러:', error);
         alert('❌ 저장에 실패했습니다.');
       }
+    }
+  };
+
+  // 💡 [추가] 구글 시트로 내보내는 핸들러
+  const handleExportToSheet = async () => {
+    if (!window.confirm(`[${targetDate}] 데이터를 구글 시트에 업데이트하시겠습니까?`)) return;
+    
+    setIsExporting(true);
+    try {
+      // 각 채널의 자동+수기 총합 숫자 배열 추출
+      const totalsArray = currentStats.map(stat => stat.autoCount + stat.manualCount);
+
+      const payload = {
+        date: targetDate, 
+        inflow: callStats.inflow,
+        response: callStats.response,
+        totals: totalsArray
+      };
+
+      const res = await fetch('/api/export-to-sheet', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        alert('✅ 구글 시트에 성공적으로 기재되었습니다!');
+      } else {
+        alert(`❌ 전송 실패: ${data.error}`);
+      }
+    } catch (err) {
+      console.error(err);
+      alert('❌ 서버와 통신하는 중 네트워크 오류가 발생했습니다.');
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -311,19 +348,38 @@ export default function StatusPage() {
               </Typography>
             </Box>
             
-            <ToggleButtonGroup
-              value={viewMode} exclusive onChange={handleViewModeChange} size="small"
-              sx={{ 
-                bgcolor: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255,255,255,0.05)',
-                '& .MuiToggleButton-root': { 
-                  color: '#64748b', border: 'none', px: 2, py: 0.5, fontSize: '0.8rem', fontWeight: 600,
-                  '&.Mui-selected': { color: '#fff', bgcolor: '#3b82f6', '&:hover': { bgcolor: '#2563eb' } }
-                }
-              }}
-            >
-              <ToggleButton value="daily">일별</ToggleButton>
-              <ToggleButton value="monthly">월별</ToggleButton>
-            </ToggleButtonGroup>
+            {/* 💡 상단 우측 컨트롤 바 */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Button 
+                size="small" 
+                variant="contained" 
+                startIcon={isExporting ? <CircularProgress size={14} color="inherit" /> : <ListAltIcon fontSize="small" />} 
+                onClick={handleExportToSheet} 
+                disabled={isExporting || viewMode !== 'daily'} 
+                sx={{ 
+                  bgcolor: '#10b981', color: '#fff', fontWeight: 600, 
+                  boxShadow: '0 4px 14px rgba(16, 185, 129, 0.4)',
+                  '&:hover': { bgcolor: '#059669' },
+                  '&.Mui-disabled': { bgcolor: 'rgba(16, 185, 129, 0.3)', color: '#a7f3d0' }
+                }}
+              >
+                시트에 내보내기
+              </Button>
+
+              <ToggleButtonGroup
+                value={viewMode} exclusive onChange={handleViewModeChange} size="small"
+                sx={{ 
+                  bgcolor: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255,255,255,0.05)',
+                  '& .MuiToggleButton-root': { 
+                    color: '#64748b', border: 'none', px: 2, py: 0.5, fontSize: '0.8rem', fontWeight: 600,
+                    '&.Mui-selected': { color: '#fff', bgcolor: '#3b82f6', '&:hover': { bgcolor: '#2563eb' } }
+                  }
+                }}
+              >
+                <ToggleButton value="daily">일별</ToggleButton>
+                <ToggleButton value="monthly">월별</ToggleButton>
+              </ToggleButtonGroup>
+            </Box>
           </Box>
         </Container>
       </Box>
