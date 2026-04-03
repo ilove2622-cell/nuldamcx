@@ -280,8 +280,7 @@ export default function StatusPage() {
     setIsExporting(true);
     try {
       // 각 채널의 자동+수기 총합 숫자 배열 추출
-      const totalsArray = currentStats.map(stat => stat.autoCount + stat.manualCount);
-
+const totalsArray = currentStats.map((stat: any) => stat.autoCount + stat.manualCount);
       const payload = {
         date: targetDate, 
         inflow: callStats.inflow,
