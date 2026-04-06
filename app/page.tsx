@@ -31,7 +31,8 @@ import {
   CheckCircleOutline as CheckCircleIcon,
   Launch as LaunchIcon,
   Link as LinkIcon,
-  UploadFile as UploadFileIcon
+  UploadFile as UploadFileIcon,
+  DocumentScanner as DocumentScannerIcon // 💡 [추가] OCR용 스캐너 아이콘
 } from '@mui/icons-material';
 
 // ==========================================
@@ -313,7 +314,6 @@ export default function IntegratedDashboardPage() {
     }
   };
 
-  // 💡 [그대로 유지] 개별 시트/텍스트 데이터 저장: /api/scripts/upload (JSON)
   const handleSaveToSheet = async (item: DBInquiry) => {
     setIsSavingSheet(prev => ({ ...prev, [item.id]: true }));
     try {
@@ -363,7 +363,6 @@ export default function IntegratedDashboardPage() {
     }
   };
 
-  // 💡 [수정 완료] 엑셀 파일(FormData) 전용 API 경로로 변경: /api/scripts/upload-excel
   const handleExcelUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -373,7 +372,6 @@ export default function IntegratedDashboardPage() {
       const formData = new FormData();
       formData.append('file', file);
 
-      // 🚨 이곳이 수정된 핵심 포인트입니다!
       const res = await fetch('/api/scripts/upload-excel', {
         method: 'POST',
         body: formData,
@@ -424,7 +422,6 @@ export default function IntegratedDashboardPage() {
   const handleBulkGenerateAI = async () => {
     if (selectedIds.length === 0) return;
     
-    // '대기' 또는 '신규' 상태인 문의만 필터링
     const validIds = selectedIds.filter(id => {
       const target = allData.find(item => item.id === id);
       return target && (target.status === '대기' || target.status === '신규');
@@ -442,7 +439,6 @@ export default function IntegratedDashboardPage() {
     setIsGeneratingAI(prev => ({ ...prev, ...loadingState }));
 
     try {
-      // 🚨 기존의 Promise.all(동시 다발적 요청)을 삭제하고 for...of 루프(순차적 요청)로 변경!
       for (const id of validIds) {
         const targetInquiry = allData.find(item => item.id === id);
         if (!targetInquiry) continue;
@@ -456,7 +452,6 @@ export default function IntegratedDashboardPage() {
           const data = await response.json();
 
           if (response.ok) {
-            // 성공하면 바로 화면에 반영
             setReplyTexts(prev => ({ ...prev, [id]: data.draft }));
           } else {
             setReplyTexts(prev => ({ ...prev, [id]: `생성 실패: ${data.error}` }));
@@ -465,11 +460,8 @@ export default function IntegratedDashboardPage() {
           setReplyTexts(prev => ({ ...prev, [id]: "네트워크 오류" }));
         }
 
-        // 개별 건 로딩 상태 해제
         setIsGeneratingAI(prev => ({ ...prev, [id]: false }));
 
-        // 💡 가장 중요한 부분: 구글 무료 플랜 1분 15건 제한을 피하기 위해 1건 처리 후 4.5초 대기 (4500ms)
-        // 만약 유료 플랜으로 업그레이드 하신다면 이 대기 코드는 지우셔도 됩니다!
         await new Promise(resolve => setTimeout(resolve, 4500));
       }
 
@@ -562,8 +554,34 @@ export default function IntegratedDashboardPage() {
             </Typography>
             <Typography variant="caption" sx={{ color: '#64748b', ml: 1, letterSpacing: '1px' }}>INTEGRATED WORKSPACE</Typography>
           </Box>
-          <Stack direction="row" spacing={2}>
-            <Button onClick={() => router.push('/status')} sx={{ color: '#cbd5e1', fontWeight: 600 }}>문의현황</Button>
+          
+          <Stack direction="row" spacing={1.5}>
+            <Button 
+              onClick={() => router.push('/ocr')} 
+              startIcon={<DocumentScannerIcon fontSize="small" />}
+              sx={{ 
+                color: '#cbd5e1', 
+                fontWeight: 600,
+                px: 2,
+                borderRadius: '8px',
+                '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.05)' }
+              }}
+            >
+              OCR
+            </Button>
+            
+            <Button 
+              onClick={() => router.push('/status')} 
+              sx={{ 
+                color: '#cbd5e1', 
+                fontWeight: 600,
+                px: 2,
+                borderRadius: '8px',
+                '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.05)' }
+              }}
+            >
+              문의현황
+            </Button>
           </Stack>
         </Container>
       </Box>
