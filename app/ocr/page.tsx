@@ -141,6 +141,7 @@ export default function OcrPage() {
   };
 
   // 🚀 API 호출: OCR 텍스트 추출
+  // 🚀 API 호출: OCR 텍스트 추출
   const handleExtract = async () => {
     if (!imageBase64) return;
     setIsExtracting(true);
@@ -154,22 +155,24 @@ export default function OcrPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || '서버 오류');
 
-      // 원문 및 매핑된 데이터 반영
-      setRawText(data.text || '');
+      // 💡 [핵심 수정] 백엔드에서 반환하는 data.result의 한글 키를 프론트 폼 필드에 매핑합니다.
+      const parsed = data.result || {};
+
+      setRawText(data.rawText || '');
       setFields(prev => ({
         ...prev,
-        mall: data.mall || prev.mall,
-        orderNo: data.orderNumber || prev.orderNo,
-        // 현재 API가 이름/전화번호 등을 못 찾았다면 기존 입력값 유지
-        name: data.name || prev.name,
-        phone: data.phone || prev.phone,
-        address: data.address || prev.address,
-        product: data.product || prev.product,
-        option: data.option || prev.option,
-        qty: data.qty || prev.qty,
-        tracking: data.tracking || prev.tracking,
-        carrier: data.carrier || prev.carrier,
+        mall: parsed['쇼핑몰'] || prev.mall,
+        orderNo: parsed['주문번호'] || prev.orderNo,
+        name: parsed['수취인이름'] || prev.name,
+        phone: parsed['연락처'] || prev.phone,
+        address: parsed['주소'] || prev.address,
+        product: parsed['상품명'] || prev.product,
+        option: parsed['옵션'] || prev.option,
+        qty: parsed['수량'] || prev.qty,
+        tracking: parsed['송장번호'] || prev.tracking,
+        carrier: parsed['택배사'] || prev.carrier,
       }));
+      
       setStatus({ type: 'success', msg: '✅ 추출 완료! 내용 확인 후 저장하세요' });
     } catch (error: any) {
       setStatus({ type: 'error', msg: '❌ ' + error.message });

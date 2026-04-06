@@ -163,8 +163,11 @@ function parseOrderInfo(text: string) {
     if (phoneM) result['연락처'] = formatPhone(phoneM[1]);
   }
 
+  // ==== 주소 파싱 ====
   const addrKeyword = /(서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주)/;
   let addrFound = false;
+  
+  // 1. 수취인 영역에서 먼저 찾기
   if (!addrFound) {
     for (const line of receiverLines) {
       if (addrKeyword.test(line)) {
@@ -177,6 +180,20 @@ function parseOrderInfo(text: string) {
     }
   }
 
+  // 2. 전체 텍스트에서 보조로 찾기 (강력한 예외 처리)
+  if (!addrFound) {
+    for (const line of lines) {
+      if (addrKeyword.test(line)) {
+        let addr = line.replace(/^\[?\d{5}\]?\s*/, '').replace(/^주소\s*/, '');
+        const regionMatch = addr.match(/(서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주).+/);
+        if (regionMatch) addr = regionMatch[0];
+        addr = addr.replace(/\s+수정.*$/i, '').replace(/\s*[•·]\s*주소.*$/, '').replace(/\s*(배송메세지|메모).*/i, '').trim();
+        if (addr.length > 5) { result['주소'] = addr; break; }
+      }
+    }
+  }
+
+  // ==== 상품명 파싱 ====
   const headerKeyword = /\[?품번|SKU.*코드|자체상품코드|쇼핑몰상품코드|수집상품명/;
   for (let i = 0; i < lines.length; i++) {
     if (headerKeyword.test(lines[i])) {
@@ -200,6 +217,7 @@ function parseOrderInfo(text: string) {
     result['상품명'] = result['상품명'].replace(/^[•·]\s*상품명\s*/i, '').replace(/\s*합포장상품.*$/i, '').replace(/\s*합포장.*$/i, '').trim();
   }
 
+  // ==== 옵션 및 수량 파싱 ====
   const optM = text.match(/수집.{0,2}선명\s*:\s*(.+?)(?:\t|\n|$)/);
   if (optM && !optM[0].match(/단품코드/)) result['옵션'] = optM[1].replace(/\s*\([\d,.]+\)\s*$/, '').trim();
   
@@ -211,6 +229,7 @@ function parseOrderInfo(text: string) {
     }
   }
 
+  // ==== 송장번호 및 택배사 파싱 ====
   const trackPatterns = [/송장\s*번호\s*[\|:]?\s*([\d\-]{10,})/, /운송장\s*[\|:]?\s*([\d\-]{10,})/, /\b(6\d{9,12})\b/, /\b(\d{12,13})\b/];
   for (const p of trackPatterns) {
     const m = full.match(p);
@@ -221,14 +240,32 @@ function parseOrderInfo(text: string) {
     }
   }
 
+  // 1. 송장정보/송장번호 라인에서 찾기
   if (!result['택배사']) {
     for (const line of lines) {
       if (line.match(/송장정보|송장번호/)) {
-        const carrierM = line.match(/(대한통운|대한동운|CJ대한통운|한진|롯데|우체국|로젠|경동|대신)/);
+        const carrierM = line.match(/(대한통운|대한동운|대한동문|대한동은|CJ대한통운|한진|롯데|우체국|로젠|경동|대신)/);
         if (carrierM) {
           result['택배사'] = carrierM[1].match(/대한/) ? 'CJ대한통운' : carrierM[1]; break;
         }
       }
+    }
+  }
+
+  // 2. 전체 텍스트에서 보조로 찾기 (강력한 예외 처리)
+  if (!result['택배사']) {
+    const carrierMap = [
+      [/대한통운|대한동운|대한동문|대한동은/, 'CJ대한통운'],
+      [/CJ대한통운/, 'CJ대한통운'],
+      [/롯데.{0,4}택배|롯데글로벌/, '롯데택배'],
+      [/한진택배|한진/, '한진택배'],
+      [/우체국/, '우체국택배'],
+      [/로젠택배|로젠/, '로젠택배'],
+      [/경동택배/, '경동택배'],
+      [/대신택배/, '대신택배'],
+    ];
+    for (const [pattern, name] of carrierMap) {
+      if (full.match(pattern)) { result['택배사'] = name as string; break; }
     }
   }
 
