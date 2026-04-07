@@ -64,10 +64,11 @@ export default function OcrPage() {
   // ⚙️ 처리 상태
   const [isExtracting, setIsExtracting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSavingPilchul, setIsSavingPilchul] = useState(false); 
   const [status, setStatus] = useState({ type: '', msg: '' });
   const [saveStatus, setSaveStatus] = useState({ type: '', msg: '' });
 
-  // 📝 폼 데이터 상태 (오리지널 필드 11개 완벽 복원)
+  // 📝 폼 데이터 상태
   const [rawText, setRawText] = useState('');
   const [fields, setFields] = useState({
     mall: '', orderNo: '', name: '', phone: '', address: '',
@@ -141,7 +142,6 @@ export default function OcrPage() {
   };
 
   // 🚀 API 호출: OCR 텍스트 추출
-  // 🚀 API 호출: OCR 텍스트 추출
   const handleExtract = async () => {
     if (!imageBase64) return;
     setIsExtracting(true);
@@ -155,7 +155,6 @@ export default function OcrPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || '서버 오류');
 
-      // 💡 [핵심 수정] 백엔드에서 반환하는 data.result의 한글 키를 프론트 폼 필드에 매핑합니다.
       const parsed = data.result || {};
 
       setRawText(data.rawText || '');
@@ -181,13 +180,74 @@ export default function OcrPage() {
     }
   };
 
-  // 💾 API 호출: 시트 저장
+  // 💾 💡 [수정] API 호출: 필출 시트로 저장 (15:30 조건 추가, 알림 제거)
+  const handleSaveToPilchul = async () => {
+    if (!fields.mall && !fields.orderNo && !fields.name) {
+      if (!confirm('입력된 정보가 거의 없습니다. 그래도 필출로 저장하시겠습니까?')) return;
+    }
+
+    // 💡 15시 30분 체크 로직 (알림창 없이 자동 계산)
+    const now = new Date();
+    const hours = now.getHours();
+    const minutes = now.getMinutes();
+
+    // 현재 시간이 15시 30분 이후라면 (16시 이상이거나 15시 30분 이상) 무조건 내일로 변경
+    if (hours > 15 || (hours === 15 && minutes >= 30)) {
+      now.setDate(now.getDate() + 1);
+    }
+
+    const targetDateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const displayDateStr = `${now.getMonth() + 1}월 ${now.getDate()}일`;
+
+    setIsSavingPilchul(true);
+    setSaveStatus({ type: 'processing', msg: `⏳ 필출 시트(${displayDateStr})에 저장 중...` });
+
+    // 송장번호 포맷팅
+    const formattedTracking = fields.tracking 
+      ? fields.tracking.replace(/\D/g, '').replace(/(\d{4})(?=\d)/g, '$1-').replace(/-$/, '') 
+      : '-';
+
+    try {
+      const resSheet = await fetch('/api/sheet', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          channel: fields.mall || '-',
+          orderNumber: fields.orderNo || '-',
+          customerName: fields.name || '-',
+          tel: fields.phone || '-',
+          address: fields.address || '-', 
+          trackingNumber: formattedTracking,
+          targetDate: targetDateStr, // 💡 백엔드에서 사용할 타겟 날짜 전송
+        })
+      });
+      const dataSheet = await resSheet.json();
+
+      if (dataSheet.success) {
+        setSaveStatus({ type: 'success', msg: `✅ [${fields.name || '고객'}]님의 정보가 필출(${displayDateStr})에 저장됐어요!` });
+      } else {
+        if (dataSheet.error === 'TODAY_TAB_MISSING') {
+          setSaveStatus({ type: 'error', msg: `❌ 필출 시트에 ${displayDateStr} 탭이 없습니다!` });
+          alert(`❌ 필출 시트에 해당 날짜(${displayDateStr}) 탭이 없습니다!\n스프레드시트 하단에 날짜 탭을 먼저 생성해 주세요.`);
+        } else {
+          setSaveStatus({ type: 'error', msg: '❌ 필출 저장 실패: ' + dataSheet.error });
+        }
+      }
+    } catch (error: any) {
+      setSaveStatus({ type: 'error', msg: '❌ 네트워크 오류가 발생했습니다.' });
+    } finally {
+      setIsSavingPilchul(false);
+      setTimeout(() => setSaveStatus({ type: '', msg: '' }), 4000);
+    }
+  };
+
+  // 💾 API 호출: 기존 스프레드시트 저장
   const handleSave = async () => {
     if (!fields.mall && !fields.orderNo && !fields.name) {
       if (!confirm('입력된 정보가 거의 없습니다. 그래도 저장하시겠습니까?')) return;
     }
     setIsSaving(true);
-    setSaveStatus({ type: 'processing', msg: '⏳ 스프레드시트에 저장 중...' });
+    setSaveStatus({ type: 'processing', msg: '⏳ 기존 시트에 저장 중...' });
 
     const ts = new Date().toLocaleString('ko-KR', { hour12: false });
     const rowData = { ...fields, timestamp: ts };
@@ -196,17 +256,14 @@ export default function OcrPage() {
       const res = await fetch('/api/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        // 오리지널 구조의 데이터를 백엔드로 전송
         body: JSON.stringify(rowData)
       });
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || '저장 실패');
 
-      // 히스토리 상단에 추가
       setHistory(prev => [{ ...rowData, displayStatus: '✅ 저장완료' }, ...prev]);
-      setSaveStatus({ type: 'success', msg: '✅ 스프레드시트에 저장됐어요!' });
+      setSaveStatus({ type: 'success', msg: '✅ 기존 스프레드시트에 저장됐어요!' });
       
-      // 저장 성공 후 입력폼 초기화
       setFields({
         mall: '', orderNo: '', name: '', phone: '', address: '',
         product: '', option: '', qty: '', tracking: '', carrier: '', memo: ''
@@ -220,7 +277,6 @@ export default function OcrPage() {
     }
   };
 
-  // CSV 복사 기능
   const copyCSV = () => {
     if (!history.length) return;
     const hdrs = ['저장시각','주문번호','수취인','연락처','주소','상품명','옵션','수량','송장번호','택배사','메모'];
@@ -232,7 +288,6 @@ export default function OcrPage() {
     alert('CSV 복사됐어요! 구글 시트에 붙여넣기 하세요 😊');
   };
 
-  // 공통 입력필드 스타일 (대시보드 테마 적용)
   const inputSx = {
     '& .MuiOutlinedInput-root': { 
       bgcolor: 'rgba(15, 23, 42, 0.5)', color: '#f8fafc', borderRadius: '6px', fontSize: '0.8rem',
@@ -242,7 +297,6 @@ export default function OcrPage() {
     }
   };
 
-  // 값 채워짐 여부에 따른 초록색 강조 테마
   const getFilledSx = (val: string) => val ? {
     '& .MuiOutlinedInput-root': { 
       bgcolor: 'rgba(16, 185, 129, 0.05)', color: '#f8fafc', borderRadius: '6px', fontSize: '0.8rem',
@@ -283,7 +337,6 @@ export default function OcrPage() {
 
       <Container maxWidth="xl" sx={{ mt: 3, mb: 8, flex: 1, display: 'flex', flexDirection: 'column', gap: 3 }}>
         
-        {/* 👉 2단 레이아웃 (왼쪽: 이미지+원본텍스트 / 오른쪽: 11개 입력폼) */}
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 3 }}>
           
           {/* 🖼️ 왼쪽 패널: 이미지 업로드 및 원본 텍스트 */}
@@ -346,7 +399,6 @@ export default function OcrPage() {
                 </Box>
               )}
 
-              {/* 오리지널 UI의 특징: 좌측 하단 원본 텍스트 박스 */}
               {rawText && (
                 <Box sx={{ mt: 1 }}>
                   <Typography variant="caption" sx={{ color: '#94a3b8', mb: 0.5, display: 'block', fontWeight: 600 }}>📄 OCR 원본 텍스트 (파싱 확인용)</Typography>
@@ -371,8 +423,6 @@ export default function OcrPage() {
             
             <CardContent sx={{ p: 2 }}>
               <Stack spacing={1.5}>
-                
-                {/* 💡 [핵심] 오리지널 Grid 구조 복원 (라벨 고정 넓이) */}
                 {[
                   ['쇼핑몰', 'mall', false],
                   ['주문번호', 'orderNo', false],
@@ -397,19 +447,35 @@ export default function OcrPage() {
                     />
                   </Box>
                 ))}
-
               </Stack>
 
-              <Button 
-                fullWidth variant="contained" 
-                disabled={isSaving || !Object.values(fields).some(v => v !== '')} onClick={handleSave}
-                sx={{ 
-                  bgcolor: '#10b981', color: '#fff', fontWeight: 700, py: 1.2, mt: 3, borderRadius: '8px',
-                  '&:hover': { bgcolor: '#059669' }, '&.Mui-disabled': { bgcolor: 'rgba(16, 185, 129, 0.3)', color: 'rgba(255,255,255,0.5)' }
-                }}
-              >
-                <span>📊</span> 스프레드시트에 저장
-              </Button>
+              <Stack direction="row" spacing={2} sx={{ mt: 3 }}>
+                <Button 
+                  fullWidth variant="contained" 
+                  disabled={isSavingPilchul || !Object.values(fields).some(v => v !== '')} 
+                  onClick={handleSaveToPilchul}
+                  startIcon={isSavingPilchul ? <CircularProgress size={16} color="inherit" /> : null}
+                  sx={{ 
+                    bgcolor: '#3b82f6', color: '#fff', fontWeight: 700, py: 1.2, borderRadius: '8px',
+                    '&:hover': { bgcolor: '#2563eb' }, '&.Mui-disabled': { bgcolor: 'rgba(59, 130, 246, 0.3)', color: 'rgba(255,255,255,0.5)' }
+                  }}
+                >
+                  <span>📝</span> 필출로 저장
+                </Button>
+
+                <Button 
+                  fullWidth variant="contained" 
+                  disabled={isSaving || !Object.values(fields).some(v => v !== '')} 
+                  onClick={handleSave}
+                  startIcon={isSaving ? <CircularProgress size={16} color="inherit" /> : null}
+                  sx={{ 
+                    bgcolor: '#10b981', color: '#fff', fontWeight: 700, py: 1.2, borderRadius: '8px',
+                    '&:hover': { bgcolor: '#059669' }, '&.Mui-disabled': { bgcolor: 'rgba(16, 185, 129, 0.3)', color: 'rgba(255,255,255,0.5)' }
+                  }}
+                >
+                  <span>📊</span> 스프레드 시트에 저장
+                </Button>
+              </Stack>
 
               {saveStatus.msg && (
                 <Box sx={{ 
@@ -425,7 +491,7 @@ export default function OcrPage() {
           </Card>
         </Box>
 
-        {/* 📜 하단 패널: 13열 히스토리 테이블 완벽 복원 */}
+        {/* 📜 하단 패널: 13열 히스토리 테이블 */}
         <Card elevation={0} sx={{ mt: 3, bgcolor: 'rgba(30, 41, 59, 0.4)', border: '1px solid rgba(255, 255, 255, 0.05)', borderRadius: '12px' }}>
           <Box sx={{ p: 2, px: 3, borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: 1 }}>

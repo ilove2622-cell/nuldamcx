@@ -191,6 +191,7 @@ export default function StatusPage() {
       endStr = `${targetMonth}-${lastDay} 23:59:59`;
     }
 
+    // 1. 자동 수집 건수 (범위 내 전체)
     const { data, error } = await supabase.from('inquiries').select('channel').gte('inquiry_date', startStr).lte('inquiry_date', endStr);
     const autoCounts: Record<string, number> = {};
     if (!error && data) {
@@ -200,29 +201,70 @@ export default function StatusPage() {
       });
     }
 
+    // 2. 수기 데이터 합산 (💡 여기서 월별 누락 버그 해결)
     let savedManualData = null;
+    let monthlyManualCounts: Record<string, number> = {};
+    let monthlyCallInflow = 0;
+    let monthlyCallResponse = 0;
+
     if (viewMode === 'daily') {
+      // 일별: 하루치 수기 데이터만
       const { data: manualData } = await supabase.from('daily_stats').select('*').eq('date', targetDate).maybeSingle();
       savedManualData = manualData;
+    } else {
+      // 월별: 한 달 치 수기 데이터를 싹 다 가져와서 채널별로 더하기
+      const startStrOnlyDate = startStr.split(' ')[0];
+      const endStrOnlyDate = endStr.split(' ')[0];
+      
+      const { data: monthlyData } = await supabase
+        .from('daily_stats')
+        .select('*')
+        .gte('date', startStrOnlyDate)
+        .lte('date', endStrOnlyDate);
+
+      if (monthlyData) {
+        monthlyData.forEach(row => {
+          monthlyCallInflow += (row.inflow || 0);
+          monthlyCallResponse += (row.response || 0);
+
+          if (row.stats && Array.isArray(row.stats)) {
+            row.stats.forEach((s: any) => {
+              if (s.name) {
+                monthlyManualCounts[s.name] = (monthlyManualCounts[s.name] || 0) + (s.manualCount || 0);
+              }
+            });
+          }
+        });
+      }
     }
 
+    // 3. 뷰어에 뿌려줄 데이터 병합
     setCurrentStats(DISPLAY_CHANNELS.map(name => {
       const finalAutoCount = autoCounts[name] || 0;
       let finalManualCount = 0;
       let finalIssue = '';
 
-      if (savedManualData?.stats) {
-        const saved = savedManualData.stats.find((s: any) => s.name === name);
-        if (saved) {
-          finalManualCount = saved.manualCount || 0; 
-          finalIssue = saved.issue || '';
+      if (viewMode === 'daily') {
+        if (savedManualData?.stats) {
+          const saved = savedManualData.stats.find((s: any) => s.name === name);
+          if (saved) {
+            finalManualCount = saved.manualCount || 0; 
+            finalIssue = saved.issue || '';
+          }
         }
+      } else {
+        // 월별 모드일 땐 합산된 수기 데이터 반영
+        finalManualCount = monthlyManualCounts[name] || 0;
       }
+
       return { name, autoCount: finalAutoCount, manualCount: finalManualCount, issue: finalIssue };
     }));
 
-    if (savedManualData) {
+    // 4. 총 유입호/응대콜 반영 (월별 통계 포함)
+    if (viewMode === 'daily' && savedManualData) {
       setCallStats({ inflow: savedManualData.inflow || 0, response: savedManualData.response || 0 });
+    } else if (viewMode === 'monthly') {
+      setCallStats({ inflow: monthlyCallInflow, response: monthlyCallResponse });
     } else {
       setCallStats({ inflow: 0, response: 0 });
     }
