@@ -11,7 +11,7 @@ export async function GET(req: Request) {
   // 오늘 날짜 및 3달 전 날짜 구하기 (검색 범위)
   const today = new Date();
   const threeMonthsAgo = new Date();
-  threeMonthsAgo.setMonth(today.getMonth() - 3);
+  threeMonthsAgo.setMonth(today.getMonth() - 6);
 
   const formatDate = (date: Date) => {
     return `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}`;
