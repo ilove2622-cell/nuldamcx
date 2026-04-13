@@ -1145,63 +1145,124 @@ export default function IntegratedDashboardPage() {
 
       {/* 배송 추적 모달 */}
       <Dialog open={!!trackingModalData} onClose={() => { setTrackingModalData(null); setTrackingResult(null); }} maxWidth="xs" fullWidth
-        PaperProps={{ sx: { bgcolor: '#1e293b', color: '#f8fafc', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.1)', maxHeight: '85vh' } }}>
-        <DialogTitle sx={{ fontWeight: 700, borderBottom: '1px solid rgba(255,255,255,0.1)', py: 1.5 }}>
+        PaperProps={{ sx: { bgcolor: '#1e293b', color: '#f8fafc', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.08)', maxHeight: '85vh' } }}>
+        <DialogTitle sx={{ fontWeight: 700, borderBottom: '1px solid rgba(255,255,255,0.08)', py: 1.5, px: 2.5 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <LocalShippingIcon sx={{ color: '#10b981' }} />
-              <span>배송 추적</span>
+              <LocalShippingIcon sx={{ color: '#10b981', fontSize: 20 }} />
+              <Typography sx={{ fontWeight: 700, fontSize: '0.95rem', color: '#f8fafc' }}>배송 추적</Typography>
             </Box>
-            <Button onClick={() => { setTrackingModalData(null); setTrackingResult(null); }} size="small" sx={{ color: '#94a3b8', minWidth: 'auto' }}>✕</Button>
+            <IconButton onClick={() => { setTrackingModalData(null); setTrackingResult(null); }} size="small"
+              sx={{ color: '#64748b', '&:hover': { color: '#f8fafc', bgcolor: 'rgba(255,255,255,0.08)' } }}>
+              <Typography sx={{ fontSize: '1rem', lineHeight: 1 }}>✕</Typography>
+            </IconButton>
           </Box>
         </DialogTitle>
-        <DialogContent sx={{ pt: '16px !important', pb: 2 }}>
+
+        <DialogContent sx={{ pt: '20px !important', pb: 2.5, px: 2.5 }}>
           {trackingModalData && (
-            <Stack spacing={2}>
-              {/* 송장번호 & 택배사 */}
-              <Box sx={{ bgcolor: 'rgba(16, 185, 129, 0.08)', borderRadius: '10px', p: 2, textAlign: 'center' }}>
-                <Typography variant="caption" sx={{ color: '#94a3b8' }}>
-                  {trackingResult?.carrier || (getStandardChannelName(trackingModalData.channel) === '네이버' || getStandardChannelName(trackingModalData.channel) === '이베이' ? 'CJ대한통운' : '롯데택배')}
-                </Typography>
-                <Typography variant="h6" sx={{ fontWeight: 800, color: '#10b981', letterSpacing: '2px', mt: 0.5 }}>
+            <Stack spacing={2.5}>
+
+              {/* ── 헤더 블록: 택배사 + 송장번호 + 현재 상태 ── */}
+              <Box sx={{ bgcolor: 'rgba(16,185,129,0.07)', border: '1px solid rgba(16,185,129,0.18)', borderRadius: '12px', p: 2 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                  <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                    {trackingResult?.carrier || (getStandardChannelName(trackingModalData.channel) === '네이버' || getStandardChannelName(trackingModalData.channel) === '이베이' ? 'CJ대한통운' : '롯데택배')}
+                  </Typography>
+                  {trackingResult && (
+                    <Chip
+                      label={trackingResult.currentStatus} size="small"
+                      sx={{
+                        bgcolor: trackingResult.currentStatus === '배달완료' ? 'rgba(16,185,129,0.2)' : 'rgba(59,130,246,0.15)',
+                        color: trackingResult.currentStatus === '배달완료' ? '#10b981' : '#60a5fa',
+                        fontWeight: 700, fontSize: '0.72rem', height: 22, border: `1px solid ${trackingResult.currentStatus === '배달완료' ? 'rgba(16,185,129,0.3)' : 'rgba(59,130,246,0.3)'}`
+                      }}
+                    />
+                  )}
+                </Box>
+                <Typography sx={{ fontFamily: 'monospace', fontSize: '1.25rem', fontWeight: 800, color: '#10b981', letterSpacing: '2px', lineHeight: 1.3 }}>
                   {formatTrackingNumber(trackingModalData.trackingNumber)}
                 </Typography>
-                {trackingResult && (
-                  <Chip label={trackingResult.currentStatus} size="small" sx={{ mt: 1, bgcolor: trackingResult.currentStatus === '배달완료' ? 'rgba(16,185,129,0.2)' : 'rgba(59,130,246,0.2)', color: trackingResult.currentStatus === '배달완료' ? '#10b981' : '#3b82f6', fontWeight: 700 }} />
-                )}
               </Box>
 
-              {/* 배송 이력 */}
+              {/* ── 배송 이력 타임라인 ── */}
               {trackingLoading ? (
-                <Box sx={{ textAlign: 'center', py: 3 }}><CircularProgress size={24} sx={{ color: '#10b981' }} /></Box>
+                <Box sx={{ textAlign: 'center', py: 4 }}>
+                  <CircularProgress size={28} sx={{ color: '#10b981' }} />
+                  <Typography sx={{ mt: 1.5, fontSize: '0.78rem', color: '#64748b' }}>배송 정보 조회 중...</Typography>
+                </Box>
               ) : trackingResult && trackingResult.steps.length > 0 ? (
-                <Box sx={{ maxHeight: '300px', overflow: 'auto', '&::-webkit-scrollbar': { width: 4 }, '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(255,255,255,0.2)', borderRadius: 2 } }}>
-                  {trackingResult.steps.map((step, idx) => (
-                    <Box key={idx} sx={{ display: 'flex', gap: 1.5, py: 1, borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                      <Box sx={{ minWidth: 6, display: 'flex', flexDirection: 'column', alignItems: 'center', pt: 0.5 }}>
-                        <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: idx === 0 ? '#10b981' : '#475569' }} />
-                      </Box>
-                      <Box sx={{ flex: 1 }}>
-                        <Typography variant="caption" sx={{ color: idx === 0 ? '#10b981' : '#94a3b8', fontWeight: idx === 0 ? 700 : 400, display: 'block' }}>
-                          {step.status}
-                        </Typography>
-                        <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.7rem' }}>
-                          {step.date} · {step.location}
-                        </Typography>
-                      </Box>
-                    </Box>
-                  ))}
+                <Box>
+                  <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '1px', mb: 1.5 }}>
+                    배송 이력 ({trackingResult.steps.length}건)
+                  </Typography>
+                  <Box sx={{ maxHeight: '340px', overflowY: 'auto', pr: 0.5, '&::-webkit-scrollbar': { width: 3 }, '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(255,255,255,0.15)', borderRadius: 2 } }}>
+                    {trackingResult.steps.map((step, idx) => {
+                      const isLatest = idx === 0;
+                      return (
+                        <Box key={idx} sx={{
+                          display: 'flex', gap: 1.5, pb: 2, position: 'relative',
+                          '&:not(:last-child)::before': {
+                            content: '""', position: 'absolute',
+                            left: '5px', top: '14px', bottom: 0,
+                            width: '1px', bgcolor: 'rgba(255,255,255,0.06)'
+                          }
+                        }}>
+                          {/* 타임라인 점 */}
+                          <Box sx={{
+                            flexShrink: 0, width: 11, height: 11, mt: '3px', borderRadius: '50%', zIndex: 1,
+                            bgcolor: isLatest ? '#10b981' : '#1e293b',
+                            border: `2px solid ${isLatest ? '#10b981' : '#334155'}`,
+                            boxShadow: isLatest ? '0 0 0 3px rgba(16,185,129,0.15)' : 'none',
+                          }} />
+                          {/* 내용 */}
+                          <Box sx={{ flex: 1 }}>
+                            <Typography sx={{
+                              fontSize: '0.82rem',
+                              fontWeight: isLatest ? 700 : 500,
+                              color: isLatest ? '#f1f5f9' : '#94a3b8',
+                              lineHeight: 1.4, mb: 0.4
+                            }}>
+                              {step.status}
+                            </Typography>
+                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center' }}>
+                              <Typography sx={{ fontSize: '0.72rem', color: '#475569', fontFamily: 'monospace' }}>
+                                {step.date}
+                              </Typography>
+                              {step.location && (
+                                <>
+                                  <Typography sx={{ fontSize: '0.65rem', color: '#334155', lineHeight: 1 }}>·</Typography>
+                                  <Typography sx={{
+                                    fontSize: '0.72rem',
+                                    color: isLatest ? '#64748b' : '#475569',
+                                    fontWeight: isLatest ? 600 : 400
+                                  }}>
+                                    {step.location}
+                                  </Typography>
+                                </>
+                              )}
+                            </Box>
+                          </Box>
+                        </Box>
+                      );
+                    })}
+                  </Box>
                 </Box>
               ) : !trackingLoading ? (
-                <Typography variant="body2" sx={{ color: '#64748b', textAlign: 'center', py: 2 }}>배송 정보를 불러올 수 없습니다.</Typography>
+                <Box sx={{ textAlign: 'center', py: 3 }}>
+                  <Typography sx={{ fontSize: '0.8rem', color: '#475569' }}>배송 정보를 불러올 수 없습니다.</Typography>
+                </Box>
               ) : null}
 
-              {/* 택배사 사이트에서 열기 */}
+              {/* ── 택배사 사이트 버튼 ── */}
               <Button
                 fullWidth variant="outlined" size="small"
                 onClick={() => window.open(trackingModalData.trackingUrl, '_blank')}
-                startIcon={<LaunchIcon />}
-                sx={{ color: '#94a3b8', borderColor: 'rgba(255,255,255,0.15)', fontSize: '0.8rem' }}
+                startIcon={<LaunchIcon sx={{ fontSize: '14px !important' }} />}
+                sx={{
+                  color: '#64748b', borderColor: 'rgba(255,255,255,0.08)', fontSize: '0.75rem', py: 0.9,
+                  '&:hover': { borderColor: 'rgba(255,255,255,0.2)', color: '#94a3b8', bgcolor: 'rgba(255,255,255,0.03)' }
+                }}
               >
                 택배사 사이트에서 보기
               </Button>
