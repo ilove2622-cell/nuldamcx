@@ -137,14 +137,16 @@ export default function StatusPage() {
   useEffect(() => {
     const checkAuth = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session || session.user.email !== 'cx@joinandjoin.com') {
+      const allowedEmails = ['cx@joinandjoin.com', 'ilove2622@nuldam.com'];
+      if (!session || !allowedEmails.includes(session.user.email || '')) {
         router.replace('/login');
       }
     };
     checkAuth();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_OUT' || !session || session.user.email !== 'cx@joinandjoin.com') {
+      const allowedEmails = ['cx@joinandjoin.com', 'ilove2622@nuldam.com'];
+      if (event === 'SIGNED_OUT' || !session || !allowedEmails.includes(session?.user?.email || '')) {
         router.replace('/login');
       }
     });
