@@ -29,7 +29,7 @@ export default function LoginPage() {
   const [successMsg, setSuccessMsg] = useState('');
 
   
-  const ALLOWED_EMAIL = 'cx@joinandjoin.com';
+  const ALLOWED_EMAILS = ['cx@joinandjoin.com', 'ilove2622@nuldam.com'];
 
   
   const handleSendOtp = async (e: React.FormEvent) => {
@@ -37,7 +37,7 @@ export default function LoginPage() {
     setErrorMsg('');
     setSuccessMsg('');
 
-    if (email !== ALLOWED_EMAIL) {
+    if (!ALLOWED_EMAILS.includes(email)) {
       setErrorMsg('인가된 사내 관리자 계정만 접근할 수 있습니다.');
       return;
     }
@@ -54,7 +54,7 @@ export default function LoginPage() {
     if (error) {
       setErrorMsg(error.message);
     } else {
-      setSuccessMsg('메일로 6자리 인증번호가 발송되었습니다. (최대 1~2분 소요)');
+      setSuccessMsg('메일로 인증번호가 발송되었습니다. (최대 1~2분 소요)');
       setStep('otp'); 
     }
     setLoading(false);
