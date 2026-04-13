@@ -168,6 +168,8 @@ export default function IntegratedDashboardPage() {
   // 모달 상태
   const [orderModalData, setOrderModalData] = useState<DBInquiry | null>(null);
   const [trackingModalData, setTrackingModalData] = useState<{ channel: string; trackingNumber: string; trackingUrl: string } | null>(null);
+  const [trackingResult, setTrackingResult] = useState<{ carrier: string; currentStatus: string; steps: { date: string; location: string; status: string }[] } | null>(null);
+  const [trackingLoading, setTrackingLoading] = useState(false);
 
   // ==========================================
   // 📡 3. 데이터 페칭 & 보안 검증
@@ -869,11 +871,21 @@ export default function IntegratedDashboardPage() {
                                   <LocalShippingIcon sx={{ fontSize: 14, color: '#10b981' }} /> 
                                   <MuiLink
                                     component="button"
-                                    onClick={() => setTrackingModalData({
-                                      channel: mainItem.channel,
-                                      trackingNumber: mainItem.tracking_number || '',
-                                      trackingUrl: getTrackingUrl(mainItem.channel, mainItem.tracking_number)
-                                    })}
+                                    onClick={async () => {
+                                      const tNum = mainItem.tracking_number || '';
+                                      const tUrl = getTrackingUrl(mainItem.channel, tNum);
+                                      const ch = mainItem.channel;
+                                      setTrackingModalData({ channel: ch, trackingNumber: tNum, trackingUrl: tUrl });
+                                      setTrackingResult(null);
+                                      setTrackingLoading(true);
+                                      try {
+                                        const stdCh = getStandardChannelName(ch);
+                                        const carrier = (stdCh === '네이버' || stdCh === '이베이') ? 'cj' : 'lotte';
+                                        const res = await fetch(`/api/tracking?carrier=${carrier}&num=${tNum.replace(/\D/g, '')}`);
+                                        const data = await res.json();
+                                        if (!data.error) setTrackingResult(data);
+                                      } catch {} finally { setTrackingLoading(false); }
+                                    }}
                                     sx={{
                                       ml: 0.5, fontWeight: 700, color: '#10b981', textDecoration: 'none',
                                       '&:hover': { textDecoration: 'underline', cursor: 'pointer' },
@@ -1132,39 +1144,68 @@ export default function IntegratedDashboardPage() {
       </Dialog>
 
       {/* 배송 추적 모달 */}
-      <Dialog open={!!trackingModalData} onClose={() => setTrackingModalData(null)} maxWidth="sm" fullWidth
-        PaperProps={{ sx: { bgcolor: '#1e293b', color: '#f8fafc', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.1)', height: '85vh' } }}>
-        <DialogTitle sx={{ fontWeight: 700, borderBottom: '1px solid rgba(255,255,255,0.1)', py: 1.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <LocalShippingIcon sx={{ color: '#10b981' }} />
-            <span>배송 추적</span>
-          </Box>
-          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-            <Chip label={trackingModalData ? formatTrackingNumber(trackingModalData.trackingNumber) : ''} size="small"
-              sx={{ bgcolor: 'rgba(16, 185, 129, 0.1)', color: '#10b981', fontWeight: 700 }} />
-            <Button onClick={() => { if (trackingModalData) window.open(trackingModalData.trackingUrl, '_blank'); }}
-              size="small" sx={{ color: '#94a3b8', minWidth: 'auto', fontSize: '0.75rem' }}>
-              새 탭
-            </Button>
-            <Button onClick={() => setTrackingModalData(null)} size="small" sx={{ color: '#94a3b8', minWidth: 'auto' }}>
-              ✕
-            </Button>
+      <Dialog open={!!trackingModalData} onClose={() => { setTrackingModalData(null); setTrackingResult(null); }} maxWidth="xs" fullWidth
+        PaperProps={{ sx: { bgcolor: '#1e293b', color: '#f8fafc', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.1)', maxHeight: '85vh' } }}>
+        <DialogTitle sx={{ fontWeight: 700, borderBottom: '1px solid rgba(255,255,255,0.1)', py: 1.5 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <LocalShippingIcon sx={{ color: '#10b981' }} />
+              <span>배송 추적</span>
+            </Box>
+            <Button onClick={() => { setTrackingModalData(null); setTrackingResult(null); }} size="small" sx={{ color: '#94a3b8', minWidth: 'auto' }}>✕</Button>
           </Box>
         </DialogTitle>
-        <DialogContent sx={{ p: 0, flex: 1, overflow: 'hidden', position: 'relative' }}>
+        <DialogContent sx={{ pt: '16px !important', pb: 2 }}>
           {trackingModalData && (
-            <>
-              <iframe
-                src={trackingModalData.trackingUrl}
-                style={{ width: '100%', height: '100%', border: 'none', background: '#fff' }}
-                title="배송 추적"
-                sandbox="allow-scripts allow-same-origin"
-              />
-              {/* 오른쪽 플로팅 아이콘 가림막 */}
-              <Box sx={{ position: 'absolute', top: 0, right: 0, width: '80px', height: '100%', background: 'linear-gradient(to right, transparent, #fff 30%)', pointerEvents: 'none', zIndex: 10 }} />
-              {/* 하단 플로팅 바 가림막 */}
-              <Box sx={{ position: 'absolute', bottom: 0, left: 0, width: '100%', height: '60px', background: 'linear-gradient(to bottom, transparent, #fff 40%)', pointerEvents: 'none', zIndex: 10 }} />
-            </>
+            <Stack spacing={2}>
+              {/* 송장번호 & 택배사 */}
+              <Box sx={{ bgcolor: 'rgba(16, 185, 129, 0.08)', borderRadius: '10px', p: 2, textAlign: 'center' }}>
+                <Typography variant="caption" sx={{ color: '#94a3b8' }}>
+                  {trackingResult?.carrier || (getStandardChannelName(trackingModalData.channel) === '네이버' || getStandardChannelName(trackingModalData.channel) === '이베이' ? 'CJ대한통운' : '롯데택배')}
+                </Typography>
+                <Typography variant="h6" sx={{ fontWeight: 800, color: '#10b981', letterSpacing: '2px', mt: 0.5 }}>
+                  {formatTrackingNumber(trackingModalData.trackingNumber)}
+                </Typography>
+                {trackingResult && (
+                  <Chip label={trackingResult.currentStatus} size="small" sx={{ mt: 1, bgcolor: trackingResult.currentStatus === '배달완료' ? 'rgba(16,185,129,0.2)' : 'rgba(59,130,246,0.2)', color: trackingResult.currentStatus === '배달완료' ? '#10b981' : '#3b82f6', fontWeight: 700 }} />
+                )}
+              </Box>
+
+              {/* 배송 이력 */}
+              {trackingLoading ? (
+                <Box sx={{ textAlign: 'center', py: 3 }}><CircularProgress size={24} sx={{ color: '#10b981' }} /></Box>
+              ) : trackingResult && trackingResult.steps.length > 0 ? (
+                <Box sx={{ maxHeight: '300px', overflow: 'auto', '&::-webkit-scrollbar': { width: 4 }, '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(255,255,255,0.2)', borderRadius: 2 } }}>
+                  {trackingResult.steps.map((step, idx) => (
+                    <Box key={idx} sx={{ display: 'flex', gap: 1.5, py: 1, borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                      <Box sx={{ minWidth: 6, display: 'flex', flexDirection: 'column', alignItems: 'center', pt: 0.5 }}>
+                        <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: idx === 0 ? '#10b981' : '#475569' }} />
+                      </Box>
+                      <Box sx={{ flex: 1 }}>
+                        <Typography variant="caption" sx={{ color: idx === 0 ? '#10b981' : '#94a3b8', fontWeight: idx === 0 ? 700 : 400, display: 'block' }}>
+                          {step.status}
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.7rem' }}>
+                          {step.date} · {step.location}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  ))}
+                </Box>
+              ) : !trackingLoading ? (
+                <Typography variant="body2" sx={{ color: '#64748b', textAlign: 'center', py: 2 }}>배송 정보를 불러올 수 없습니다.</Typography>
+              ) : null}
+
+              {/* 택배사 사이트에서 열기 */}
+              <Button
+                fullWidth variant="outlined" size="small"
+                onClick={() => window.open(trackingModalData.trackingUrl, '_blank')}
+                startIcon={<LaunchIcon />}
+                sx={{ color: '#94a3b8', borderColor: 'rgba(255,255,255,0.15)', fontSize: '0.8rem' }}
+              >
+                택배사 사이트에서 보기
+              </Button>
+            </Stack>
           )}
         </DialogContent>
       </Dialog>
