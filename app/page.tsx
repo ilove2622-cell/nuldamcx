@@ -313,22 +313,20 @@ export default function IntegratedDashboardPage() {
   const handleTriggerBot = async () => {
     setIsTriggeringBot(true);
     try {
-      // 1. 답변저장 상태인 항목들의 ID 가져오기
-      const { data: pendingItems } = await supabase.from('inquiries').select('id').eq('status', '답변저장');
-      if (!pendingItems || pendingItems.length === 0) {
-        alert('전송할 답변이 없습니다. 먼저 답변을 저장해주세요.');
-        return;
-      }
-      const ids = pendingItems.map((item: any) => item.id);
-      // 2. 사방넷에 실제 전송
-      const res = await fetch('/api/reply', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids }) });
-      const result = await res.json();
-      if (result.status === 'success' && result.processed) {
-        alert(`✅ 사방넷 전송 성공! ${result.count}건 처리완료`);
-      } else if (result.status === 'success') {
-        alert(`⚠️ 사방넷에 요청했으나 처리된 건수가 0건입니다.\n\n이미 답변된 문의이거나, 사방넷에서 거부한 건일 수 있습니다.`);
+      // 1. 답변저장 상태인 항목을 전송요청으로 변경 (로컬 봇이 감지)
+      const { data, error } = await supabase
+        .from('inquiries')
+        .update({ status: '전송요청' })
+        .eq('status', '답변저장')
+        .select();
+
+      if (error) throw new Error(error.message);
+
+      const count = data?.length || 0;
+      if (count > 0) {
+        alert(`✅ ${count}건의 송신 요청 완료!\n\n로컬 봇이 자동으로 사방넷에 전송합니다.`);
       } else {
-        alert(`❌ 전송 실패: ${result.message}`);
+        alert('전송할 답변이 없습니다. 먼저 답변을 저장해주세요.');
       }
       fetchDataAndCounts();
     } finally { setIsTriggeringBot(false); }
