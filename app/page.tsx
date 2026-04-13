@@ -1132,33 +1132,35 @@ export default function IntegratedDashboardPage() {
       </Dialog>
 
       {/* 배송 추적 모달 */}
-      <Dialog open={!!trackingModalData} onClose={() => setTrackingModalData(null)} maxWidth="md" fullWidth
-        PaperProps={{ sx: { bgcolor: '#1e293b', color: '#f8fafc', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.1)', height: '80vh' } }}>
-        <DialogTitle sx={{ fontWeight: 700, borderBottom: '1px solid rgba(255,255,255,0.1)', pb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span>배송 추적</span>
-          {trackingModalData && (
-            <Chip label={formatTrackingNumber(trackingModalData.trackingNumber)} size="small"
+      <Dialog open={!!trackingModalData} onClose={() => setTrackingModalData(null)} maxWidth="sm" fullWidth
+        PaperProps={{ sx: { bgcolor: '#1e293b', color: '#f8fafc', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.1)', height: '85vh' } }}>
+        <DialogTitle sx={{ fontWeight: 700, borderBottom: '1px solid rgba(255,255,255,0.1)', py: 1.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <LocalShippingIcon sx={{ color: '#10b981' }} />
+            <span>배송 추적</span>
+          </Box>
+          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+            <Chip label={trackingModalData ? formatTrackingNumber(trackingModalData.trackingNumber) : ''} size="small"
               sx={{ bgcolor: 'rgba(16, 185, 129, 0.1)', color: '#10b981', fontWeight: 700 }} />
-          )}
+            <Button onClick={() => { if (trackingModalData) window.open(trackingModalData.trackingUrl, '_blank'); }}
+              size="small" sx={{ color: '#94a3b8', minWidth: 'auto', fontSize: '0.75rem' }}>
+              새 탭
+            </Button>
+            <Button onClick={() => setTrackingModalData(null)} size="small" sx={{ color: '#94a3b8', minWidth: 'auto' }}>
+              ✕
+            </Button>
+          </Box>
         </DialogTitle>
-        <DialogContent sx={{ p: 0, flex: 1 }}>
+        <DialogContent sx={{ p: 0, flex: 1, overflow: 'hidden' }}>
           {trackingModalData && (
             <iframe
               src={trackingModalData.trackingUrl}
-              style={{ width: '100%', height: '100%', border: 'none' }}
+              style={{ width: '100%', height: '100%', border: 'none', background: '#fff' }}
               title="배송 추적"
+              sandbox="allow-scripts allow-same-origin allow-popups"
             />
           )}
         </DialogContent>
-        <DialogActions sx={{ borderTop: '1px solid rgba(255,255,255,0.1)', p: 2, gap: 1 }}>
-          <Button onClick={() => { if (trackingModalData) window.open(trackingModalData.trackingUrl, '_blank'); }}
-            variant="outlined" size="small" sx={{ color: '#10b981', borderColor: '#10b981' }}>
-            새 탭에서 열기
-          </Button>
-          <Button onClick={() => setTrackingModalData(null)} variant="contained" size="small" sx={{ bgcolor: '#10b981' }}>
-            닫기
-          </Button>
-        </DialogActions>
       </Dialog>
 
     </Box>
