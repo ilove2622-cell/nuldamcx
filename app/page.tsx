@@ -4,7 +4,6 @@ import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
-// 💡 상수 및 정규화 함수 임포트
 import { CHANNEL_URL_MAP, STATUS_OPTIONS, MALL_OPTIONS, CHANNEL_MAP, QUICK_LINKS } from '@/lib/constants';
 
 // MUI Components
@@ -31,7 +30,9 @@ import {
   SmartToy as SmartToyIcon,
   CheckCircleOutline as CheckCircleIcon,
   Launch as LaunchIcon,
-  Link as LinkIcon
+  Link as LinkIcon,
+  UploadFile as UploadFileIcon,
+  DocumentScanner as DocumentScannerIcon // 💡 [추가] OCR용 스캐너 아이콘
 } from '@mui/icons-material';
 
 // ==========================================
@@ -158,10 +159,10 @@ export default function IntegratedDashboardPage() {
   
   const [isGeneratingAI, setIsGeneratingAI] = useState<Record<string, boolean>>({});
   const [isGeneratingBulkAI, setIsGeneratingBulkAI] = useState(false);
+  
+  const [isUploadingScript, setIsUploadingScript] = useState(false);
 
   const [linkAnchorEl, setLinkAnchorEl] = useState<null | HTMLElement>(null);
-
-  // 💡 [추가] 시트 저장 로딩 상태
   const [isSavingSheet, setIsSavingSheet] = useState<Record<string, boolean>>({});
 
   // ==========================================
@@ -298,7 +299,11 @@ export default function IntegratedDashboardPage() {
   };
 
   const handleCollectAll = async () => { setIsCollectingAll(true); try { await fetch("/api/collect", { method: "POST" }); fetchDataAndCounts(); } finally { setIsCollectingAll(false); } };
+
+
   const handleBulkSubmit = async () => { setIsSubmitting(true); try { await Promise.all(selectedIds.map(id => supabase.from('inquiries').update({ admin_reply: replyTexts[id], status: '답변저장' }).eq('id', id))); await fetch('/api/reply', { method: 'POST', body: JSON.stringify({ ids: selectedIds }) }); fetchDataAndCounts(); } finally { setIsSubmitting(false); } };
+
+  
   const handleTriggerBot = async () => { setIsTriggeringBot(true); try { await fetch('/api/trigger-bot', { method: 'POST' }); fetchDataAndCounts(); } finally { setIsTriggeringBot(false); } };
 
   const handleForceComplete = async (id: string) => {
@@ -311,11 +316,10 @@ export default function IntegratedDashboardPage() {
     }
   };
 
-
   const handleSaveToSheet = async (item: DBInquiry) => {
     setIsSavingSheet(prev => ({ ...prev, [item.id]: true }));
     try {
-      const res = await fetch('/api/sheet', {
+      const resSheet = await fetch('/api/sheet', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -327,17 +331,31 @@ export default function IntegratedDashboardPage() {
           trackingNumber: item.tracking_number ? formatTrackingNumber(item.tracking_number) : '-',
         })
       });
-      const data = await res.json();
+      const dataSheet = await resSheet.json();
+
+      const currentScript = replyTexts[item.id] || item.admin_reply || item.ai_draft || '';
+      if (currentScript.trim()) {
+        await fetch('/api/scripts/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            inquiryId: item.id,
+            orderNumber: item.order_number || '-',
+            customerName: item.customer_name || '-',
+            script: currentScript
+          })
+        }).catch(err => console.error("스크립트 업로드 에러:", err));
+      }
       
       const safeName = item.customer_name ? item.customer_name : '고객';
       
-      if (data.success) {
-        alert(`✅ [${safeName}]님의 데이터가 오늘 시트 탭에 저장되었습니다!`);
+      if (dataSheet.success) {
+        alert(`✅ [${safeName}]님의 정보와 스크립트가 성공적으로 저장되었습니다!`);
       } else {
-        if (data.error === 'TODAY_TAB_MISSING') {
+        if (dataSheet.error === 'TODAY_TAB_MISSING') {
           alert(`❌ 시트에 오늘 날짜 탭이 없습니다!\n스프레드시트 하단에 오늘 날짜 탭을 먼저 생성해 주세요.`);
         } else {
-          alert('❌ 저장 실패: ' + data.error);
+          alert('❌ 저장 실패: ' + dataSheet.error);
         }
       }
     } catch (error) {
@@ -347,13 +365,57 @@ export default function IntegratedDashboardPage() {
     }
   };
 
+  const handleExcelUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingScript(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const res = await fetch('/api/scripts/upload-excel', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        alert('✅ 엑셀 스크립트가 성공적으로 업로드되었습니다!');
+      } else {
+        alert('❌ 업로드 실패: ' + (data.error || '알 수 없는 오류'));
+      }
+    } catch (error) {
+      console.error('엑셀 업로드 에러:', error);
+      alert('❌ 네트워크 오류가 발생했습니다. 백엔드에 upload-excel 폴더가 있는지 확인해주세요!');
+    } finally {
+      setIsUploadingScript(false);
+      event.target.value = '';
+    }
+  };
+
   const handleGenerateAI = async (id: string) => {
     setIsGeneratingAI(prev => ({ ...prev, [id]: true }));
     try {
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      setReplyTexts(prev => ({ ...prev, [id]: "개별 생성된 AI 답변입니다. (봇 연동 대기 중)" }));
+      const targetInquiry = allData.find(item => item.id === id);
+      if (!targetInquiry) return;
+
+      const response = await fetch('/api/generate-draft', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ inquiryContent: targetInquiry.content }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setReplyTexts(prev => ({ ...prev, [id]: data.draft }));
+      } else {
+        alert('AI 초안 생성 실패: ' + data.error);
+      }
     } catch (error) {
       console.error("AI 생성 실패:", error);
+      alert('네트워크 오류가 발생했습니다.');
     } finally {
       setIsGeneratingAI(prev => ({ ...prev, [id]: false }));
     }
@@ -361,28 +423,62 @@ export default function IntegratedDashboardPage() {
 
   const handleBulkGenerateAI = async () => {
     if (selectedIds.length === 0) return;
+    
+    const validIds = selectedIds.filter(id => {
+      const target = allData.find(item => item.id === id);
+      return target && (target.status === '대기' || target.status === '신규');
+    });
+
+    if (validIds.length === 0) {
+      alert("선택된 문의 중 AI 답변을 생성할 수 있는 대기/신규 건이 없습니다.");
+      return;
+    }
+
     setIsGeneratingBulkAI(true);
+    
     const loadingState: Record<string, boolean> = {};
-    selectedIds.forEach(id => { loadingState[id] = true; });
+    validIds.forEach(id => { loadingState[id] = true; });
     setIsGeneratingAI(prev => ({ ...prev, ...loadingState }));
 
     try {
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      const newReplies: Record<string, string> = {};
-      selectedIds.forEach(id => {
-        newReplies[id] = "선택된 항목에 대해 일괄 생성된 AI 답변입니다.";
-      });
-      setReplyTexts(prev => ({ ...prev, ...newReplies }));
+      for (const id of validIds) {
+        const targetInquiry = allData.find(item => item.id === id);
+        if (!targetInquiry) continue;
+
+        try {
+          const response = await fetch('/api/generate-draft', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ inquiryContent: targetInquiry.content }),
+          });
+          const data = await response.json();
+
+          if (response.ok) {
+            setReplyTexts(prev => ({ ...prev, [id]: data.draft }));
+          } else {
+            setReplyTexts(prev => ({ ...prev, [id]: `생성 실패: ${data.error}` }));
+          }
+        } catch (err) {
+          setReplyTexts(prev => ({ ...prev, [id]: "네트워크 오류" }));
+        }
+
+        setIsGeneratingAI(prev => ({ ...prev, [id]: false }));
+
+        await new Promise(resolve => setTimeout(resolve, 4500));
+      }
+
     } catch (error) {
       console.error("AI 일괄 생성 실패:", error);
+      alert("일괄 생성 중 오류가 발생했습니다.");
     } finally {
       setIsGeneratingBulkAI(false);
+      
       const doneState: Record<string, boolean> = {};
-      selectedIds.forEach(id => { doneState[id] = false; });
+      validIds.forEach(id => { doneState[id] = false; });
       setIsGeneratingAI(prev => ({ ...prev, ...doneState }));
     }
   };
-
+  
   // ==========================================
   // 🎨 6. 화면 렌더링 (UI)
   // ==========================================
@@ -460,8 +556,34 @@ export default function IntegratedDashboardPage() {
             </Typography>
             <Typography variant="caption" sx={{ color: '#64748b', ml: 1, letterSpacing: '1px' }}>INTEGRATED WORKSPACE</Typography>
           </Box>
-          <Stack direction="row" spacing={2}>
-            <Button onClick={() => router.push('/status')} sx={{ color: '#cbd5e1', fontWeight: 600 }}>문의현황</Button>
+          
+          <Stack direction="row" spacing={1.5}>
+            <Button 
+              onClick={() => router.push('/ocr')} 
+              startIcon={<DocumentScannerIcon fontSize="small" />}
+              sx={{ 
+                color: '#cbd5e1', 
+                fontWeight: 600,
+                px: 2,
+                borderRadius: '8px',
+                '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.05)' }
+              }}
+            >
+              OCR
+            </Button>
+            
+            <Button 
+              onClick={() => router.push('/status')} 
+              sx={{ 
+                color: '#cbd5e1', 
+                fontWeight: 600,
+                px: 2,
+                borderRadius: '8px',
+                '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.05)' }
+              }}
+            >
+              문의현황
+            </Button>
           </Stack>
         </Container>
       </Box>
@@ -531,6 +653,23 @@ export default function IntegratedDashboardPage() {
             <Typography variant="body2" sx={{ color: '#f8fafc', fontWeight: 600 }}>전체 선택 <span style={{ color: '#3b82f6' }}>({selectedIds.length}건)</span></Typography>
           </Box>
           <Stack direction="row" spacing={1}>
+            <Button
+              component="label"
+              size="small"
+              variant="outlined"
+              startIcon={isUploadingScript ? <CircularProgress size={14} color="inherit" /> : <UploadFileIcon fontSize="small" />}
+              disabled={isUploadingScript}
+              sx={{ borderColor: 'rgba(255,255,255,0.2)', color: '#cbd5e1', fontWeight: 600, '&:hover': { borderColor: '#f8fafc', bgcolor: 'rgba(255,255,255,0.05)' } }}
+            >
+              스크립트 엑셀 추가
+              <input
+                type="file"
+                hidden
+                accept=".xlsx, .xls, .csv"
+                onChange={handleExcelUpload}
+              />
+            </Button>
+
             <Button size="small" variant="outlined" startIcon={isCollectingAll ? <CircularProgress size={14} color="inherit" /> : <CloudDownloadIcon fontSize="small" />} onClick={handleCollectAll} disabled={isCollectingAll} sx={{ borderColor: 'rgba(255,255,255,0.2)', color: '#cbd5e1', fontWeight: 600, '&:hover': { borderColor: '#f8fafc', bgcolor: 'rgba(255,255,255,0.05)' } }}>새로 수집</Button>
             
             <Button 
@@ -634,7 +773,6 @@ export default function IntegratedDashboardPage() {
                               />
                               <Chip label={mainItem.status} size="small" sx={{ bgcolor: mainStatusColor.bg, color: mainStatusColor.color, fontWeight: 700, borderRadius: '4px', height: '22px', fontSize: '0.7rem' }} />
                               
-                              {/* 💡 [추가] 메인 문의 - 시트 저장 버튼 */}
                               <Button
                                 size="small"
                                 disabled={isSavingSheet[mainItem.id]}
@@ -818,7 +956,6 @@ export default function IntegratedDashboardPage() {
                                         
                                         <Stack direction="row" spacing={1} alignItems="center">
                                           <Chip label={subItem.status} size="small" sx={{ bgcolor: subStatusColor.bg, color: subStatusColor.color, fontWeight: 700, borderRadius: '4px', height: '20px', fontSize: '0.7rem' }} />
-                                          {/* 💡 [추가] 서브 문의 - 시트 저장 버튼 */}
                                           <Button
                                             size="small"
                                             disabled={isSavingSheet[subItem.id]}
