@@ -581,7 +581,7 @@ export default function IntegratedDashboardPage() {
       </Box>
 
       <Box component="header" sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(10px)', bgcolor: 'rgba(15, 23, 42, 0.6)', position: 'sticky', top: 0, zIndex: 50 }}>
-        <Container maxWidth="lg" sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 2 }}>
+        <Container maxWidth="xl" sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 2, px: { xs: 2, sm: 3, lg: 4 } }}>
           <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
             <Typography variant="h5" sx={{ fontWeight: 800, letterSpacing: '-1px' }}>
               <span style={{ color: '#3b82f6' }}>N</span>uldam <span style={{ color: '#94a3b8', fontWeight: 300 }}>CX</span>
@@ -620,17 +620,17 @@ export default function IntegratedDashboardPage() {
         </Container>
       </Box>
 
-      <Container maxWidth="lg" sx={{ mt: 2, mb: 8, flex: 1 }}>
+      <Container maxWidth="xl" sx={{ mt: 2, mb: 8, flex: 1, px: { xs: 2, sm: 3, lg: 4 } }}>
         
         {/* --- KPI 요약 보드 --- */}
-        <Box sx={{ display: 'flex', gap: 2, mb: 2, overflowX: 'auto', pb: 0.5 }}>
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(4, 1fr)' }, gap: 2, mb: 2 }}>
           {SUMMARY_DATA.map((item, index) => (
-            <Card key={index} elevation={0} sx={{ flex: 1, minWidth: '150px', bgcolor: 'rgba(30, 41, 59, 0.6)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '12px', backdropFilter: 'blur(10px)' }}>
-              <CardContent sx={{ p: '12px 16px !important' }}>
-                <Typography variant="caption" sx={{ color: '#94a3b8', fontWeight: 600, mb: 0.5, display: 'block' }}>{item.title}</Typography>
+            <Card key={index} elevation={0} sx={{ bgcolor: 'rgba(30, 41, 59, 0.6)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '12px', backdropFilter: 'blur(10px)' }}>
+              <CardContent sx={{ p: { xs: '12px 16px !important', lg: '16px 20px !important' } }}>
+                <Typography variant="caption" sx={{ color: '#94a3b8', fontWeight: 600, mb: 0.5, display: 'block', fontSize: { xs: '0.7rem', lg: '0.75rem' } }}>{item.title}</Typography>
                 <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.5 }}>
-                  <Typography variant="h5" sx={{ color: item.color, fontWeight: 800 }}>{item.count}</Typography>
-                  <Typography variant="caption" sx={{ color: '#64748b' }}>건</Typography>
+                  <Typography sx={{ color: item.color, fontWeight: 800, fontSize: { xs: '1.5rem', lg: '2rem' }, lineHeight: 1.2 }}>{item.count}</Typography>
+                  <Typography variant="caption" sx={{ color: '#64748b', fontSize: { xs: '0.7rem', lg: '0.8rem' } }}>건</Typography>
                 </Box>
               </CardContent>
             </Card>
@@ -638,7 +638,7 @@ export default function IntegratedDashboardPage() {
         </Box>
 
         {/* --- 슈퍼 필터 바 --- */}
-        <Box sx={{ px: 1.5, py: 1, mb: 2, bgcolor: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+        <Box sx={{ px: 1.5, py: 1, mb: 2, bgcolor: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', display: 'flex', gap: 1, flexWrap: { xs: 'wrap', xl: 'nowrap' }, alignItems: 'flex-end' }}>
           <Box sx={{ flex: 1, minWidth: '90px' }}>
             <Typography variant="caption" sx={{ color: '#94a3b8', mb: 0.2, fontSize: '0.7rem', display: 'block' }}>정렬</Typography>
             <Select fullWidth size="small" value={sortOrder} onChange={(e) => { setSortOrder(e.target.value); setPage(0); }} sx={{ bgcolor: 'rgba(15, 23, 42, 0.5)', color: '#f8fafc', borderRadius: '6px', fontSize: '0.8rem', height: '32px', '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.1)' } }}>
@@ -679,7 +679,7 @@ export default function IntegratedDashboardPage() {
         </Box>
 
         {/* --- 액션 컨트롤 바 --- */}
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', mb: 2, px: 2, py: 1.5, bgcolor: 'rgba(30, 41, 59, 0.8)', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
+        <Box sx={{ display: 'flex', flexWrap: { xs: 'wrap', md: 'nowrap' }, justifyContent: 'space-between', alignItems: 'center', gap: 1, mb: 2, px: 2, py: 1.5, bgcolor: 'rgba(30, 41, 59, 0.8)', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.1)', overflowX: 'auto' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <Checkbox color="primary" size="small" indeterminate={isSomePageSelected} checked={isAllPageSelected} onChange={handleSelectAllPageClick} sx={{ color: '#64748b', '&.Mui-checked': { color: '#3b82f6' } }} />
             <Typography variant="body2" sx={{ color: '#f8fafc', fontWeight: 600 }}>전체 선택 <span style={{ color: '#3b82f6' }}>({selectedIds.length}건)</span></Typography>
@@ -756,8 +756,11 @@ export default function IntegratedDashboardPage() {
                       <Box sx={{ pt: 0.5 }}>
                         <Checkbox checked={isMainSelected} onChange={() => handleClick(mainItem.id)} sx={{ color: '#64748b', '&.Mui-checked': { color: '#3b82f6' }, p: 0.5 }} />
                       </Box>
-                      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                        
+                      <Box sx={{ flex: 1, display: 'flex', flexDirection: { xs: 'column', lg: 'row' }, gap: { xs: 1.5, lg: 2 }, minWidth: 0 }}>
+
+                        {/* ── 좌측: 문의 정보 + 내용 ── */}
+                        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1.5, minWidth: 0 }}>
+
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
                             <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#f8fafc' }}>
@@ -903,9 +906,14 @@ export default function IntegratedDashboardPage() {
                         <Box sx={{ bgcolor: 'rgba(15, 23, 42, 0.6)', p: 1.5, borderRadius: '8px', border: '1px solid rgba(255,255,255,0.03)' }}>
                           <Typography variant="body2" sx={{ color: '#cbd5e1', whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>{mainItem.content}</Typography>
                         </Box>
-                        
+
+                        </Box>{/* ── 좌측 열 끝 ── */}
+
+                        {/* ── 우측: 답변 입력 ── */}
+                        <Box sx={{ width: { xs: '100%', lg: '360px' }, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
+
                         <Box sx={{ position: 'relative' }}>
-                          <TextField 
+                          <TextField
                             multiline fullWidth minRows={2} maxRows={6} size="small" 
                             value={replyTexts[mainItem.id] !== undefined ? replyTexts[mainItem.id] : ''} 
                             onChange={(e) => handleReplyChange(mainItem.id, e.target.value)} 
@@ -969,6 +977,10 @@ export default function IntegratedDashboardPage() {
                             <AutoAwesomeIcon sx={{ fontSize: 12 }} /> AI 작성 초안
                           </Typography>
                         )}
+
+                        </Box>{/* ── 우측 열 끝 ── */}
+
+                      </Box>{/* ── 2열 행 끝 ── */}
 
                         {isMultiple && (
                           <Box sx={{ mt: 1, textAlign: 'center' }}>
@@ -1107,45 +1119,46 @@ export default function IntegratedDashboardPage() {
 
       {/* 주문 상세 모달 */}
       <Dialog open={!!orderModalData} onClose={() => setOrderModalData(null)} maxWidth="sm" fullWidth
-        PaperProps={{ sx: { bgcolor: '#1e293b', color: '#f8fafc', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.1)' } }}>
-        <DialogTitle sx={{ fontWeight: 700, borderBottom: '1px solid rgba(255,255,255,0.1)', pb: 2 }}>
+        PaperProps={{ sx: { bgcolor: '#1e293b', color: '#f8fafc', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.1)', width: { sm: '560px' }, mx: { xs: 2, sm: 'auto' } } }}>
+        <DialogTitle sx={{ fontWeight: 700, borderBottom: '1px solid rgba(255,255,255,0.1)', pb: 2, px: 3 }}>
           주문 상세 정보
         </DialogTitle>
-        <DialogContent sx={{ pt: '24px !important' }}>
+        <DialogContent sx={{ pt: '20px !important', px: 3 }}>
           {orderModalData && (
-            <Stack spacing={2}>
+            <Box sx={{ display: 'grid', gridTemplateColumns: '88px 1fr', rowGap: 2, columnGap: 2 }}>
               {[
                 { label: '주문번호', value: orderModalData.order_number },
-                { label: '상품명', value: orderModalData.product_name },
-                { label: '고객명', value: orderModalData.customer_name },
-                { label: '수령인', value: orderModalData.receiver_name },
-                { label: '연락처', value: orderModalData.receiver_tel },
+                { label: '상품명',   value: orderModalData.product_name },
+                { label: '고객명',   value: orderModalData.customer_name },
+                { label: '수령인',   value: orderModalData.receiver_name },
+                { label: '연락처',   value: orderModalData.receiver_tel },
                 { label: '배송주소', value: orderModalData.shipping_address },
                 { label: '송장번호', value: orderModalData.tracking_number ? formatTrackingNumber(orderModalData.tracking_number) : '-' },
-                { label: '쇼핑몰', value: getStandardChannelName(orderModalData.channel) },
+                { label: '쇼핑몰',   value: getStandardChannelName(orderModalData.channel) },
               ].map(({ label, value }) => (
-                <Box key={label} sx={{ display: 'flex', gap: 2, alignItems: 'flex-start' }}>
-                  <Typography variant="body2" sx={{ color: '#94a3b8', minWidth: 80, fontWeight: 600 }}>{label}</Typography>
-                  <Typography variant="body2" sx={{ color: '#f8fafc', wordBreak: 'break-all' }}>{value || '-'}</Typography>
-                </Box>
+                <>
+                  <Typography key={`lbl-${label}`} variant="body2" sx={{ color: '#64748b', fontWeight: 700, fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.5px', pt: '2px' }}>{label}</Typography>
+                  <Typography key={`val-${label}`} variant="body2" sx={{ color: '#f8fafc', wordBreak: 'break-all', fontSize: '0.875rem' }}>{value || '-'}</Typography>
+                </>
               ))}
-            </Stack>
+            </Box>
           )}
         </DialogContent>
-        <DialogActions sx={{ borderTop: '1px solid rgba(255,255,255,0.1)', p: 2, gap: 1 }}>
+        <DialogActions sx={{ borderTop: '1px solid rgba(255,255,255,0.08)', p: 2, px: 3, gap: 1 }}>
           <Button onClick={() => { if (orderModalData) window.open(getSabangnetOrderUrl(orderModalData.order_number), '_blank'); }}
-            variant="outlined" size="small" sx={{ color: '#3b82f6', borderColor: '#3b82f6' }}>
+            variant="outlined" size="small" startIcon={<LaunchIcon sx={{ fontSize: 14 }} />}
+            sx={{ color: '#3b82f6', borderColor: 'rgba(59,130,246,0.4)', '&:hover': { borderColor: '#3b82f6' } }}>
             사방넷에서 열기
           </Button>
-          <Button onClick={() => setOrderModalData(null)} variant="contained" size="small" sx={{ bgcolor: '#3b82f6' }}>
+          <Button onClick={() => setOrderModalData(null)} variant="contained" size="small" sx={{ bgcolor: '#3b82f6', '&:hover': { bgcolor: '#2563eb' } }}>
             닫기
           </Button>
         </DialogActions>
       </Dialog>
 
       {/* 배송 추적 모달 */}
-      <Dialog open={!!trackingModalData} onClose={() => { setTrackingModalData(null); setTrackingResult(null); }} maxWidth="xs" fullWidth
-        PaperProps={{ sx: { bgcolor: '#1e293b', color: '#f8fafc', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.08)', maxHeight: '85vh' } }}>
+      <Dialog open={!!trackingModalData} onClose={() => { setTrackingModalData(null); setTrackingResult(null); }} maxWidth="sm" fullWidth
+        PaperProps={{ sx: { bgcolor: '#1e293b', color: '#f8fafc', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.08)', maxHeight: '85vh', width: { sm: '520px' }, mx: { xs: 2, sm: 'auto' } } }}>
         <DialogTitle sx={{ fontWeight: 700, borderBottom: '1px solid rgba(255,255,255,0.08)', py: 1.5, px: 2.5 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
