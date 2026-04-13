@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
@@ -164,6 +164,9 @@ export default function IntegratedDashboardPage() {
 
   const [linkAnchorEl, setLinkAnchorEl] = useState<null | HTMLElement>(null);
   const [isSavingSheet, setIsSavingSheet] = useState<Record<string, boolean>>({});
+
+  // 문의 내용 펼치기 (모바일)
+  const [expandedContent, setExpandedContent] = useState<Record<string, boolean>>({});
 
   // 모달 상태
   const [orderModalData, setOrderModalData] = useState<DBInquiry | null>(null);
@@ -512,6 +515,32 @@ export default function IntegratedDashboardPage() {
   };
   
   // ==========================================
+  // 🔧 5-b. 콘텐츠 헬퍼
+  // ==========================================
+
+  /** URL을 [이미지 보기] 링크로 대체 */
+  const renderContent = (text: string) => {
+    if (!text) return text;
+    const urlRegex = /https?:\/\/\S+/g;
+    const nodes: React.ReactNode[] = [];
+    let last = 0;
+    let m: RegExpExecArray | null;
+    urlRegex.lastIndex = 0;
+    while ((m = urlRegex.exec(text)) !== null) {
+      if (m.index > last) nodes.push(text.slice(last, m.index));
+      nodes.push(
+        <MuiLink key={m.index} href={m[0]} target="_blank" rel="noopener noreferrer"
+          sx={{ color: '#60a5fa', textDecoration: 'underline', overflowWrap: 'break-word', wordBreak: 'break-all', fontSize: 'inherit' }}>
+          [이미지 보기]
+        </MuiLink>
+      );
+      last = m.index + m[0].length;
+    }
+    if (last < text.length) nodes.push(text.slice(last));
+    return nodes.length > 0 ? nodes : text;
+  };
+
+  // ==========================================
   // 🎨 6. 화면 렌더링 (UI)
   // ==========================================
   const SUMMARY_DATA = [
@@ -750,47 +779,58 @@ export default function IntegratedDashboardPage() {
                   borderRadius: '12px', transition: '0.2s', 
                   '&:hover': { borderColor: isMainSelected ? '#3b82f6' : 'rgba(255,255,255,0.2)' } 
                 }}>
-                  <CardContent sx={{ p: '16px !important' }}>
-                    
-                    <Box sx={{ display: 'flex', gap: 1.5 }}>
+                  <CardContent sx={{ p: { xs: '12px !important', md: '16px !important' } }}>
+
+                    <Box sx={{ display: 'flex', gap: { xs: 1, md: 1.5 } }}>
                       <Box sx={{ pt: 0.5 }}>
                         <Checkbox checked={isMainSelected} onChange={() => handleClick(mainItem.id)} sx={{ color: '#64748b', '&.Mui-checked': { color: '#3b82f6' }, p: 0.5 }} />
                       </Box>
                       <Box sx={{ flex: 1, display: 'flex', flexDirection: { xs: 'column', lg: 'row' }, gap: { xs: 1.5, lg: 2 }, minWidth: 0 }}>
 
                         {/* ── 좌측: 문의 정보 + 내용 ── */}
-                        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1.5, minWidth: 0 }}>
+                        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1.5, minWidth: 0, overflow: 'hidden' }}>
 
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
-                            <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#f8fafc' }}>
+                        {/* 헤더행: 고객명 + 날짜 */}
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1 }}>
+                          <Box sx={{ flex: 1, display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, alignItems: { xs: 'flex-start', sm: 'center' }, gap: { xs: 0.5, sm: 1.5 }, flexWrap: 'wrap', minWidth: 0 }}>
+                            <Typography sx={{ fontWeight: 700, color: '#f8fafc', fontSize: { xs: '0.9rem', md: '1rem' }, flexShrink: 0 }}>
                               {mainItem.customer_name}
                             </Typography>
-                            <Divider orientation="vertical" flexItem sx={{ borderColor: 'rgba(255,255,255,0.2)', my: 0.5 }} />
-                            
-                            <Typography variant="body2" sx={{ color: '#94a3b8', display: 'flex', alignItems: 'center', flexWrap: 'wrap' }}>
-                              주문번호: 
+
+                            {/* 주문번호 — 모바일: 말줄임, 클릭 시 상세 */}
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, minWidth: 0, maxWidth: '100%' }}>
+                              <Typography sx={{ color: '#64748b', fontSize: '0.75rem', flexShrink: 0 }}>주문번호</Typography>
                               {mainItem.order_number && mainItem.order_number !== '-' ? (
                                 <MuiLink
                                   component="button"
                                   onClick={() => setOrderModalData(mainItem)}
-                                  sx={{ color: '#3b82f6', ml: 0.5, fontWeight: 600, textDecoration: 'none', '&:hover': { textDecoration: 'underline', cursor: 'pointer' }, background: 'none', border: 'none', font: 'inherit' }}
+                                  sx={{
+                                    color: '#3b82f6', fontWeight: 600, textDecoration: 'none', fontSize: '0.75rem',
+                                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                                    maxWidth: { xs: '160px', sm: 'none' },
+                                    display: 'inline-block',
+                                    '&:hover': { textDecoration: 'underline', cursor: 'pointer' },
+                                    background: 'none', border: 'none', font: 'inherit',
+                                  }}
                                 >
                                   {mainItem.order_number}
                                 </MuiLink>
                               ) : (
-                                <span style={{ marginLeft: '4px' }}>-</span>
+                                <Typography sx={{ color: '#475569', fontSize: '0.75rem' }}>-</Typography>
                               )}
+                            </Box>
 
-                              {mainItem.product_name && mainItem.product_name !== '-' && (
-                                <>
-                                  <span style={{ margin: '0 8px', color: 'rgba(255,255,255,0.2)' }}>|</span>
-                                  <span style={{ color: '#cbd5e1', fontWeight: 500 }}>{mainItem.product_name}</span>
-                                </>
-                              )}
-                            </Typography>
+                            {mainItem.product_name && mainItem.product_name !== '-' && (
+                              <Typography sx={{
+                                color: '#cbd5e1', fontWeight: 500, fontSize: '0.75rem',
+                                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                                maxWidth: { xs: '200px', sm: 'none' },
+                              }}>
+                                {mainItem.product_name}
+                              </Typography>
+                            )}
 
-                            <Stack direction="row" spacing={1} alignItems="center" sx={{ ml: 0.5 }}>
+                            <Stack direction="row" spacing={1} alignItems="center" sx={{ flexShrink: 0 }}>
                               <Chip 
                                 component="a"
                                 href={channelAdminUrl}
@@ -825,86 +865,118 @@ export default function IntegratedDashboardPage() {
                             </Stack>
                           </Box>
 
-                          <Typography variant="caption" sx={{ color: '#64748b' }}>
-                            문의 일시 : {getDisplayTime(mainItem.inquiry_date, mainItem.collected_at)}
+                          <Typography sx={{ color: '#64748b', fontSize: '0.7rem', flexShrink: 0, whiteSpace: 'nowrap', pt: '2px' }}>
+                            {getDisplayTime(mainItem.inquiry_date, mainItem.collected_at)}
                           </Typography>
                         </Box>
                         
-                        <Box>
-                          {(mainItem.receiver_name || mainItem.receiver_tel || mainItem.tracking_number || mainItem.shipping_address) && (
-                            <Box sx={{ 
-                              mt: 0.5, p: 1, px: 1.5, 
-                              bgcolor: 'rgba(15, 23, 42, 0.4)', 
-                              borderRadius: '8px', 
-                              border: '1px solid rgba(59, 130, 246, 0.1)', 
-                              display: 'flex', 
-                              flexWrap: 'wrap', 
-                              alignItems: 'center', 
-                              gap: 2 
-                            }}>
-                              {mainItem.receiver_name && (
-                                <Typography variant="caption" sx={{ color: '#cbd5e1', display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                  <PersonIcon sx={{ fontSize: 14, color: '#94a3b8' }} /> 
-                                  <span style={{ fontWeight: 600, color: '#f8fafc' }}>수령인 : {mainItem.receiver_name}</span>
-                                </Typography>
-                              )}
-                              {mainItem.receiver_name && mainItem.receiver_tel && (
-                                <Divider orientation="vertical" flexItem sx={{ borderColor: 'rgba(255,255,255,0.1)', height: '14px', my: 'auto' }} />
-                              )}
-                              {mainItem.receiver_tel && (
-                                <Typography variant="caption" sx={{ color: '#cbd5e1', display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                  <PhoneIcon sx={{ fontSize: 14, color: '#94a3b8' }} /> 
-                                  <span style={{ fontWeight: 600, color: '#f8fafc' }}>연락처 : {mainItem.receiver_tel}</span>
-                                </Typography>
-                              )}
-                              {mainItem.receiver_tel && mainItem.shipping_address && (
-                                <Divider orientation="vertical" flexItem sx={{ borderColor: 'rgba(255,255,255,0.1)', height: '14px', my: 'auto' }} />
-                              )}
-                              {mainItem.shipping_address && (
-                                <Typography variant="caption" sx={{ color: '#cbd5e1', display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                  <HomeIcon sx={{ fontSize: 14, color: '#94a3b8' }} /> 
-                                  <span style={{ color: '#f8fafc' }}>주소 : {mainItem.shipping_address}</span>
-                                </Typography>
-                              )}
-                              {mainItem.shipping_address && mainItem.tracking_number && (
-                                <Divider orientation="vertical" flexItem sx={{ borderColor: 'rgba(255,255,255,0.1)', height: '14px', my: 'auto' }} />
-                              )}
-                              {mainItem.tracking_number && (
-                                <Typography variant="caption" sx={{ color: '#cbd5e1', display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                  <LocalShippingIcon sx={{ fontSize: 14, color: '#10b981' }} /> 
-                                  <MuiLink
-                                    component="button"
-                                    onClick={async () => {
-                                      const tNum = mainItem.tracking_number || '';
-                                      const tUrl = getTrackingUrl(mainItem.channel, tNum);
-                                      const ch = mainItem.channel;
-                                      setTrackingModalData({ channel: ch, trackingNumber: tNum, trackingUrl: tUrl });
-                                      setTrackingResult(null);
-                                      setTrackingLoading(true);
-                                      try {
-                                        const stdCh = getStandardChannelName(ch);
-                                        const carrier = (stdCh === '네이버' || stdCh === '이베이') ? 'cj' : 'lotte';
-                                        const res = await fetch(`/api/tracking?carrier=${carrier}&num=${tNum.replace(/\D/g, '')}`);
-                                        const data = await res.json();
-                                        if (!data.error) setTrackingResult(data);
-                                      } catch {} finally { setTrackingLoading(false); }
-                                    }}
-                                    sx={{
-                                      ml: 0.5, fontWeight: 700, color: '#10b981', textDecoration: 'none',
-                                      '&:hover': { textDecoration: 'underline', cursor: 'pointer' },
-                                      background: 'none', border: 'none', font: 'inherit'
-                                    }}
-                                  >
-                                    {formatTrackingNumber(mainItem.tracking_number)}
-                                  </MuiLink>
-                                </Typography>
-                              )}
-                            </Box>
-                          )}
-                        </Box>
+                        {(mainItem.receiver_name || mainItem.receiver_tel || mainItem.tracking_number || mainItem.shipping_address) && (
+                          <Box sx={{
+                            p: 1, px: 1.5,
+                            bgcolor: 'rgba(15, 23, 42, 0.4)',
+                            borderRadius: '8px',
+                            border: '1px solid rgba(59, 130, 246, 0.1)',
+                            display: 'flex',
+                            flexDirection: { xs: 'column', sm: 'row' },
+                            flexWrap: { sm: 'wrap' },
+                            alignItems: { sm: 'center' },
+                            gap: { xs: 0.8, sm: 2 },
+                          }}>
+                            {mainItem.receiver_name && (
+                              <Typography sx={{ color: '#cbd5e1', display: 'flex', alignItems: 'center', gap: 0.5, fontSize: '0.75rem' }}>
+                                <PersonIcon sx={{ fontSize: 13, color: '#94a3b8', flexShrink: 0 }} />
+                                <span style={{ fontWeight: 600, color: '#f8fafc' }}>수령인 : {mainItem.receiver_name}</span>
+                              </Typography>
+                            )}
+                            {mainItem.receiver_name && mainItem.receiver_tel && (
+                              <Divider orientation="vertical" flexItem sx={{ borderColor: 'rgba(255,255,255,0.1)', height: '14px', my: 'auto', display: { xs: 'none', sm: 'block' } }} />
+                            )}
+                            {mainItem.receiver_tel && (
+                              <Typography sx={{ color: '#cbd5e1', display: 'flex', alignItems: 'center', gap: 0.5, fontSize: '0.75rem' }}>
+                                <PhoneIcon sx={{ fontSize: 13, color: '#94a3b8', flexShrink: 0 }} />
+                                <span style={{ fontWeight: 600, color: '#f8fafc' }}>연락처 : {mainItem.receiver_tel}</span>
+                              </Typography>
+                            )}
+                            {mainItem.receiver_tel && mainItem.shipping_address && (
+                              <Divider orientation="vertical" flexItem sx={{ borderColor: 'rgba(255,255,255,0.1)', height: '14px', my: 'auto', display: { xs: 'none', sm: 'block' } }} />
+                            )}
+                            {mainItem.shipping_address && (
+                              <Typography sx={{ color: '#cbd5e1', display: 'flex', alignItems: 'center', gap: 0.5, fontSize: '0.75rem', overflowWrap: 'break-word', wordBreak: 'break-all' }}>
+                                <HomeIcon sx={{ fontSize: 13, color: '#94a3b8', flexShrink: 0 }} />
+                                <span style={{ color: '#f8fafc' }}>주소 : {mainItem.shipping_address}</span>
+                              </Typography>
+                            )}
+                            {mainItem.shipping_address && mainItem.tracking_number && (
+                              <Divider orientation="vertical" flexItem sx={{ borderColor: 'rgba(255,255,255,0.1)', height: '14px', my: 'auto', display: { xs: 'none', sm: 'block' } }} />
+                            )}
+                            {mainItem.tracking_number && (
+                              <Typography sx={{ color: '#cbd5e1', display: 'flex', alignItems: 'center', gap: 0.5, fontSize: '0.75rem' }}>
+                                <LocalShippingIcon sx={{ fontSize: 13, color: '#10b981', flexShrink: 0 }} />
+                                <MuiLink
+                                  component="button"
+                                  onClick={async () => {
+                                    const tNum = mainItem.tracking_number || '';
+                                    const tUrl = getTrackingUrl(mainItem.channel, tNum);
+                                    const ch = mainItem.channel;
+                                    setTrackingModalData({ channel: ch, trackingNumber: tNum, trackingUrl: tUrl });
+                                    setTrackingResult(null);
+                                    setTrackingLoading(true);
+                                    try {
+                                      const stdCh = getStandardChannelName(ch);
+                                      const carrier = (stdCh === '네이버' || stdCh === '이베이') ? 'cj' : 'lotte';
+                                      const res = await fetch(`/api/tracking?carrier=${carrier}&num=${tNum.replace(/\D/g, '')}`);
+                                      const data = await res.json();
+                                      if (!data.error) setTrackingResult(data);
+                                    } catch {} finally { setTrackingLoading(false); }
+                                  }}
+                                  sx={{
+                                    fontWeight: 700, color: '#10b981', textDecoration: 'none', fontSize: '0.75rem',
+                                    '&:hover': { textDecoration: 'underline', cursor: 'pointer' },
+                                    background: 'none', border: 'none', font: 'inherit',
+                                    overflowWrap: 'break-word', wordBreak: 'break-all',
+                                  }}
+                                >
+                                  {formatTrackingNumber(mainItem.tracking_number)}
+                                </MuiLink>
+                              </Typography>
+                            )}
+                          </Box>
+                        )}
                         
-                        <Box sx={{ bgcolor: 'rgba(15, 23, 42, 0.6)', p: 1.5, borderRadius: '8px', border: '1px solid rgba(255,255,255,0.03)' }}>
-                          <Typography variant="body2" sx={{ color: '#cbd5e1', whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>{mainItem.content}</Typography>
+                        <Box sx={{ bgcolor: 'rgba(15, 23, 42, 0.6)', p: { xs: 1, md: 1.5 }, borderRadius: '8px', border: '1px solid rgba(255,255,255,0.03)' }}>
+                          <Box
+                            onClick={() => setExpandedContent(prev => ({ ...prev, [mainItem.id]: !prev[mainItem.id] }))}
+                            sx={{
+                              overflow: 'hidden',
+                              maxHeight: { xs: expandedContent[mainItem.id] ? 'none' : '4.8em', md: 'none' },
+                              cursor: { xs: 'pointer', md: 'default' },
+                            }}
+                          >
+                            <Typography sx={{
+                              color: '#cbd5e1', whiteSpace: 'pre-wrap', lineHeight: 1.6,
+                              fontSize: { xs: '0.82rem', md: '0.875rem' },
+                              overflowWrap: 'break-word', wordBreak: 'break-word',
+                            }}>
+                              {renderContent(mainItem.content)}
+                            </Typography>
+                          </Box>
+                          {/* 모바일 더보기 버튼 */}
+                          {!expandedContent[mainItem.id] && (mainItem.content?.length ?? 0) > 80 && (
+                            <Typography
+                              onClick={() => setExpandedContent(prev => ({ ...prev, [mainItem.id]: true }))}
+                              sx={{ display: { xs: 'block', md: 'none' }, mt: 0.5, color: '#3b82f6', fontSize: '0.75rem', cursor: 'pointer' }}
+                            >
+                              더 보기 ▾
+                            </Typography>
+                          )}
+                          {expandedContent[mainItem.id] && (
+                            <Typography
+                              onClick={() => setExpandedContent(prev => ({ ...prev, [mainItem.id]: false }))}
+                              sx={{ display: { xs: 'block', md: 'none' }, mt: 0.5, color: '#64748b', fontSize: '0.75rem', cursor: 'pointer' }}
+                            >
+                              접기 ▴
+                            </Typography>
+                          )}
                         </Box>
 
                         </Box>{/* ── 좌측 열 끝 ── */}
@@ -912,64 +984,70 @@ export default function IntegratedDashboardPage() {
                         {/* ── 우측: 답변 입력 ── */}
                         <Box sx={{ width: { xs: '100%', lg: '360px' }, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
 
-                        <Box sx={{ position: 'relative' }}>
-                          <TextField
-                            multiline fullWidth minRows={2} maxRows={6} size="small" 
-                            value={replyTexts[mainItem.id] !== undefined ? replyTexts[mainItem.id] : ''} 
-                            onChange={(e) => handleReplyChange(mainItem.id, e.target.value)} 
-                            placeholder={isCompletedMain ? "처리 완료된 문의입니다." : "답변 작성"}
-                            disabled={isCompletedMain}
-                            sx={{ 
-                              '& .MuiOutlinedInput-root': { 
-                                bgcolor: 'rgba(15, 23, 42, 0.8)', color: '#f8fafc', borderRadius: '8px', fontSize: '0.85rem', p: 1.5, pr: 20,
-                                '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' }, 
-                                '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.2)' }, 
-                                '&.Mui-focused fieldset': { borderColor: '#3b82f6' },
-                                '&.Mui-disabled': { bgcolor: 'rgba(255, 255, 255, 0.05)' },
-                                '& .MuiInputBase-input.Mui-disabled': {
-                                  WebkitTextFillColor: '#ffffff !important',
-                                  color: '#ffffff !important',
-                                  opacity: 1, 
+                        {/* 답변 입력 + 액션 버튼 */}
+                        <Box>
+                          {/* PC: 버튼 absolute / 모바일: 버튼 분리 행 */}
+                          <Box sx={{ position: 'relative' }}>
+                            <TextField
+                              multiline fullWidth minRows={2} maxRows={6} size="small"
+                              value={replyTexts[mainItem.id] !== undefined ? replyTexts[mainItem.id] : ''}
+                              onChange={(e) => handleReplyChange(mainItem.id, e.target.value)}
+                              placeholder={isCompletedMain ? "처리 완료된 문의입니다." : "답변 작성"}
+                              disabled={isCompletedMain}
+                              sx={{
+                                '& .MuiOutlinedInput-root': {
+                                  bgcolor: 'rgba(15, 23, 42, 0.8)', color: '#f8fafc', borderRadius: '8px',
+                                  fontSize: { xs: '0.82rem', md: '0.85rem' },
+                                  p: 1.5,
+                                  pr: { xs: 1.5, lg: 20 },
+                                  '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' },
+                                  '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.2)' },
+                                  '&.Mui-focused fieldset': { borderColor: '#3b82f6' },
+                                  '&.Mui-disabled': { bgcolor: 'rgba(255, 255, 255, 0.05)' },
+                                  '& .MuiInputBase-input.Mui-disabled': {
+                                    WebkitTextFillColor: '#ffffff !important',
+                                    color: '#ffffff !important',
+                                    opacity: 1,
+                                  }
                                 }
-                              } 
-                            }} 
-                          />
-                          
-                          <Stack direction="row" spacing={1} sx={{ position: 'absolute', right: 8, bottom: 8 }}>
-                            {!isCompletedMain && (
-                              <Button
-                                size="small"
-                                onClick={() => handleForceComplete(mainItem.id)}
-                                startIcon={<CheckCircleIcon sx={{ fontSize: 16 }} />}
-                                sx={{
-                                  bgcolor: 'rgba(255, 255, 255, 0.05)', color: '#cbd5e1',
-                                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                                  fontWeight: 600, fontSize: '0.7rem', height: '24px', py: 0, px: 1,
-                                  borderRadius: '6px',
-                                  '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.1)' }
-                                }}
-                              >
+                              }}
+                            />
+                            {/* PC 전용 절대위치 버튼 */}
+                            <Stack direction="row" spacing={1} sx={{ position: 'absolute', right: 8, bottom: 8, display: { xs: 'none', lg: 'flex' } }}>
+                              {!isCompletedMain && (
+                                <Button size="small" onClick={() => handleForceComplete(mainItem.id)}
+                                  startIcon={<CheckCircleIcon sx={{ fontSize: 16 }} />}
+                                  sx={{ bgcolor: 'rgba(255,255,255,0.05)', color: '#cbd5e1', border: '1px solid rgba(255,255,255,0.1)', fontWeight: 600, fontSize: '0.7rem', height: '24px', py: 0, px: 1, borderRadius: '6px', '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' } }}>
+                                  강제 완료
+                                </Button>
+                              )}
+                              <Button size="small" variant="contained"
+                                disabled={isGeneratingAI[mainItem.id] || isCompletedMain}
+                                onClick={() => handleGenerateAI(mainItem.id)}
+                                startIcon={isGeneratingAI[mainItem.id] ? <CircularProgress size={12} color="inherit" /> : <SmartToyIcon sx={{ fontSize: 16 }} />}
+                                sx={{ bgcolor: 'rgba(139,92,246,0.2)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.3)', fontWeight: 600, fontSize: '0.7rem', height: '24px', py: 0, px: 1, borderRadius: '6px', '&:hover': { bgcolor: 'rgba(139,92,246,0.4)' }, '&.Mui-disabled': { bgcolor: 'transparent', color: 'transparent', borderColor: 'transparent' } }}>
+                                {isGeneratingAI[mainItem.id] ? '생성 중...' : 'AI 답변'}
+                              </Button>
+                            </Stack>
+                          </Box>
+
+                          {/* 모바일 전용 버튼 행 */}
+                          {!isCompletedMain && (
+                            <Stack direction="row" spacing={1} sx={{ mt: 1, display: { xs: 'flex', lg: 'none' } }}>
+                              <Button fullWidth size="small" onClick={() => handleForceComplete(mainItem.id)}
+                                startIcon={<CheckCircleIcon sx={{ fontSize: 14 }} />}
+                                sx={{ bgcolor: 'rgba(255,255,255,0.05)', color: '#cbd5e1', border: '1px solid rgba(255,255,255,0.1)', fontWeight: 600, fontSize: '0.78rem', height: '34px', borderRadius: '8px', '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' } }}>
                                 강제 완료
                               </Button>
-                            )}
-                            <Button
-                              size="small"
-                              variant="contained"
-                              disabled={isGeneratingAI[mainItem.id] || isCompletedMain}
-                              onClick={() => handleGenerateAI(mainItem.id)}
-                              startIcon={isGeneratingAI[mainItem.id] ? <CircularProgress size={12} color="inherit" /> : <SmartToyIcon sx={{ fontSize: 16 }} />}
-                              sx={{
-                                bgcolor: 'rgba(139, 92, 246, 0.2)', color: '#a78bfa',
-                                border: '1px solid rgba(139, 92, 246, 0.3)',
-                                fontWeight: 600, fontSize: '0.7rem', height: '24px', py: 0, px: 1,
-                                borderRadius: '6px',
-                                '&:hover': { bgcolor: 'rgba(139, 92, 246, 0.4)' },
-                                '&.Mui-disabled': { bgcolor: 'transparent', color: 'transparent', borderColor: 'transparent' } 
-                              }}
-                            >
-                              {isGeneratingAI[mainItem.id] ? '생성 중...' : 'AI 답변'}
-                            </Button>
-                          </Stack>
+                              <Button fullWidth size="small" variant="contained"
+                                disabled={isGeneratingAI[mainItem.id]}
+                                onClick={() => handleGenerateAI(mainItem.id)}
+                                startIcon={isGeneratingAI[mainItem.id] ? <CircularProgress size={12} color="inherit" /> : <SmartToyIcon sx={{ fontSize: 14 }} />}
+                                sx={{ bgcolor: 'rgba(139,92,246,0.2)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.3)', fontWeight: 600, fontSize: '0.78rem', height: '34px', borderRadius: '8px', '&:hover': { bgcolor: 'rgba(139,92,246,0.4)' }, '&.Mui-disabled': { opacity: 0.4 } }}>
+                                {isGeneratingAI[mainItem.id] ? '생성 중...' : 'AI 답변'}
+                              </Button>
+                            </Stack>
+                          )}
                         </Box>
                         
                         {mainItem.ai_draft && !mainItem.admin_reply && (
