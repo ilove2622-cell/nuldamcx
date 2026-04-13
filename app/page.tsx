@@ -325,12 +325,13 @@ export default function IntegratedDashboardPage() {
       const result = await res.json();
       if (result.status === 'success') {
         const sabangRes = result.sabangnetResponse || '';
-        // 사방넷 응답에서 실제 처리 건수 확인
+        // 사방넷 응답에서 성공 건수 확인 (성공 키워드 또는 총건수 파싱)
+        const hasSuccess = sabangRes.includes('성공') || sabangRes.includes('blue');
         const match = sabangRes.match(/총건수\s*:\s*(\d+)/);
-        const processedCount = match ? parseInt(match[1]) : -1;
-        if (processedCount > 0) {
+        const processedCount = match ? parseInt(match[1]) : (hasSuccess ? ids.length : 0);
+        if (processedCount > 0 || hasSuccess) {
           await supabase.from('inquiries').update({ status: '처리완료' }).in('id', ids);
-          alert(`✅ 사방넷 전송 성공! ${processedCount}건 처리완료`);
+          alert(`✅ 사방넷 전송 성공! ${processedCount || ids.length}건 처리완료`);
         } else {
           alert(`⚠️ 사방넷에 요청했으나 처리된 건수가 0건입니다.\n\n사방넷 응답: ${sabangRes}\n\n이미 답변된 문의이거나, 사방넷에서 거부한 건일 수 있습니다.`);
         }
