@@ -714,59 +714,64 @@ export default function IntegratedDashboardPage() {
             <Checkbox color="primary" size="small" indeterminate={isSomePageSelected} checked={isAllPageSelected} onChange={handleSelectAllPageClick} sx={{ color: '#64748b', '&.Mui-checked': { color: '#3b82f6' }, p: 0.5 }} />
             <Typography variant="body2" sx={{ color: '#f8fafc', fontWeight: 600, fontSize: '0.8rem' }}>전체 선택 <span style={{ color: '#3b82f6' }}>({selectedIds.length}건)</span></Typography>
           </Box>
-          {/* 버튼 행 — 모바일 가로 스크롤 */}
-          <Box sx={{ display: 'flex', flexDirection: 'row', gap: 0.75, overflowX: 'auto', pb: 0.5, '&::-webkit-scrollbar': { height: 0 } }}>
+          {/* 버튼 행 — 모바일 가로 스크롤 (native div + inline style로 Tailwind 충돌 방지) */}
+          <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'nowrap', overflowX: 'auto', gap: '6px', paddingBottom: '2px' }}>
             <Button
               component="label"
+              size="small"
               variant="outlined"
-              startIcon={isUploadingScript ? <CircularProgress size={12} color="inherit" /> : <UploadFileIcon sx={{ fontSize: '14px !important' }} />}
+              startIcon={isUploadingScript ? <CircularProgress size={12} color="inherit" /> : <UploadFileIcon fontSize="small" />}
               disabled={isUploadingScript}
-              sx={{ borderColor: 'rgba(255,255,255,0.2)', color: '#cbd5e1', fontWeight: 600, fontSize: '0.72rem', height: 30, px: 1.2, py: 0, whiteSpace: 'nowrap', flexShrink: 0, '&:hover': { borderColor: '#f8fafc', bgcolor: 'rgba(255,255,255,0.05)' } }}
+              sx={{ borderColor: 'rgba(255,255,255,0.2)', color: '#cbd5e1', fontWeight: 600, fontSize: '0.72rem', height: 32, minWidth: 'auto', px: 1.5, whiteSpace: 'nowrap', flexShrink: 0, '&:hover': { borderColor: '#f8fafc', bgcolor: 'rgba(255,255,255,0.05)' } }}
             >
               스크립트 엑셀 추가
               <input type="file" hidden accept=".xlsx, .xls, .csv" onChange={handleExcelUpload} />
             </Button>
 
             <Button
+              size="small"
               variant="outlined"
-              startIcon={isCollectingAll ? <CircularProgress size={12} color="inherit" /> : <CloudDownloadIcon sx={{ fontSize: '14px !important' }} />}
+              startIcon={isCollectingAll ? <CircularProgress size={12} color="inherit" /> : <CloudDownloadIcon fontSize="small" />}
               onClick={handleCollectAll}
               disabled={isCollectingAll}
-              sx={{ borderColor: 'rgba(255,255,255,0.2)', color: '#cbd5e1', fontWeight: 600, fontSize: '0.72rem', height: 30, px: 1.2, py: 0, whiteSpace: 'nowrap', flexShrink: 0, '&:hover': { borderColor: '#f8fafc', bgcolor: 'rgba(255,255,255,0.05)' } }}
+              sx={{ borderColor: 'rgba(255,255,255,0.2)', color: '#cbd5e1', fontWeight: 600, fontSize: '0.72rem', height: 32, minWidth: 'auto', px: 1.5, whiteSpace: 'nowrap', flexShrink: 0, '&:hover': { borderColor: '#f8fafc', bgcolor: 'rgba(255,255,255,0.05)' } }}
             >
               새로 수집
             </Button>
 
             <Button
+              size="small"
               variant="contained"
-              startIcon={isGeneratingBulkAI ? <CircularProgress size={12} color="inherit" /> : <AutoAwesomeIcon sx={{ fontSize: '14px !important' }} />}
+              startIcon={isGeneratingBulkAI ? <CircularProgress size={12} color="inherit" /> : <AutoAwesomeIcon fontSize="small" />}
               onClick={handleBulkGenerateAI}
               disabled={isGeneratingBulkAI || selectedIds.length === 0}
-              sx={{ bgcolor: '#ec4899', color: '#fff', fontWeight: 600, fontSize: '0.72rem', height: 30, px: 1.2, py: 0, whiteSpace: 'nowrap', flexShrink: 0, boxShadow: '0 4px 14px rgba(236, 72, 153, 0.4)', '&:hover': { bgcolor: '#db2777' }, '&.Mui-disabled': { bgcolor: 'rgba(236, 72, 153, 0.3)', color: '#fbcfe8' } }}
+              sx={{ bgcolor: '#ec4899', color: '#fff', fontWeight: 600, fontSize: '0.72rem', height: 32, minWidth: 'auto', px: 1.5, whiteSpace: 'nowrap', flexShrink: 0, boxShadow: '0 4px 14px rgba(236, 72, 153, 0.4)', '&:hover': { bgcolor: '#db2777' }, '&.Mui-disabled': { bgcolor: 'rgba(236, 72, 153, 0.3)', color: '#fbcfe8' } }}
             >
               AI 답변 생성
             </Button>
 
             <Button
+              size="small"
               variant="contained"
-              startIcon={<SendIcon sx={{ fontSize: '14px !important' }} />}
+              startIcon={<SendIcon fontSize="small" />}
               onClick={handleBulkSubmit}
               disabled={isSubmitting || selectedIds.length === 0}
-              sx={{ bgcolor: '#3b82f6', color: '#fff', fontWeight: 600, fontSize: '0.72rem', height: 30, px: 1.2, py: 0, whiteSpace: 'nowrap', flexShrink: 0, boxShadow: '0 4px 14px rgba(59, 130, 246, 0.4)' }}
+              sx={{ bgcolor: '#3b82f6', color: '#fff', fontWeight: 600, fontSize: '0.72rem', height: 32, minWidth: 'auto', px: 1.5, whiteSpace: 'nowrap', flexShrink: 0, boxShadow: '0 4px 14px rgba(59, 130, 246, 0.4)' }}
             >
               1. 답변저장
             </Button>
 
             <Button
+              size="small"
               variant="contained"
-              startIcon={isTriggeringBot ? <CircularProgress size={12} color="inherit" /> : <RocketLaunchIcon sx={{ fontSize: '14px !important' }} />}
+              startIcon={isTriggeringBot ? <CircularProgress size={12} color="inherit" /> : <RocketLaunchIcon fontSize="small" />}
               onClick={handleTriggerBot}
               disabled={isTriggeringBot || selectedIds.length === 0}
-              sx={{ bgcolor: '#8b5cf6', color: '#fff', fontWeight: 600, fontSize: '0.72rem', height: 30, px: 1.2, py: 0, whiteSpace: 'nowrap', flexShrink: 0, '&:hover': { bgcolor: '#7c3aed' }, boxShadow: '0 4px 14px rgba(139, 92, 246, 0.4)' }}
+              sx={{ bgcolor: '#8b5cf6', color: '#fff', fontWeight: 600, fontSize: '0.72rem', height: 32, minWidth: 'auto', px: 1.5, whiteSpace: 'nowrap', flexShrink: 0, '&:hover': { bgcolor: '#7c3aed' }, boxShadow: '0 4px 14px rgba(139, 92, 246, 0.4)' }}
             >
               2. 쇼핑몰 송신
             </Button>
-          </Box>
+          </div>
         </Box>
 
         {loading ? (
