@@ -25,14 +25,18 @@ export async function GET() {
   // 2. 답변 내용물 조립
   let dataXml = '';
   if (pendingItems && pendingItems.length > 0) {
+    dataXml += `
+    <DATA>`;
     pendingItems.forEach(item => {
-      // CDATA를 사용해 특수문자나 줄바꿈이 깨지지 않게 보호합니다.
       dataXml += `
-    <DATA>
-        <NUM><![CDATA[${item.sabangnet_num}]]></NUM>
-        <CS_RE_CONTENT><![CDATA[${item.admin_reply || ''}]]></CS_RE_CONTENT>
-    </DATA>`;
+        <ITEM>
+            <NUM><![CDATA[${item.sabangnet_num}]]></NUM>
+            <CS_RE_CONTENT><![CDATA[${item.admin_reply || ''}]]></CS_RE_CONTENT>
+            <SEND_YN>Y</SEND_YN>
+        </ITEM>`;
     });
+    dataXml += `
+    </DATA>`;
   }
 
   // 3. 최종 XML 문서 조립
