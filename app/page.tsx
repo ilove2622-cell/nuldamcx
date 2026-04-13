@@ -324,11 +324,18 @@ export default function IntegratedDashboardPage() {
       const res = await fetch('/api/reply', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids }) });
       const result = await res.json();
       if (result.status === 'success') {
-        // 3. 전송 성공 시 상태를 처리완료로 변경
-        await supabase.from('inquiries').update({ status: '처리완료' }).in('id', ids);
-        alert(`${ids.length}건이 사방넷에 전송 완료되었습니다!`);
+        const sabangRes = result.sabangnetResponse || '';
+        // 사방넷 응답에서 실제 처리 건수 확인
+        const match = sabangRes.match(/총건수\s*:\s*(\d+)/);
+        const processedCount = match ? parseInt(match[1]) : -1;
+        if (processedCount > 0) {
+          await supabase.from('inquiries').update({ status: '처리완료' }).in('id', ids);
+          alert(`✅ 사방넷 전송 성공! ${processedCount}건 처리완료`);
+        } else {
+          alert(`⚠️ 사방넷에 요청했으나 처리된 건수가 0건입니다.\n\n사방넷 응답: ${sabangRes}\n\n이미 답변된 문의이거나, 사방넷에서 거부한 건일 수 있습니다.`);
+        }
       } else {
-        alert(`전송 실패: ${result.message}`);
+        alert(`❌ 전송 실패: ${result.message}`);
       }
       fetchDataAndCounts();
     } finally { setIsTriggeringBot(false); }
