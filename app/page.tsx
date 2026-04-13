@@ -301,10 +301,38 @@ export default function IntegratedDashboardPage() {
   const handleCollectAll = async () => { setIsCollectingAll(true); try { await fetch("/api/collect", { method: "POST" }); fetchDataAndCounts(); } finally { setIsCollectingAll(false); } };
 
 
-  const handleBulkSubmit = async () => { setIsSubmitting(true); try { await Promise.all(selectedIds.map(id => supabase.from('inquiries').update({ admin_reply: replyTexts[id], status: '답변저장' }).eq('id', id))); await fetch('/api/reply', { method: 'POST', body: JSON.stringify({ ids: selectedIds }) }); fetchDataAndCounts(); } finally { setIsSubmitting(false); } };
+  const handleBulkSubmit = async () => {
+    setIsSubmitting(true);
+    try {
+      await Promise.all(selectedIds.map(id => supabase.from('inquiries').update({ admin_reply: replyTexts[id], status: '답변저장' }).eq('id', id)));
+      alert(`${selectedIds.length}건의 답변이 저장되었습니다.`);
+      fetchDataAndCounts();
+    } finally { setIsSubmitting(false); }
+  };
 
-  
-  const handleTriggerBot = async () => { setIsTriggeringBot(true); try { await fetch('/api/trigger-bot', { method: 'POST' }); fetchDataAndCounts(); } finally { setIsTriggeringBot(false); } };
+  const handleTriggerBot = async () => {
+    setIsTriggeringBot(true);
+    try {
+      // 1. 답변저장 상태인 항목들의 ID 가져오기
+      const { data: pendingItems } = await supabase.from('inquiries').select('id').eq('status', '답변저장');
+      if (!pendingItems || pendingItems.length === 0) {
+        alert('전송할 답변이 없습니다. 먼저 답변을 저장해주세요.');
+        return;
+      }
+      const ids = pendingItems.map((item: any) => item.id);
+      // 2. 사방넷에 실제 전송
+      const res = await fetch('/api/reply', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids }) });
+      const result = await res.json();
+      if (result.status === 'success') {
+        // 3. 전송 성공 시 상태를 처리완료로 변경
+        await supabase.from('inquiries').update({ status: '처리완료' }).in('id', ids);
+        alert(`${ids.length}건이 사방넷에 전송 완료되었습니다!`);
+      } else {
+        alert(`전송 실패: ${result.message}`);
+      }
+      fetchDataAndCounts();
+    } finally { setIsTriggeringBot(false); }
+  };
 
   const handleForceComplete = async (id: string) => {
     if (!window.confirm('이 문의를 강제로 [처리완료] 상태로 변경하시겠습니까?')) return;
