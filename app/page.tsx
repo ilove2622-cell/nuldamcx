@@ -11,7 +11,7 @@ import {
   Box, Container, Typography, IconButton, Button,
   Card, CardContent, TextField, Checkbox, Stack, CircularProgress,
   MenuItem, Select, InputAdornment, Chip, TablePagination, Collapse, Link as MuiLink, Divider,
-  Fab, Menu 
+  Fab, Menu, Dialog, DialogTitle, DialogContent, DialogActions
 } from '@mui/material';
 
 // Icons
@@ -164,6 +164,10 @@ export default function IntegratedDashboardPage() {
 
   const [linkAnchorEl, setLinkAnchorEl] = useState<null | HTMLElement>(null);
   const [isSavingSheet, setIsSavingSheet] = useState<Record<string, boolean>>({});
+
+  // 모달 상태
+  const [orderModalData, setOrderModalData] = useState<DBInquiry | null>(null);
+  const [trackingModalData, setTrackingModalData] = useState<{ channel: string; trackingNumber: string; trackingUrl: string } | null>(null);
 
   // ==========================================
   // 📡 3. 데이터 페칭 & 보안 검증
@@ -762,11 +766,10 @@ export default function IntegratedDashboardPage() {
                             <Typography variant="body2" sx={{ color: '#94a3b8', display: 'flex', alignItems: 'center', flexWrap: 'wrap' }}>
                               주문번호: 
                               {mainItem.order_number && mainItem.order_number !== '-' ? (
-                                <MuiLink 
-                                  href={getSabangnetOrderUrl(mainItem.order_number)} 
-                                  target="_blank" 
-                                  rel="noopener noreferrer"
-                                  sx={{ color: '#3b82f6', ml: 0.5, fontWeight: 600, textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
+                                <MuiLink
+                                  component="button"
+                                  onClick={() => setOrderModalData(mainItem)}
+                                  sx={{ color: '#3b82f6', ml: 0.5, fontWeight: 600, textDecoration: 'none', '&:hover': { textDecoration: 'underline', cursor: 'pointer' }, background: 'none', border: 'none', font: 'inherit' }}
                                 >
                                   {mainItem.order_number}
                                 </MuiLink>
@@ -864,13 +867,17 @@ export default function IntegratedDashboardPage() {
                               {mainItem.tracking_number && (
                                 <Typography variant="caption" sx={{ color: '#cbd5e1', display: 'flex', alignItems: 'center', gap: 0.5 }}>
                                   <LocalShippingIcon sx={{ fontSize: 14, color: '#10b981' }} /> 
-                                  <MuiLink 
-                                    href={getTrackingUrl(mainItem.channel, mainItem.tracking_number)} 
-                                    target="_blank" 
-                                    rel="noopener noreferrer"
-                                    sx={{ 
+                                  <MuiLink
+                                    component="button"
+                                    onClick={() => setTrackingModalData({
+                                      channel: mainItem.channel,
+                                      trackingNumber: mainItem.tracking_number || '',
+                                      trackingUrl: getTrackingUrl(mainItem.channel, mainItem.tracking_number)
+                                    })}
+                                    sx={{
                                       ml: 0.5, fontWeight: 700, color: '#10b981', textDecoration: 'none',
-                                      '&:hover': { textDecoration: 'underline' }
+                                      '&:hover': { textDecoration: 'underline', cursor: 'pointer' },
+                                      background: 'none', border: 'none', font: 'inherit'
                                     }}
                                   >
                                     {formatTrackingNumber(mainItem.tracking_number)}
@@ -1085,6 +1092,75 @@ export default function IntegratedDashboardPage() {
         )}
 
       </Container>
+
+      {/* 주문 상세 모달 */}
+      <Dialog open={!!orderModalData} onClose={() => setOrderModalData(null)} maxWidth="sm" fullWidth
+        PaperProps={{ sx: { bgcolor: '#1e293b', color: '#f8fafc', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.1)' } }}>
+        <DialogTitle sx={{ fontWeight: 700, borderBottom: '1px solid rgba(255,255,255,0.1)', pb: 2 }}>
+          주문 상세 정보
+        </DialogTitle>
+        <DialogContent sx={{ pt: '24px !important' }}>
+          {orderModalData && (
+            <Stack spacing={2}>
+              {[
+                { label: '주문번호', value: orderModalData.order_number },
+                { label: '상품명', value: orderModalData.product_name },
+                { label: '고객명', value: orderModalData.customer_name },
+                { label: '수령인', value: orderModalData.receiver_name },
+                { label: '연락처', value: orderModalData.receiver_tel },
+                { label: '배송주소', value: orderModalData.shipping_address },
+                { label: '송장번호', value: orderModalData.tracking_number ? formatTrackingNumber(orderModalData.tracking_number) : '-' },
+                { label: '쇼핑몰', value: getStandardChannelName(orderModalData.channel) },
+              ].map(({ label, value }) => (
+                <Box key={label} sx={{ display: 'flex', gap: 2, alignItems: 'flex-start' }}>
+                  <Typography variant="body2" sx={{ color: '#94a3b8', minWidth: 80, fontWeight: 600 }}>{label}</Typography>
+                  <Typography variant="body2" sx={{ color: '#f8fafc', wordBreak: 'break-all' }}>{value || '-'}</Typography>
+                </Box>
+              ))}
+            </Stack>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ borderTop: '1px solid rgba(255,255,255,0.1)', p: 2, gap: 1 }}>
+          <Button onClick={() => { if (orderModalData) window.open(getSabangnetOrderUrl(orderModalData.order_number), '_blank'); }}
+            variant="outlined" size="small" sx={{ color: '#3b82f6', borderColor: '#3b82f6' }}>
+            사방넷에서 열기
+          </Button>
+          <Button onClick={() => setOrderModalData(null)} variant="contained" size="small" sx={{ bgcolor: '#3b82f6' }}>
+            닫기
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* 배송 추적 모달 */}
+      <Dialog open={!!trackingModalData} onClose={() => setTrackingModalData(null)} maxWidth="md" fullWidth
+        PaperProps={{ sx: { bgcolor: '#1e293b', color: '#f8fafc', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.1)', height: '80vh' } }}>
+        <DialogTitle sx={{ fontWeight: 700, borderBottom: '1px solid rgba(255,255,255,0.1)', pb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>배송 추적</span>
+          {trackingModalData && (
+            <Chip label={formatTrackingNumber(trackingModalData.trackingNumber)} size="small"
+              sx={{ bgcolor: 'rgba(16, 185, 129, 0.1)', color: '#10b981', fontWeight: 700 }} />
+          )}
+        </DialogTitle>
+        <DialogContent sx={{ p: 0, flex: 1 }}>
+          {trackingModalData && (
+            <iframe
+              src={trackingModalData.trackingUrl}
+              style={{ width: '100%', height: '100%', border: 'none' }}
+              title="배송 추적"
+            />
+          )}
+        </DialogContent>
+        <DialogActions sx={{ borderTop: '1px solid rgba(255,255,255,0.1)', p: 2, gap: 1 }}>
+          <Button onClick={() => { if (trackingModalData) window.open(trackingModalData.trackingUrl, '_blank'); }}
+            variant="outlined" size="small" sx={{ color: '#10b981', borderColor: '#10b981' }}>
+            새 탭에서 열기
+          </Button>
+          <Button onClick={() => setTrackingModalData(null)} variant="contained" size="small" sx={{ bgcolor: '#10b981' }}>
+            닫기
+          </Button>
+        </DialogActions>
+      </Dialog>
+
     </Box>
   );
 }
