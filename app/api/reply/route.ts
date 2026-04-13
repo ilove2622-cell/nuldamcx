@@ -48,15 +48,25 @@ export async function POST(req: Request) {
     if (!response.ok) throw new Error(`사방넷 API 서버 응답 오류: ${response.status}`);
 
     const arrayBuffer = await response.arrayBuffer();
-    const resultText = iconv.decode(Buffer.from(arrayBuffer), 'euc-kr'); // 한글 깨짐 방지
-    
+    const resultText = iconv.decode(Buffer.from(arrayBuffer), 'euc-kr');
+
     console.log("[답변 전송] 사방넷 응답 결과:", resultText);
 
-    // 🌟 6. 상태 업데이트는 건너뛰고, 사방넷의 진짜 응답을 프론트엔드로 전달합니다.
-    return NextResponse.json({ 
-      status: 'success', 
-      count: pendingItems.length,
-      sabangnetResponse: resultText 
+    // 🌟 6. 성공 여부 판단 후 상태 업데이트
+    const hasSuccess = resultText.includes('성공') || resultText.includes('blue');
+    const countMatch = resultText.match(/총건수\s*:\s*(\d+)/);
+    const processedCount = countMatch ? parseInt(countMatch[1]) : 0;
+
+    if (processedCount > 0 || hasSuccess) {
+      // 전송 성공 시 상태를 처리완료로 변경
+      await supabase.from('inquiries').update({ status: '처리완료' }).eq('status', '답변저장');
+    }
+
+    return NextResponse.json({
+      status: 'success',
+      count: processedCount || pendingItems.length,
+      sabangnetResponse: resultText,
+      processed: processedCount > 0 || hasSuccess
     });
 
   } catch (error: any) {
