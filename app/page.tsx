@@ -1151,14 +1151,20 @@ export default function IntegratedDashboardPage() {
             </Button>
           </Box>
         </DialogTitle>
-        <DialogContent sx={{ p: 0, flex: 1, overflow: 'hidden' }}>
+        <DialogContent sx={{ p: 0, flex: 1, overflow: 'hidden', position: 'relative' }}>
           {trackingModalData && (
-            <iframe
-              src={trackingModalData.trackingUrl}
-              style={{ width: '100%', height: '100%', border: 'none', background: '#fff' }}
-              title="배송 추적"
-              sandbox="allow-scripts allow-same-origin allow-popups"
-            />
+            <>
+              <iframe
+                src={trackingModalData.trackingUrl}
+                style={{ width: '100%', height: '100%', border: 'none', background: '#fff' }}
+                title="배송 추적"
+                sandbox="allow-scripts allow-same-origin"
+              />
+              {/* 오른쪽 플로팅 아이콘 가림막 */}
+              <Box sx={{ position: 'absolute', top: 0, right: 0, width: '80px', height: '100%', background: 'linear-gradient(to right, transparent, #fff 30%)', pointerEvents: 'none', zIndex: 10 }} />
+              {/* 하단 플로팅 바 가림막 */}
+              <Box sx={{ position: 'absolute', bottom: 0, left: 0, width: '100%', height: '60px', background: 'linear-gradient(to bottom, transparent, #fff 40%)', pointerEvents: 'none', zIndex: 10 }} />
+            </>
           )}
         </DialogContent>
       </Dialog>
