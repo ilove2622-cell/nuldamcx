@@ -44,7 +44,7 @@ export default function ImportPanel() {
   };
 
   return (
-    <div className="bg-slate-800/40 rounded-xl border border-white/10 shadow-sm p-6 space-y-3">
+    <div className="bg-[rgba(30,41,59,0.6)] backdrop-blur rounded-[12px] border border-white/[0.08] p-6 space-y-3">
       <button
         onClick={() => setOpen((v) => !v)}
         className="w-full flex items-center justify-between text-left"
@@ -56,7 +56,7 @@ export default function ImportPanel() {
       </button>
 
       {open && (
-        <div className="space-y-3 pt-2 border-t border-white/10">
+        <div className="space-y-3 pt-2 border-t border-white/[0.08]">
           <p className="text-xs text-[#94a3b8] leading-relaxed">
             CSV 또는 Excel(.xlsx) 파일을 업로드하면 DB에 일괄 등록됩니다.
             <br />
@@ -120,7 +120,7 @@ export default function ImportPanel() {
                 <p className="text-xs text-yellow-400 mt-2">{result.diagnostics.message}</p>
               )}
               {result.diagnostics && result.inserted === 0 && (
-                <div className="mt-3 space-y-2 text-xs text-[#cbd5e1] bg-[#0f172a] rounded p-2 border border-white/10">
+                <div className="mt-3 space-y-2 text-xs text-[#cbd5e1] bg-[rgba(15,23,42,0.5)] rounded p-2 border border-white/[0.08]">
                   <div>
                     <strong>감지된 헤더 ({result.diagnostics.headers?.length ?? 0}개):</strong>
                     <div className="font-mono mt-1 break-all">

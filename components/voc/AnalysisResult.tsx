@@ -42,29 +42,29 @@ export default function AnalysisResult({ result, onChange, onRegenerate, regener
     update('recommendedActions', result.recommendedActions.filter((_, idx) => idx !== i));
 
   return (
-    <div className={`rounded-xl border-2 ${borderColor} bg-slate-800/40 shadow-sm overflow-hidden`}>
-      <div className="px-5 py-4 border-b border-white/10 flex items-center justify-between">
+    <div className={`rounded-[12px] border ${borderColor} bg-[rgba(30,41,59,0.6)] backdrop-blur overflow-hidden`}>
+      <div className="px-5 py-4 border-b border-white/[0.08] flex items-center justify-between">
         <h2 className="text-lg font-semibold text-[#f8fafc]">분석 결과</h2>
         <div className="flex items-center gap-2">
           {editing ? (
             <select
               value={result.riskLevel}
               onChange={(e) => update('riskLevel', e.target.value as RiskLevel)}
-              className="text-sm border border-white/10 rounded-lg px-2 py-1 bg-[rgba(15,23,42,0.5)] text-[#f8fafc]"
+              className="text-sm border border-white/[0.1] rounded-lg px-2 py-1 bg-[rgba(15,23,42,0.5)] text-[#f8fafc]"
             >
               <option value="low">낮음</option>
               <option value="medium">중간</option>
               <option value="high">높음</option>
             </select>
           ) : (
-            <span className={`px-3 py-1 rounded-full text-sm font-medium border ${risk.className}`}>
-              위험도: {risk.label}
+            <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${risk.className}`}>
+              {risk.label}
             </span>
           )}
           {onChange && (
             <button
               onClick={() => setEditing((v) => !v)}
-              className="text-xs px-2.5 py-1 rounded-lg border border-white/10 hover:bg-[#0f172a] text-[#cbd5e1]"
+              className="text-xs px-2.5 py-1 rounded-lg border border-white/[0.1] hover:bg-[rgba(15,23,42,0.5)] text-[#cbd5e1]"
             >
               {editing ? '완료' : '✏️ 수정'}
             </button>
@@ -81,7 +81,7 @@ export default function AnalysisResult({ result, onChange, onRegenerate, regener
                 type="text"
                 value={result.substanceType}
                 onChange={(e) => update('substanceType', e.target.value)}
-                className="flex-1 px-2 py-1.5 border border-white/10 rounded text-sm bg-[rgba(15,23,42,0.5)] text-[#f8fafc]"
+                className="flex-1 px-2 py-1.5 border border-white/[0.1] rounded text-sm bg-[rgba(15,23,42,0.5)] text-[#f8fafc]"
               />
               {onRegenerate && (
                 <button
@@ -118,7 +118,7 @@ export default function AnalysisResult({ result, onChange, onRegenerate, regener
                       type="text"
                       value={action}
                       onChange={(e) => updateAction(i, e.target.value)}
-                      className="flex-1 px-2 py-1 border border-white/10 rounded text-sm bg-[rgba(15,23,42,0.5)] text-[#f8fafc]"
+                      className="flex-1 px-2 py-1 border border-white/[0.1] rounded text-sm bg-[rgba(15,23,42,0.5)] text-[#f8fafc]"
                     />
                     <button
                       onClick={() => removeAction(i)}
@@ -169,14 +169,14 @@ function Field({
             value={value}
             onChange={(e) => onChange(e.target.value)}
             rows={2}
-            className="mt-1 w-full px-2 py-1.5 border border-white/10 rounded text-sm bg-[rgba(15,23,42,0.5)] text-[#f8fafc]"
+            className="mt-1 w-full px-2 py-1.5 border border-white/[0.1] rounded text-sm bg-[rgba(15,23,42,0.5)] text-[#f8fafc]"
           />
         ) : (
           <input
             type="text"
             value={value}
             onChange={(e) => onChange(e.target.value)}
-            className="mt-1 w-full px-2 py-1.5 border border-white/10 rounded text-sm bg-[rgba(15,23,42,0.5)] text-[#f8fafc]"
+            className="mt-1 w-full px-2 py-1.5 border border-white/[0.1] rounded text-sm bg-[rgba(15,23,42,0.5)] text-[#f8fafc]"
           />
         )
       ) : (

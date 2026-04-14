@@ -30,14 +30,14 @@ export default function CsScript({ script, onChange }: Props) {
   };
 
   return (
-    <div className="rounded-xl border-2 border-blue-500/30 bg-blue-500/10 shadow-sm overflow-hidden">
-      <div className="px-5 py-4 border-b border-blue-500/20 flex items-center justify-between">
+    <div className="rounded-[12px] border border-blue-500/30 bg-[rgba(30,41,59,0.6)] backdrop-blur overflow-hidden">
+      <div className="px-5 py-4 border-b border-white/[0.08] flex items-center justify-between">
         <h2 className="text-lg font-semibold text-[#f8fafc]">CS 응대 스크립트</h2>
         <div className="flex items-center gap-2">
         {onChange && (
           <button
             onClick={() => setEditing((v) => !v)}
-            className="text-xs px-2.5 py-1 rounded-lg border border-white/10 bg-slate-800/40 hover:bg-[#0f172a] text-[#cbd5e1]"
+            className="text-xs px-2.5 py-1 rounded-lg border border-white/[0.1] bg-[rgba(15,23,42,0.5)] hover:bg-[rgba(15,23,42,0.7)] text-[#cbd5e1]"
           >
             {editing ? '완료' : '✏️ 수정'}
           </button>
@@ -47,7 +47,7 @@ export default function CsScript({ script, onChange }: Props) {
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors
             ${copied
               ? 'bg-green-900/30 text-green-400 border border-green-400/30'
-              : 'bg-slate-800/40 text-[#cbd5e1] border border-white/10 hover:bg-[#0f172a]'
+              : 'bg-[rgba(15,23,42,0.5)] text-[#cbd5e1] border border-white/[0.1] hover:bg-[rgba(15,23,42,0.7)]'
             }`}
         >
           {copied ? (
@@ -74,7 +74,7 @@ export default function CsScript({ script, onChange }: Props) {
             value={script}
             onChange={(e) => onChange?.(e.target.value)}
             rows={4}
-            className="w-full px-3 py-2 border border-white/10 rounded-lg text-sm leading-relaxed bg-[rgba(15,23,42,0.5)] text-[#f8fafc]"
+            className="w-full px-3 py-2 border border-white/[0.1] rounded-lg text-sm leading-relaxed bg-[rgba(15,23,42,0.5)] text-[#f8fafc]"
           />
         ) : (
           <p className="text-sm text-[#f8fafc] leading-relaxed whitespace-pre-wrap">{script}</p>

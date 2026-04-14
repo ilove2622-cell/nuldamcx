@@ -53,8 +53,8 @@ export default function DropZone({ onFileSelect }: DropZoneProps) {
       onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
       onDragLeave={() => setIsDragging(false)}
       onClick={() => inputRef.current?.click()}
-      className={`border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-colors
-        ${isDragging ? 'border-blue-500 bg-blue-500/10' : 'border-white/10 hover:border-blue-500'}`}
+      className={`border-2 border-dashed rounded-[12px] p-10 text-center cursor-pointer transition-colors
+        ${isDragging ? 'border-blue-500 bg-blue-500/10' : 'border-white/[0.12] hover:border-blue-500/50 hover:bg-blue-500/5'}`}
     >
       <input ref={inputRef} type="file" accept="image/*" onChange={handleChange} className="hidden" />
       {preview ? (
