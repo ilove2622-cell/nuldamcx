@@ -50,17 +50,22 @@ export default function ImportPanel() {
     >
       <button
         onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center justify-between text-left"
-        style={{ color: '#ffffff' }}
+        className="!text-white w-full flex items-center justify-between text-left bg-transparent border-0 p-0 cursor-pointer"
+        style={{ appearance: 'none', WebkitAppearance: 'none', color: '#ffffff' }}
       >
-        <h2 className="text-lg font-bold tracking-tight flex items-center gap-2" style={{ color: '#ffffff' }}>
+        <span
+          role="heading"
+          aria-level={2}
+          className="!text-white text-lg font-bold tracking-tight flex items-center gap-2"
+          style={{ color: '#ffffff' }}
+        >
           <span
             className="inline-block w-1 h-5 rounded-sm"
             style={{ background: '#60a5fa' }}
             aria-hidden
           />
           📥 과거 사례 일괄 등록 (CSV/Excel)
-        </h2>
+        </span>
         <span className="text-sm font-medium" style={{ color: '#cbd5e1' }}>{open ? '접기 ▲' : '펼치기 ▼'}</span>
       </button>
 
