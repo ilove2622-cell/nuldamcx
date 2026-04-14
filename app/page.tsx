@@ -611,23 +611,28 @@ export default function IntegratedDashboardPage() {
       </Box>
 
       <Box component="header" sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(10px)', bgcolor: 'rgba(15, 23, 42, 0.6)', position: 'sticky', top: 0, zIndex: 50 }}>
-        <Container maxWidth="xl" sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 2, px: { xs: 2, sm: 3, lg: 4 } }}>
-          <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
-            <Typography variant="h5" sx={{ fontWeight: 800, letterSpacing: '-1px' }}>
+        <Container maxWidth="xl" sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: { xs: 1.5, md: 2 }, px: { xs: 1.5, sm: 3, lg: 4 }, gap: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, minWidth: 0, flexShrink: 1 }}>
+            <Typography sx={{ fontWeight: 800, letterSpacing: '-1px', fontSize: { xs: '1.1rem', md: '1.5rem' }, whiteSpace: 'nowrap' }}>
               <span style={{ color: '#3b82f6' }}>N</span>uldam <span style={{ color: '#94a3b8', fontWeight: 300 }}>CX</span>
             </Typography>
-            <Typography variant="caption" sx={{ color: '#64748b', ml: 1, letterSpacing: '1px' }}>INTEGRATED WORKSPACE</Typography>
+            <Typography variant="caption" sx={{ color: '#64748b', ml: 1, letterSpacing: '1px', display: { xs: 'none', lg: 'inline' } }}>
+              INTEGRATED WORKSPACE
+            </Typography>
           </Box>
-          
-          <Stack direction="row" spacing={1.5}>
+
+          <Stack direction="row" spacing={{ xs: 0.5, md: 1.5 }} sx={{ flexShrink: 0 }}>
             <Button
               onClick={() => router.push('/ocr')}
               startIcon={<DocumentScannerIcon fontSize="small" />}
               sx={{
                 color: '#cbd5e1',
                 fontWeight: 600,
-                px: 2,
+                fontSize: { xs: '0.75rem', md: '0.875rem' },
+                px: { xs: 1, md: 2 },
+                minWidth: 0,
                 borderRadius: '8px',
+                '& .MuiButton-startIcon': { mr: { xs: 0.3, md: 1 } },
                 '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.05)' }
               }}
             >
@@ -639,21 +644,27 @@ export default function IntegratedDashboardPage() {
               sx={{
                 color: '#cbd5e1',
                 fontWeight: 600,
-                px: 2,
+                fontSize: { xs: '0.75rem', md: '0.875rem' },
+                px: { xs: 1, md: 2 },
+                minWidth: 0,
                 borderRadius: '8px',
+                '& .MuiButton-startIcon': { mr: { xs: 0.3, md: 1 } },
                 '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.05)' }
               }}
             >
               VOC
             </Button>
-            
-            <Button 
-              onClick={() => router.push('/status')} 
-              sx={{ 
-                color: '#cbd5e1', 
+
+            <Button
+              onClick={() => router.push('/status')}
+              sx={{
+                color: '#cbd5e1',
                 fontWeight: 600,
-                px: 2,
+                fontSize: { xs: '0.75rem', md: '0.875rem' },
+                px: { xs: 1, md: 2 },
+                minWidth: 0,
                 borderRadius: '8px',
+                whiteSpace: 'nowrap',
                 '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.05)' }
               }}
             >
