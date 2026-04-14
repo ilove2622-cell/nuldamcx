@@ -819,7 +819,7 @@ export default function IntegratedDashboardPage() {
                       <Box sx={{ pt: 0.5 }}>
                         <Checkbox checked={isMainSelected} onChange={() => handleClick(mainItem.id)} sx={{ color: '#64748b', '&.Mui-checked': { color: '#3b82f6' }, p: 0.5 }} />
                       </Box>
-                      <Box sx={{ flex: 1, display: 'flex', flexDirection: { xs: 'column', lg: 'row' }, gap: { xs: 1.5, lg: 2 }, minWidth: 0 }}>
+                      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1.5, minWidth: 0 }}>
 
                         {/* ── 좌측: 문의 정보 + 내용 ── */}
                         <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1.5, minWidth: 0, overflow: 'hidden' }}>
@@ -1015,8 +1015,8 @@ export default function IntegratedDashboardPage() {
 
                         </Box>{/* ── 좌측 열 끝 ── */}
 
-                        {/* ── 우측: 답변 입력 ── */}
-                        <Box sx={{ width: { xs: '100%', lg: '360px' }, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
+                        {/* ── 하단: 답변 입력 ── */}
+                        <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 1 }}>
 
                         {/* 답변 입력 + 액션 버튼 */}
                         <Box>
