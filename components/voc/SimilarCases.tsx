@@ -6,7 +6,7 @@ interface Props {
   cases: SimilarCase[];
 }
 
-const riskLabel: Record<string, { text: string; color: string }> = {
+const riskLabel: Record<string, { text: string; color: string; style?: React.CSSProperties }> = {
   low:    { text: '낮음', color: 'bg-green-900/30 text-green-400' },
   medium: { text: '보통', color: 'bg-yellow-900/30 text-yellow-400' },
   high:   { text: '높음', color: 'bg-red-900/30 text-red-400' },
@@ -22,32 +22,44 @@ export default function SimilarCases({ cases }: Props) {
   if (!cases || cases.length === 0) return null;
 
   return (
-    <div className="bg-[rgba(30,41,59,0.6)] backdrop-blur rounded-[12px] border border-white/[0.08] p-6 space-y-4">
-      <h2 className="text-base font-semibold text-[#f8fafc]">
+    <div
+      className="backdrop-blur rounded-[12px] border p-6 space-y-4"
+      style={{ background: 'rgba(30,41,59,0.6)', borderColor: 'rgba(255,255,255,0.08)' }}
+    >
+      <h2 className="text-base font-semibold" style={{ color: '#f8fafc' }}>
         📋 유사 과거 사례 {cases.length}건
       </h2>
       <div className="space-y-3">
         {cases.map((c) => {
-          const risk = riskLabel[c.riskLevel] ?? { text: c.riskLevel, color: 'bg-slate-700/50 text-[#cbd5e1]' };
+          const risk = riskLabel[c.riskLevel] ?? { text: c.riskLevel, color: 'bg-slate-700/50', style: { color: '#cbd5e1' } };
           return (
-            <div key={c.id} className="border border-white/[0.08] rounded-lg p-4 space-y-2 bg-[rgba(15,23,42,0.5)] hover:bg-[rgba(15,23,42,0.7)] transition-colors">
+            <div
+              key={c.id}
+              className="border rounded-lg p-4 space-y-2 transition-colors"
+              style={{ borderColor: 'rgba(255,255,255,0.08)', background: 'rgba(15,23,42,0.5)' }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(15,23,42,0.7)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(15,23,42,0.5)'; }}
+            >
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-[#f8fafc]">
+                <span className="text-sm font-medium" style={{ color: '#f8fafc' }}>
                   {c.substanceType}
                 </span>
-                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${risk.color}`}>
+                <span
+                  className={`text-xs px-2 py-0.5 rounded-full font-medium ${risk.color}`}
+                  style={risk.style}
+                >
                   위험도 {risk.text}
                 </span>
               </div>
-              <div className="flex items-center gap-3 text-xs text-[#94a3b8]">
+              <div className="flex items-center gap-3 text-xs" style={{ color: '#94a3b8' }}>
                 <span>📅 {formatDate(c.createdAt)}</span>
                 {c.productName && <span>📦 {c.productName}</span>}
               </div>
-              <p className="text-xs text-[#cbd5e1] line-clamp-2">{c.characteristics}</p>
+              <p className="text-xs line-clamp-2" style={{ color: '#cbd5e1' }}>{c.characteristics}</p>
               {c.csScript && (
-                <div className="mt-2 pt-2 border-t border-white/[0.08]">
+                <div className="mt-2 pt-2 border-t" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
                   <p className="text-[11px] font-medium text-blue-400 mb-1">💬 CS 응대 스크립트</p>
-                  <p className="text-xs text-[#cbd5e1] leading-relaxed whitespace-pre-wrap">
+                  <p className="text-xs leading-relaxed whitespace-pre-wrap" style={{ color: '#cbd5e1' }}>
                     {c.csScript}
                   </p>
                 </div>

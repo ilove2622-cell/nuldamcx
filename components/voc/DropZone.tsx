@@ -54,16 +54,17 @@ export default function DropZone({ onFileSelect }: DropZoneProps) {
       onDragLeave={() => setIsDragging(false)}
       onClick={() => inputRef.current?.click()}
       className={`border-2 border-dashed rounded-[12px] p-10 text-center cursor-pointer transition-colors
-        ${isDragging ? 'border-blue-500 bg-blue-500/10' : 'border-white/[0.12] hover:border-blue-500/50 hover:bg-blue-500/5'}`}
+        ${isDragging ? 'border-blue-500 bg-blue-500/10' : 'hover:border-blue-500/50 hover:bg-blue-500/5'}`}
+      style={isDragging ? undefined : { borderColor: 'rgba(255,255,255,0.12)' }}
     >
       <input ref={inputRef} type="file" accept="image/*" onChange={handleChange} className="hidden" />
       {preview ? (
         <img src={preview} alt="preview" className="max-h-64 mx-auto rounded-lg object-contain" />
       ) : (
-        <div className="text-[#94a3b8]">
+        <div style={{ color: '#94a3b8' }}>
           <p className="text-lg font-medium">이미지를 드래그하거나 클릭해서 업로드</p>
           <p className="text-sm mt-1">또는 <span className="text-blue-500 font-semibold">Ctrl+V</span> 로 붙여넣기</p>
-          <p className="text-xs mt-2 text-[#94a3b8]">PNG, JPG, WEBP 지원</p>
+          <p className="text-xs mt-2" style={{ color: '#94a3b8' }}>PNG, JPG, WEBP 지원</p>
         </div>
       )}
     </div>

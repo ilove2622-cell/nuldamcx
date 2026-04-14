@@ -30,25 +30,31 @@ export default function CsScript({ script, onChange }: Props) {
   };
 
   return (
-    <div className="rounded-[12px] border border-blue-500/30 bg-[rgba(30,41,59,0.6)] backdrop-blur overflow-hidden">
-      <div className="px-5 py-4 border-b border-white/[0.08] flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-[#f8fafc]">CS 응대 스크립트</h2>
+    <div className="rounded-[12px] border border-blue-500/30 backdrop-blur overflow-hidden" style={{ background: 'rgba(30,41,59,0.6)' }}>
+      <div className="px-5 py-4 border-b flex items-center justify-between" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
+        <h2 className="text-lg font-semibold" style={{ color: '#f8fafc' }}>CS 응대 스크립트</h2>
         <div className="flex items-center gap-2">
         {onChange && (
           <button
             onClick={() => setEditing((v) => !v)}
-            className="text-xs px-2.5 py-1 rounded-lg border border-white/[0.1] bg-[rgba(15,23,42,0.5)] hover:bg-[rgba(15,23,42,0.7)] text-[#cbd5e1]"
+            className="text-xs px-2.5 py-1 rounded-lg border"
+            style={{ borderColor: 'rgba(255,255,255,0.1)', background: 'rgba(15,23,42,0.5)', color: '#cbd5e1' }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(15,23,42,0.7)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(15,23,42,0.5)'; }}
           >
             {editing ? '완료' : '✏️ 수정'}
           </button>
         )}
         <button
           onClick={handleCopy}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border
             ${copied
-              ? 'bg-green-900/30 text-green-400 border border-green-400/30'
-              : 'bg-[rgba(15,23,42,0.5)] text-[#cbd5e1] border border-white/[0.1] hover:bg-[rgba(15,23,42,0.7)]'
+              ? 'bg-green-900/30 text-green-400 border-green-400/30'
+              : ''
             }`}
+          style={copied ? undefined : { background: 'rgba(15,23,42,0.5)', color: '#cbd5e1', borderColor: 'rgba(255,255,255,0.1)' }}
+          onMouseEnter={copied ? undefined : (e) => { e.currentTarget.style.background = 'rgba(15,23,42,0.7)'; }}
+          onMouseLeave={copied ? undefined : (e) => { e.currentTarget.style.background = 'rgba(15,23,42,0.5)'; }}
         >
           {copied ? (
             <>
@@ -74,10 +80,11 @@ export default function CsScript({ script, onChange }: Props) {
             value={script}
             onChange={(e) => onChange?.(e.target.value)}
             rows={4}
-            className="w-full px-3 py-2 border border-white/[0.1] rounded-lg text-sm leading-relaxed bg-[rgba(15,23,42,0.5)] text-[#f8fafc]"
+            className="w-full px-3 py-2 border rounded-lg text-sm leading-relaxed"
+            style={{ borderColor: 'rgba(255,255,255,0.1)', background: 'rgba(15,23,42,0.5)', color: '#f8fafc' }}
           />
         ) : (
-          <p className="text-sm text-[#f8fafc] leading-relaxed whitespace-pre-wrap">{script}</p>
+          <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: '#f8fafc' }}>{script}</p>
         )}
       </div>
     </div>

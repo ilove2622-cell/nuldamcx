@@ -44,20 +44,23 @@ export default function ImportPanel() {
   };
 
   return (
-    <div className="bg-[rgba(30,41,59,0.6)] backdrop-blur rounded-[12px] border border-white/[0.08] p-6 space-y-3">
+    <div
+      className="backdrop-blur rounded-[12px] border p-6 space-y-3"
+      style={{ background: 'rgba(30,41,59,0.6)', borderColor: 'rgba(255,255,255,0.08)' }}
+    >
       <button
         onClick={() => setOpen((v) => !v)}
         className="w-full flex items-center justify-between text-left"
       >
-        <h2 className="text-base font-semibold text-[#f8fafc]">
+        <h2 className="text-base font-semibold" style={{ color: '#f8fafc' }}>
           📥 과거 사례 일괄 등록 (CSV/Excel)
         </h2>
-        <span className="text-[#94a3b8] text-sm">{open ? '접기 ▲' : '펼치기 ▼'}</span>
+        <span className="text-sm" style={{ color: '#94a3b8' }}>{open ? '접기 ▲' : '펼치기 ▼'}</span>
       </button>
 
       {open && (
-        <div className="space-y-3 pt-2 border-t border-white/[0.08]">
-          <p className="text-xs text-[#94a3b8] leading-relaxed">
+        <div className="space-y-3 pt-2 border-t" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
+          <p className="text-xs leading-relaxed" style={{ color: '#94a3b8' }}>
             CSV 또는 Excel(.xlsx) 파일을 업로드하면 DB에 일괄 등록됩니다.
             <br />
             <strong>필수 컬럼:</strong> 이물질종류, 특징, CS스크립트
@@ -85,15 +88,16 @@ export default function ImportPanel() {
               const file = e.target.files?.[0];
               if (file) handleUpload(file);
             }}
-            className="block w-full text-sm text-[#cbd5e1]
+            className="block w-full text-sm
               file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0
               file:text-sm file:font-medium
               file:bg-blue-500/10 file:text-blue-400
               hover:file:bg-blue-500/20 disabled:opacity-50"
+            style={{ color: '#cbd5e1' }}
           />
 
           {loading && (
-            <p className="text-sm text-[#94a3b8]">⏳ 업로드 처리 중…</p>
+            <p className="text-sm" style={{ color: '#94a3b8' }}>⏳ 업로드 처리 중…</p>
           )}
 
           {result && result.success && (
@@ -120,7 +124,10 @@ export default function ImportPanel() {
                 <p className="text-xs text-yellow-400 mt-2">{result.diagnostics.message}</p>
               )}
               {result.diagnostics && result.inserted === 0 && (
-                <div className="mt-3 space-y-2 text-xs text-[#cbd5e1] bg-[rgba(15,23,42,0.5)] rounded p-2 border border-white/[0.08]">
+                <div
+                  className="mt-3 space-y-2 text-xs rounded p-2 border"
+                  style={{ color: '#cbd5e1', background: 'rgba(15,23,42,0.5)', borderColor: 'rgba(255,255,255,0.08)' }}
+                >
                   <div>
                     <strong>감지된 헤더 ({result.diagnostics.headers?.length ?? 0}개):</strong>
                     <div className="font-mono mt-1 break-all">
