@@ -45,22 +45,28 @@ export default function ImportPanel() {
 
   return (
     <div
-      className="backdrop-blur rounded-[12px] border p-6 space-y-3"
+      className="backdrop-blur rounded-[12px] border px-7 py-6 space-y-3"
       style={{ background: 'rgba(30,41,59,0.6)', borderColor: 'rgba(255,255,255,0.08)' }}
     >
       <button
         onClick={() => setOpen((v) => !v)}
         className="w-full flex items-center justify-between text-left"
+        style={{ color: '#ffffff' }}
       >
-        <h2 className="text-lg font-semibold tracking-tight" style={{ color: '#ffffff' }}>
+        <h2 className="text-lg font-bold tracking-tight flex items-center gap-2" style={{ color: '#ffffff' }}>
+          <span
+            className="inline-block w-1 h-5 rounded-sm"
+            style={{ background: '#60a5fa' }}
+            aria-hidden
+          />
           📥 과거 사례 일괄 등록 (CSV/Excel)
         </h2>
         <span className="text-sm font-medium" style={{ color: '#cbd5e1' }}>{open ? '접기 ▲' : '펼치기 ▼'}</span>
       </button>
 
       {open && (
-        <div className="space-y-4 pt-3 border-t" style={{ borderColor: 'rgba(255,255,255,0.12)' }}>
-          <div className="text-[13px] leading-7 space-y-1" style={{ color: '#e2e8f0' }}>
+        <div className="space-y-4 pt-4 mt-2 border-t pl-3" style={{ borderColor: 'rgba(255,255,255,0.12)' }}>
+          <div className="text-[13px] leading-7 space-y-1.5" style={{ color: '#e2e8f0' }}>
             <p>CSV 또는 Excel(.xlsx) 파일을 업로드하면 DB에 일괄 등록됩니다.</p>
             <p>
               <strong style={{ color: '#ffffff' }}>필수 컬럼:</strong> 이물질종류, 특징, CS스크립트
