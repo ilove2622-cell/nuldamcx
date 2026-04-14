@@ -82,7 +82,8 @@ export default function OcrPage() {
   useEffect(() => {
     const checkAuth = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session || session?.user?.email !== 'cx@joinandjoin.com') {
+      const allowedEmails = ['cx@joinandjoin.com', 'ilove2622@nuldam.com'];
+      if (!session || !allowedEmails.includes(session?.user?.email || '')) {
         router.replace('/login');
       } else {
         setIsCheckingAuth(false);
