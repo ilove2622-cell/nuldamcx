@@ -57,9 +57,15 @@ export default function StatusPage() {
   const todayDate = getLocalYYYYMMDD(new Date());
   const thisMonth = todayDate.substring(0, 7);
 
-  const [viewMode, setViewMode] = useState<'daily' | 'monthly'>('daily');
+  const [viewMode, setViewMode] = useState<'daily' | 'monthly' | 'range' | 'picker'>('daily');
   const [targetDate, setTargetDate] = useState(todayDate);
   const [targetMonth, setTargetMonth] = useState(thisMonth);
+
+  // 📅 커스텀 날짜 모드 상태
+  const [rangeStart, setRangeStart] = useState(todayDate);
+  const [rangeEnd, setRangeEnd] = useState(todayDate);
+  const [pickerDates, setPickerDates] = useState<string[]>([todayDate]);
+  const [pickerInput, setPickerInput] = useState(todayDate);
   
   const [trendData, setTrendData] = useState<TrendData[]>([]);
   
@@ -79,6 +85,12 @@ export default function StatusPage() {
   // ==========================================
   useEffect(() => {
     const fetchTrendData = async () => {
+      // range/picker 모드에서는 트렌드 차트를 표시하지 않음
+      if (viewMode === 'range' || viewMode === 'picker') {
+        setTrendData([]);
+        return;
+      }
+
       const today = new Date();
       let startStr = '';
       let endStr = `${getLocalYYYYMMDD(today)} 23:59:59`;
@@ -184,22 +196,45 @@ export default function StatusPage() {
     setLoading(true);
     let startStr = '';
     let endStr = '';
+    let pickerDateSet: Set<string> | null = null; // picker 모드: 선택된 날짜만 필터
 
     if (viewMode === 'daily') {
       startStr = `${targetDate} 00:00:00`;
       endStr = `${targetDate} 23:59:59`;
-    } else {
+    } else if (viewMode === 'monthly') {
       const [yyyy, mm] = targetMonth.split('-');
       const lastDay = new Date(Number(yyyy), Number(mm), 0).getDate();
       startStr = `${targetMonth}-01 00:00:00`;
       endStr = `${targetMonth}-${lastDay} 23:59:59`;
+    } else if (viewMode === 'range') {
+      // 날짜 범위
+      const [sd, ed] = rangeStart <= rangeEnd ? [rangeStart, rangeEnd] : [rangeEnd, rangeStart];
+      startStr = `${sd} 00:00:00`;
+      endStr = `${ed} 23:59:59`;
+    } else {
+      // picker: 선택된 날짜들. 쿼리는 최소~최대 범위로 가져오고, 이후 Set으로 필터링
+      if (pickerDates.length === 0) {
+        setCurrentStats(DISPLAY_CHANNELS.map(name => ({ name, autoCount: 0, manualCount: 0, issue: '' })));
+        setCallStats({ inflow: 0, response: 0 });
+        setLoading(false);
+        return;
+      }
+      const sorted = [...pickerDates].sort();
+      startStr = `${sorted[0]} 00:00:00`;
+      endStr = `${sorted[sorted.length - 1]} 23:59:59`;
+      pickerDateSet = new Set(pickerDates);
     }
 
     // 1. 자동 수집 건수 (범위 내 전체)
-    const { data, error } = await supabase.from('inquiries').select('channel').gte('inquiry_date', startStr).lte('inquiry_date', endStr);
+    const { data, error } = await supabase.from('inquiries').select('channel, inquiry_date').gte('inquiry_date', startStr).lte('inquiry_date', endStr);
     const autoCounts: Record<string, number> = {};
     if (!error && data) {
       data.forEach(row => {
+        // picker 모드: 선택된 날짜만 집계
+        if (pickerDateSet) {
+          const dateOnly = (row.inquiry_date || '').split(' ')[0].split('T')[0];
+          if (!pickerDateSet.has(dateOnly)) return;
+        }
         const ch = normalizeSiteName(row.channel);
         autoCounts[ch] = (autoCounts[ch] || 0) + 1;
       });
@@ -216,18 +251,21 @@ export default function StatusPage() {
       const { data: manualData } = await supabase.from('daily_stats').select('*').eq('date', targetDate).maybeSingle();
       savedManualData = manualData;
     } else {
-      // 월별: 한 달 치 수기 데이터를 싹 다 가져와서 채널별로 더하기
+      // 월별/범위/선택: 수기 데이터를 범위로 가져와서 합산
       const startStrOnlyDate = startStr.split(' ')[0];
       const endStrOnlyDate = endStr.split(' ')[0];
-      
-      const { data: monthlyData } = await supabase
+
+      const { data: rangeData } = await supabase
         .from('daily_stats')
         .select('*')
         .gte('date', startStrOnlyDate)
         .lte('date', endStrOnlyDate);
 
-      if (monthlyData) {
-        monthlyData.forEach(row => {
+      if (rangeData) {
+        rangeData.forEach(row => {
+          // picker 모드: 선택된 날짜만 합산
+          if (pickerDateSet && !pickerDateSet.has(row.date)) return;
+
           monthlyCallInflow += (row.inflow || 0);
           monthlyCallResponse += (row.response || 0);
 
@@ -252,29 +290,29 @@ export default function StatusPage() {
         if (savedManualData?.stats) {
           const saved = savedManualData.stats.find((s: any) => s.name === name);
           if (saved) {
-            finalManualCount = saved.manualCount || 0; 
+            finalManualCount = saved.manualCount || 0;
             finalIssue = saved.issue || '';
           }
         }
       } else {
-        // 월별 모드일 땐 합산된 수기 데이터 반영
+        // 월별/범위/선택 모드일 땐 합산된 수기 데이터 반영
         finalManualCount = monthlyManualCounts[name] || 0;
       }
 
       return { name, autoCount: finalAutoCount, manualCount: finalManualCount, issue: finalIssue };
     }));
 
-    // 4. 총 유입호/응대콜 반영 (월별 통계 포함)
+    // 4. 총 유입호/응대콜 반영 (월별/범위/선택 통계 포함)
     if (viewMode === 'daily' && savedManualData) {
       setCallStats({ inflow: savedManualData.inflow || 0, response: savedManualData.response || 0 });
-    } else if (viewMode === 'monthly') {
-      setCallStats({ inflow: monthlyCallInflow, response: monthlyCallResponse });
-    } else {
+    } else if (viewMode === 'daily') {
       setCallStats({ inflow: 0, response: 0 });
+    } else {
+      setCallStats({ inflow: monthlyCallInflow, response: monthlyCallResponse });
     }
 
     setLoading(false);
-  }, [viewMode, targetDate, targetMonth]);
+  }, [viewMode, targetDate, targetMonth, rangeStart, rangeEnd, pickerDates]);
 
   useEffect(() => {
     fetchDetails();
@@ -293,14 +331,24 @@ export default function StatusPage() {
     setCurrentStats(newStats);
   };
 
-  const handleViewModeChange = (event: React.MouseEvent<HTMLElement>, newView: 'daily' | 'monthly') => {
+  const handleViewModeChange = (event: React.MouseEvent<HTMLElement>, newView: 'daily' | 'monthly' | 'range' | 'picker') => {
     if (newView !== null) setViewMode(newView);
+  };
+
+  // 📅 선택된 날짜 리스트 조작
+  const addPickerDate = () => {
+    if (pickerInput && !pickerDates.includes(pickerInput)) {
+      setPickerDates([...pickerDates, pickerInput].sort());
+    }
+  };
+  const removePickerDate = (d: string) => {
+    setPickerDates(pickerDates.filter(x => x !== d));
   };
 
   const handleKeyDown = async (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       e.preventDefault(); 
-      if (viewMode !== 'daily') return;
+      if (viewMode !== 'daily') return; // 일별 모드에서만 저장
 
       try {
         const { error } = await supabase.from('daily_stats').upsert({
@@ -413,9 +461,9 @@ const totalsArray = currentStats.map((stat: any) => stat.autoCount + stat.manual
 
               <ToggleButtonGroup
                 value={viewMode} exclusive onChange={handleViewModeChange} size="small"
-                sx={{ 
+                sx={{
                   bgcolor: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255,255,255,0.05)',
-                  '& .MuiToggleButton-root': { 
+                  '& .MuiToggleButton-root': {
                     color: '#64748b', border: 'none', px: 2, py: 0.5, fontSize: '0.8rem', fontWeight: 600,
                     '&.Mui-selected': { color: '#fff', bgcolor: '#3b82f6', '&:hover': { bgcolor: '#2563eb' } }
                   }
@@ -423,6 +471,8 @@ const totalsArray = currentStats.map((stat: any) => stat.autoCount + stat.manual
               >
                 <ToggleButton value="daily">일별</ToggleButton>
                 <ToggleButton value="monthly">월별</ToggleButton>
+                <ToggleButton value="range">기간</ToggleButton>
+                <ToggleButton value="picker">선택</ToggleButton>
               </ToggleButtonGroup>
             </Box>
           </Box>
@@ -433,7 +483,71 @@ const totalsArray = currentStats.map((stat: any) => stat.autoCount + stat.manual
         <Fade in={true} timeout={500}>
           <Box>
             
-            {/* 📈 상단: 트렌드 차트 */}
+            {/* 📅 기간 선택 (range 모드) */}
+            {viewMode === 'range' && (
+              <Card elevation={0} sx={{ bgcolor: 'rgba(30, 41, 59, 0.4)', border: '1px solid rgba(255, 255, 255, 0.05)', borderRadius: '12px', mb: 3 }}>
+                <CardContent sx={{ p: '20px !important', display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#f8fafc' }}>📅 기간 선택</Typography>
+                  <TextField
+                    type="date" size="small" value={rangeStart} onChange={(e) => setRangeStart(e.target.value)}
+                    sx={{ '& .MuiInputBase-root': { bgcolor: 'rgba(15,23,42,0.5)', color: '#f8fafc', borderRadius: '8px', fontSize: '0.85rem' }, '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' } }}
+                    InputLabelProps={{ shrink: true }}
+                  />
+                  <Typography sx={{ color: '#64748b' }}>~</Typography>
+                  <TextField
+                    type="date" size="small" value={rangeEnd} onChange={(e) => setRangeEnd(e.target.value)}
+                    sx={{ '& .MuiInputBase-root': { bgcolor: 'rgba(15,23,42,0.5)', color: '#f8fafc', borderRadius: '8px', fontSize: '0.85rem' }, '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' } }}
+                    InputLabelProps={{ shrink: true }}
+                  />
+                  <Chip
+                    label={`${rangeStart} ~ ${rangeEnd}`}
+                    size="small"
+                    sx={{ bgcolor: 'rgba(59,130,246,0.15)', color: '#60a5fa', fontWeight: 700 }}
+                  />
+                </CardContent>
+              </Card>
+            )}
+
+            {/* 📅 개별 날짜 선택 (picker 모드) */}
+            {viewMode === 'picker' && (
+              <Card elevation={0} sx={{ bgcolor: 'rgba(30, 41, 59, 0.4)', border: '1px solid rgba(255, 255, 255, 0.05)', borderRadius: '12px', mb: 3 }}>
+                <CardContent sx={{ p: '20px !important' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap', mb: 2 }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#f8fafc' }}>📅 개별 날짜 선택</Typography>
+                    <TextField
+                      type="date" size="small" value={pickerInput} onChange={(e) => setPickerInput(e.target.value)}
+                      sx={{ '& .MuiInputBase-root': { bgcolor: 'rgba(15,23,42,0.5)', color: '#f8fafc', borderRadius: '8px', fontSize: '0.85rem' }, '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' } }}
+                      InputLabelProps={{ shrink: true }}
+                    />
+                    <Button
+                      size="small" variant="contained" onClick={addPickerDate}
+                      sx={{ bgcolor: '#3b82f6', color: '#fff', fontWeight: 700, '&:hover': { bgcolor: '#2563eb' } }}
+                    >
+                      추가
+                    </Button>
+                    <Typography variant="caption" sx={{ color: '#64748b' }}>
+                      선택된 {pickerDates.length}일의 데이터가 합산됩니다.
+                    </Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                    {pickerDates.length === 0 ? (
+                      <Typography variant="caption" sx={{ color: '#64748b' }}>날짜를 선택해서 추가해주세요.</Typography>
+                    ) : (
+                      pickerDates.map(d => (
+                        <Chip
+                          key={d} label={d} size="small"
+                          onDelete={() => removePickerDate(d)}
+                          sx={{ bgcolor: 'rgba(59,130,246,0.15)', color: '#60a5fa', fontWeight: 700, '& .MuiChip-deleteIcon': { color: '#60a5fa' } }}
+                        />
+                      ))
+                    )}
+                  </Box>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* 📈 상단: 트렌드 차트 (일별/월별 전용) */}
+            {(viewMode === 'daily' || viewMode === 'monthly') && (
             <Card elevation={0} sx={{ bgcolor: 'rgba(30, 41, 59, 0.4)', border: '1px solid rgba(255, 255, 255, 0.05)', borderRadius: '12px', mb: 3 }}>
               <Box sx={{ p: 2, px: 3, borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -481,6 +595,7 @@ const totalsArray = currentStats.map((stat: any) => stat.autoCount + stat.manual
                 </Box>
               </CardContent>
             </Card>
+            )}
 
             <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 3 }}>
               
@@ -489,7 +604,10 @@ const totalsArray = currentStats.map((stat: any) => stat.autoCount + stat.manual
                 <Card elevation={0} sx={{ bgcolor: 'rgba(30, 41, 59, 0.4)', border: '1px solid rgba(255, 255, 255, 0.05)', borderRadius: '12px', flex: 1, minHeight: '300px' }}>
                   <Box sx={{ p: 2, px: 3, borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#f8fafc' }}>
-                      {viewMode === 'daily' ? targetDate : targetMonth} 통합 비중
+                      {viewMode === 'daily' ? targetDate
+                        : viewMode === 'monthly' ? targetMonth
+                        : viewMode === 'range' ? `${rangeStart} ~ ${rangeEnd}`
+                        : `선택한 ${pickerDates.length}일`} 통합 비중
                     </Typography>
                     <Chip label={`총 합계: ${totalCount}건`} size="small" sx={{ bgcolor: 'rgba(16, 185, 129, 0.15)', color: '#10b981', fontWeight: 800 }} />
                   </Box>
