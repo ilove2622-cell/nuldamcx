@@ -32,7 +32,8 @@ export async function GET() {
         <ITEM>
             <NUM><![CDATA[${item.sabangnet_num}]]></NUM>
             <CS_RE_CONTENT><![CDATA[${item.admin_reply || ''}]]></CS_RE_CONTENT>
-            <SEND_YN>Y</SEND_YN>
+            <CS_RE_SEND_FLAG>Y</CS_RE_SEND_FLAG>
+            <SEND_FLAG>Y</SEND_FLAG>
         </ITEM>`;
     });
     dataXml += `

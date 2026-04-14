@@ -1078,9 +1078,10 @@ export default function IntegratedDashboardPage() {
 
                         </Box>{/* ── 우측 열 끝 ── */}
 
-                      </Box>{/* ── 2열 행 끝 ── */}
+                      </Box>{/* ── 2열 flex 끝 ── */}
+                    </Box>{/* ── checkbox + content flex 끝 ── */}
 
-                        {isMultiple && (
+                    {isMultiple && (
                           <Box sx={{ mt: 1, textAlign: 'center' }}>
                             <Button
                               onClick={() => toggleGroup(groupKey)}
@@ -1194,10 +1195,8 @@ export default function IntegratedDashboardPage() {
                               })}
                             </Stack>
                           </Box>
-                        </Collapse>
+                    </Collapse>
 
-                      </Box>
-                    </Box>
                   </CardContent>
                 </Card>
               );
