@@ -52,29 +52,33 @@ export default function ImportPanel() {
         onClick={() => setOpen((v) => !v)}
         className="w-full flex items-center justify-between text-left"
       >
-        <h2 className="text-base font-semibold" style={{ color: '#f8fafc' }}>
+        <h2 className="text-lg font-semibold tracking-tight" style={{ color: '#ffffff' }}>
           📥 과거 사례 일괄 등록 (CSV/Excel)
         </h2>
-        <span className="text-sm" style={{ color: '#94a3b8' }}>{open ? '접기 ▲' : '펼치기 ▼'}</span>
+        <span className="text-sm font-medium" style={{ color: '#cbd5e1' }}>{open ? '접기 ▲' : '펼치기 ▼'}</span>
       </button>
 
       {open && (
-        <div className="space-y-3 pt-2 border-t" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
-          <p className="text-xs leading-relaxed" style={{ color: '#94a3b8' }}>
-            CSV 또는 Excel(.xlsx) 파일을 업로드하면 DB에 일괄 등록됩니다.
-            <br />
-            <strong>필수 컬럼:</strong> 이물질종류, 특징, CS스크립트
-            <br />
-            <strong>선택 컬럼:</strong> 제품명, 위험도(low/medium/high 또는 낮음/보통/높음),
-            위험근거, 추정원인, 권장조치(줄바꿈/세미콜론/| 구분)
-            <br />
-            <strong>📷 이미지:</strong> Excel(.xlsx)의 경우 셀에 직접 삽입한 사진이 해당 행과 자동 매칭됩니다.
-          </p>
+        <div className="space-y-4 pt-3 border-t" style={{ borderColor: 'rgba(255,255,255,0.12)' }}>
+          <div className="text-[13px] leading-7 space-y-1" style={{ color: '#e2e8f0' }}>
+            <p>CSV 또는 Excel(.xlsx) 파일을 업로드하면 DB에 일괄 등록됩니다.</p>
+            <p>
+              <strong style={{ color: '#ffffff' }}>필수 컬럼:</strong> 이물질종류, 특징, CS스크립트
+            </p>
+            <p>
+              <strong style={{ color: '#ffffff' }}>선택 컬럼:</strong> 제품명, 위험도(low/medium/high 또는 낮음/보통/높음),
+              위험근거, 추정원인, 권장조치(줄바꿈/세미콜론/| 구분)
+            </p>
+            <p>
+              <strong style={{ color: '#ffffff' }}>📷 이미지:</strong> Excel(.xlsx)의 경우 셀에 직접 삽입한 사진이 해당 행과 자동 매칭됩니다.
+            </p>
+          </div>
 
           <a
             href="/sample-import.csv"
             download
-            className="inline-flex items-center gap-1.5 text-xs font-medium text-blue-400 hover:text-blue-300 hover:underline"
+            className="inline-flex items-center gap-1.5 text-sm font-semibold hover:underline"
+            style={{ color: '#60a5fa' }}
           >
             ⬇️ 샘플 파일 다운로드 (sample-import.csv)
           </a>
@@ -88,12 +92,13 @@ export default function ImportPanel() {
               const file = e.target.files?.[0];
               if (file) handleUpload(file);
             }}
-            className="block w-full text-sm
-              file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0
-              file:text-sm file:font-medium
-              file:bg-blue-500/10 file:text-blue-400
-              hover:file:bg-blue-500/20 disabled:opacity-50"
-            style={{ color: '#cbd5e1' }}
+            className="block w-full text-sm font-medium
+              file:mr-3 file:py-2.5 file:px-5 file:rounded-lg file:border-0
+              file:text-sm file:font-semibold
+              file:bg-blue-500 file:text-white
+              hover:file:bg-blue-600 file:cursor-pointer
+              disabled:opacity-50"
+            style={{ color: '#f1f5f9' }}
           />
 
           {loading && (
