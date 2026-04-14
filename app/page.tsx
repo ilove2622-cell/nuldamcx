@@ -32,7 +32,8 @@ import {
   Launch as LaunchIcon,
   Link as LinkIcon,
   UploadFile as UploadFileIcon,
-  DocumentScanner as DocumentScannerIcon // 💡 [추가] OCR용 스캐너 아이콘
+  DocumentScanner as DocumentScannerIcon, // 💡 [추가] OCR용 스캐너 아이콘
+  Biotech as BiotechIcon // VOC 이물질 분석 아이콘
 } from '@mui/icons-material';
 
 // ==========================================
@@ -619,11 +620,11 @@ export default function IntegratedDashboardPage() {
           </Box>
           
           <Stack direction="row" spacing={1.5}>
-            <Button 
-              onClick={() => router.push('/ocr')} 
+            <Button
+              onClick={() => router.push('/ocr')}
               startIcon={<DocumentScannerIcon fontSize="small" />}
-              sx={{ 
-                color: '#cbd5e1', 
+              sx={{
+                color: '#cbd5e1',
                 fontWeight: 600,
                 px: 2,
                 borderRadius: '8px',
@@ -631,6 +632,19 @@ export default function IntegratedDashboardPage() {
               }}
             >
               OCR
+            </Button>
+            <Button
+              onClick={() => router.push('/voc')}
+              startIcon={<BiotechIcon fontSize="small" />}
+              sx={{
+                color: '#cbd5e1',
+                fontWeight: 600,
+                px: 2,
+                borderRadius: '8px',
+                '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.05)' }
+              }}
+            >
+              VOC
             </Button>
             
             <Button 

@@ -19,6 +19,7 @@
     "@mui/x-date-pickers": "^8.25.0",
     "@supabase/supabase-js": "^2.99.1",
     "date-fns": "^4.1.0",
+    "exceljs": "^4.4.0",
     "fast-xml-parser": "^5.5.8",
     "googleapis": "^171.4.0",
     "iconv-lite": "^0.7.2",
