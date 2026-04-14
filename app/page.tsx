@@ -1175,19 +1175,33 @@ export default function IntegratedDashboardPage() {
               {trackingLoading ? (
                 <Box sx={{ textAlign: 'center', py: 3 }}><CircularProgress size={24} sx={{ color: '#10b981' }} /></Box>
               ) : trackingResult && trackingResult.steps.length > 0 ? (
-                <Box sx={{ maxHeight: '300px', overflow: 'auto', '&::-webkit-scrollbar': { width: 4 }, '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(255,255,255,0.2)', borderRadius: 2 } }}>
-                  {trackingResult.steps.map((step, idx) => (
-                    <Box key={idx} sx={{ display: 'flex', gap: 1.5, py: 1, borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                      <Box sx={{ minWidth: 6, display: 'flex', flexDirection: 'column', alignItems: 'center', pt: 0.5 }}>
-                        <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: idx === 0 ? '#10b981' : '#475569' }} />
+                <Box sx={{ maxHeight: '350px', overflow: 'auto', '&::-webkit-scrollbar': { width: 4 }, '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(255,255,255,0.2)', borderRadius: 2 } }}>
+                  <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, mb: 1, display: 'block' }}>배송 이력</Typography>
+                  {trackingResult.steps.map((step: any, idx: number) => (
+                    <Box key={idx} sx={{ display: 'flex', gap: 1.5, py: 1.2, borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                      <Box sx={{ minWidth: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', pt: 0.3 }}>
+                        <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: idx === 0 ? '#10b981' : '#475569', flexShrink: 0 }} />
+                        {idx < trackingResult.steps.length - 1 && (
+                          <Box sx={{ width: 1, flex: 1, bgcolor: 'rgba(255,255,255,0.1)', mt: 0.5 }} />
+                        )}
                       </Box>
                       <Box sx={{ flex: 1 }}>
-                        <Typography variant="caption" sx={{ color: idx === 0 ? '#10b981' : '#94a3b8', fontWeight: idx === 0 ? 700 : 400, display: 'block' }}>
-                          {step.status}
-                        </Typography>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <Typography variant="body2" sx={{ color: idx === 0 ? '#10b981' : '#e2e8f0', fontWeight: idx === 0 ? 700 : 500, fontSize: '0.82rem' }}>
+                            {step.step || step.status}
+                          </Typography>
+                          <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.7rem', flexShrink: 0, ml: 1 }}>
+                            {step.location}
+                          </Typography>
+                        </Box>
                         <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.7rem' }}>
-                          {step.date} · {step.location}
+                          {step.date}
                         </Typography>
+                        {step.detail && (
+                          <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.72rem', display: 'block', mt: 0.3 }}>
+                            {step.detail}
+                          </Typography>
+                        )}
                       </Box>
                     </Box>
                   ))}
