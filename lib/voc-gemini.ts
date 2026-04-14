@@ -5,7 +5,10 @@ const ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${MODE
 const MAX_ATTEMPTS = 4;
 
 const SYSTEM_INSTRUCTION =
-  '당신은 식품 이물질 분석 전문가입니다. 반드시 JSON만 응답하세요. 마크다운, 설명, 추가 텍스트 없이 순수 JSON만 반환하세요.';
+  "당신은 'Nuldam(널담)' 브랜드의 식품 이물질 분석 전문가이자 전문 CS 상담원입니다. " +
+  'csScript 필드는 실제로 고객 게시판에 등록될 정중한 공식 답변 형식이어야 하며, ' +
+  '"안녕하세요, Suggest the better 널 담입니다." 로 시작해 "감사합니다." 로 마무리합니다. ' +
+  '반드시 JSON만 응답하세요. 마크다운, 설명, 추가 텍스트 없이 순수 JSON만 반환하세요.';
 
 function buildPrompt(
   productName?: string,
@@ -18,16 +21,24 @@ function buildPrompt(
     : '';
   const refInfo =
     referenceScripts && referenceScripts.length > 0
-      ? `\n📚 [필수 참고] 우리 회사의 실제 CS 응대 스크립트 예시입니다. csScript는 반드시 아래 예시들과 동일한 톤·인사말·구조·말투로 작성해야 합니다.
+      ? `\n📚 [참고] 우리 회사의 실제 CS 응대 스크립트 예시입니다. 아래 예시의 톤과 표현을 참고하되, 반드시 아래 ✍️ csScript 작성 규칙을 우선 따르세요.
 
-${referenceScripts.map((s, i) => `[예시 ${i + 1}]\n${s}`).join('\n\n')}
-
-⚠️ csScript 작성 규칙:
-- 위 예시처럼 시작 인사말("안녕하세요" 등)을 그대로 따라하세요.
-- 사과 표현, 문장 구조, 종결어미, 존댓말 수준을 동일하게 유지하세요.
-- 자체적으로 새로운 톤을 만들지 말고, 위 예시의 스타일을 그대로 복제해서 이번 상황에 맞게만 내용을 바꾸세요.\n`
+${referenceScripts.map((s, i) => `[예시 ${i + 1}]\n${s}`).join('\n\n')}\n`
       : '';
   return `${productInfo}${hintInfo}${refInfo}위 이미지에서 발견된 이물질을 분석해주세요. 반드시 아래 JSON 형식으로만 응답하세요. 다른 텍스트는 절대 포함하지 마세요.
+
+✍️ csScript 작성 규칙 (게시판 답변 형식과 동일):
+1. 반드시 첫 줄을 "안녕하세요, Suggest the better 널 담입니다." 로 시작하세요.
+2. 그 다음 한 줄 띄우고 본문을 작성하세요.
+3. 본문에는 다음 흐름을 자연스럽게 포함하세요:
+   - 불편을 드린 점에 대한 진심 어린 사과
+   - 사진 확인 결과(이물질 종류 추정)에 대한 안내
+   - 발생 가능 원인에 대한 짧은 설명
+   - 향후 재발 방지를 위한 조치 약속
+   - (필요 시) 교환·환불·보상 안내 또는 추가 확인 요청
+4. 마지막 줄은 "감사합니다." 로 마무리하세요.
+5. 정중한 존댓말을 사용하고, 문장은 자연스럽게 줄바꿈(\\n)으로 구분하세요.
+6. JSON 문자열 안의 줄바꿈은 반드시 \\n 으로 이스케이프하세요.
 
 {
   "substanceType": "이물질 종류 (예: 금속 조각, 플라스틱, 곤충, 털 등)",
@@ -36,7 +47,7 @@ ${referenceScripts.map((s, i) => `[예시 ${i + 1}]\n${s}`).join('\n\n')}
   "riskReason": "위험도 판단 근거",
   "estimatedSource": "혼입 추정 원인 (제조 공정, 원재료, 포장 등)",
   "recommendedActions": ["권장 조치 1", "권장 조치 2", "권장 조치 3"],
-  "csScript": "고객에게 전달할 정중한 CS 응대 멘트 (2-3문장)"
+  "csScript": "안녕하세요, Suggest the better 널 담입니다.\\n\\n(사과)... (분석 결과 안내)... (원인 설명)... (재발 방지 약속)... (필요 시 보상 안내)...\\n\\n감사합니다."
 }`;
 }
 
