@@ -76,17 +76,17 @@ export default function AnalysisResult({ result, onChange, onRegenerate, regener
         </div>
       </div>
 
-      <div className="p-5 space-y-4">
+      <div className="p-5 space-y-5">
         <div>
-          <p className="text-sm font-medium" style={{ color: '#94a3b8' }}>이물질 종류</p>
+          <p className="text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: '#93c5fd' }}>이물질 종류</p>
           {editing ? (
             <div className="mt-1 flex items-center gap-2">
               <input
                 type="text"
                 value={result.substanceType}
                 onChange={(e) => update('substanceType', e.target.value)}
-                className="flex-1 px-2 py-1.5 border rounded text-sm"
-                style={{ borderColor: 'rgba(255,255,255,0.1)', background: 'rgba(15,23,42,0.5)', color: '#f8fafc' }}
+                className="flex-1 px-2 py-1.5 border rounded text-[15px]"
+                style={{ borderColor: 'rgba(255,255,255,0.1)', background: 'rgba(15,23,42,0.5)', color: '#ffffff' }}
               />
               {onRegenerate && (
                 <button
@@ -99,7 +99,7 @@ export default function AnalysisResult({ result, onChange, onRegenerate, regener
               )}
             </div>
           ) : (
-            <p className="mt-0.5 text-sm" style={{ color: '#f8fafc' }}>{result.substanceType}</p>
+            <p className="text-[15px] font-semibold leading-7" style={{ color: '#ffffff' }}>{result.substanceType}</p>
           )}
         </div>
         <Field label="외관 특징" value={result.characteristics} editing={editing} multiline
@@ -110,11 +110,11 @@ export default function AnalysisResult({ result, onChange, onRegenerate, regener
           onChange={(v) => update('estimatedSource', v)} />
 
         <div>
-          <p className="text-sm font-medium mb-2" style={{ color: '#94a3b8' }}>권장 조치</p>
-          <ul className="space-y-1.5">
+          <p className="text-xs font-semibold uppercase tracking-wider mb-2.5" style={{ color: '#93c5fd' }}>권장 조치</p>
+          <ul className="space-y-2.5">
             {result.recommendedActions.map((action, i) => (
-              <li key={i} className="flex items-start gap-2 text-sm" style={{ color: '#cbd5e1' }}>
-                <span className="mt-0.5 flex-shrink-0 w-5 h-5 rounded-full bg-blue-500/20 text-blue-400 text-xs flex items-center justify-center font-medium">
+              <li key={i} className="flex items-start gap-3 text-[15px] leading-7" style={{ color: '#f1f5f9' }}>
+                <span className="mt-0.5 flex-shrink-0 w-6 h-6 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center font-bold">
                   {i + 1}
                 </span>
                 {editing ? (
@@ -168,27 +168,27 @@ function Field({
 }) {
   return (
     <div>
-      <p className="text-sm font-medium" style={{ color: '#94a3b8' }}>{label}</p>
+      <p className="text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: '#93c5fd' }}>{label}</p>
       {editing ? (
         multiline ? (
           <textarea
             value={value}
             onChange={(e) => onChange(e.target.value)}
-            rows={2}
-            className="mt-1 w-full px-2 py-1.5 border rounded text-sm"
-            style={{ borderColor: 'rgba(255,255,255,0.1)', background: 'rgba(15,23,42,0.5)', color: '#f8fafc' }}
+            rows={3}
+            className="mt-1 w-full px-2 py-1.5 border rounded text-[15px] leading-7"
+            style={{ borderColor: 'rgba(255,255,255,0.1)', background: 'rgba(15,23,42,0.5)', color: '#ffffff' }}
           />
         ) : (
           <input
             type="text"
             value={value}
             onChange={(e) => onChange(e.target.value)}
-            className="mt-1 w-full px-2 py-1.5 border rounded text-sm"
-            style={{ borderColor: 'rgba(255,255,255,0.1)', background: 'rgba(15,23,42,0.5)', color: '#f8fafc' }}
+            className="mt-1 w-full px-2 py-1.5 border rounded text-[15px]"
+            style={{ borderColor: 'rgba(255,255,255,0.1)', background: 'rgba(15,23,42,0.5)', color: '#ffffff' }}
           />
         )
       ) : (
-        <p className="mt-0.5 text-sm whitespace-pre-wrap" style={{ color: '#f8fafc' }}>{value}</p>
+        <p className="text-[15px] leading-7 whitespace-pre-wrap" style={{ color: '#f1f5f9' }}>{value}</p>
       )}
     </div>
   );

@@ -79,12 +79,12 @@ export default function CsScript({ script, onChange }: Props) {
           <textarea
             value={script}
             onChange={(e) => onChange?.(e.target.value)}
-            rows={4}
-            className="w-full px-3 py-2 border rounded-lg text-sm leading-relaxed"
-            style={{ borderColor: 'rgba(255,255,255,0.1)', background: 'rgba(15,23,42,0.5)', color: '#f8fafc' }}
+            rows={5}
+            className="w-full px-3 py-2.5 border rounded-lg text-[15px] leading-8"
+            style={{ borderColor: 'rgba(255,255,255,0.15)', background: 'rgba(15,23,42,0.5)', color: '#ffffff' }}
           />
         ) : (
-          <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: '#f8fafc' }}>{script}</p>
+          <p className="text-[15px] leading-8 whitespace-pre-wrap" style={{ color: '#ffffff' }}>{script}</p>
         )}
       </div>
     </div>
