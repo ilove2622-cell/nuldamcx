@@ -22,18 +22,22 @@ export async function GET(req: Request) {
     // 단품/옵션 관련 후보 (실제 사방넷 응답에서 채워지는 것만 추후 정식 적용)
     const candidateFields = [
       'ORDER_ID', 'PRODUCT_NAME', 'PRODUCT_ID', 'MALL_PRODUCT_ID', 'SKU_VALUE', 'SALE_CNT', 'BARCODE',
-      // 단품 관련 후보들
-      'SKU_NO', 'SKU_ALIAS_NO', 'SKU_NAME',
-      'OPTION_ID', 'OPTION_T', 'OPTION_NM',
-      'JUNG_OPTION_NO', 'JUNG_OPTION_T', 'JUNG_OPTION_NM', 'JUNG_OPTION_NAME',
-      'BUNDLE_NO', 'BUNDLE_NM', 'BUNDLE_NAME', 'BUNDLE_T',
-      'SET_PRODUCT_NAME', 'SET_GUBN',
-      'MULTI_GBN', 'OPT_TYPE',
-      'EXPECTED_PAYOUT', 'GIFT_NAME',
-      'TEMPORARY_PUMBUN', 'PUMBUN_NO', 'PUMBUN_NAME',
-      'P_PRODUCT_ID', 'P_PRODUCT_NAME',
-      'JANGBU_NO', 'JANGBU_T',
-      'BUNDLE_GUBN', 'BUNDLE_DC', 'PUMBUN_GUBN',
+      // P_PRODUCT_NAME(=확정옵션/단품명) 짝꿍 코드 후보
+      'P_PRODUCT_NO', 'P_PRODUCT_CODE', 'P_PRODUCT_SEQ',
+      'P_SKU_NO', 'P_SKU_ALIAS', 'P_SKU_ALIAS_NO',
+      'P_BUNDLE_NO', 'P_BUNDLE_NAME', 'P_BUNDLE_SEQ',
+      'P_OPTION_NO', 'P_OPTION_T', 'P_OPTION_NM',
+      'P_BARCODE',
+      // 매핑 관련
+      'MAPPING_NO', 'MAPPING_PRODUCT_NO', 'MAPPING_PRODUCT_NAME',
+      'MATCH_PRODUCT_NO', 'MATCH_PRODUCT_NAME',
+      'JUNG_PRODUCT_NO', 'JUNG_PRODUCT_NAME',
+      // 처리/출고 SKU
+      'OUT_SKU_NO', 'OUT_SKU_NAME', 'OUT_PRODUCT_NO',
+      'PRESS_SKU_NO', 'PRESS_PRODUCT_NO',
+      // 추가 가능성
+      'PUMBUN_CODE', 'BUNDLE_CODE', 'SKU_CODE',
+      'OPTION_NO', 'OPTION_CODE',
     ].join('|');
 
     // 만들기는 우리 도메인에서 호스트
