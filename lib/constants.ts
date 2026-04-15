@@ -42,7 +42,7 @@ export const CHANNEL_URL_MAP: Record<string, string> = {
   '톡스토어': 'https://shopping-seller.kakao.com/product/store-seller/qna/list?answerExist=false&period=',
   '11번가': 'https://soffice.11st.co.kr/view/main',
   '롯데온': 'https://store.lotteon.com/cm/main/index_SO.wsp',
-  '카카오 지그재그': 'https://partners.kakaostyle.com/shop/cq-xgnz8ee9/stats',
+  '카카오 지그재그': 'https://partners.kakaostyle.com/shop/cq-xgnz8ee9/cs/inquiry',
   'CJ온스타일': 'https://partners.cjonstyle.com/login',
   '올웨이즈': 'https://alwayzseller.ilevit.com/',
   'GS샵': 'https://withgs.gsshop.com/cmm/login',
@@ -65,6 +65,7 @@ export const QUICK_LINKS = [
   { name: '코케비즈', url: 'https://biz.koke.kr/seller/chats' },
   { name: 'B2B', url: 'https://business.kakao.com/_gGxcCxj/chats' },
   { name: '쿠팡', url: 'https://wing.coupang.com/tenants/cs/csinquiry' },
+  { name: '지그재그', url: 'https://partners.kakaostyle.com/shop/cq-xgnz8ee9/cs/inquiry' },
 ];
 
 
