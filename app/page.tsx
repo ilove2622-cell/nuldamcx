@@ -1405,21 +1405,22 @@ export default function IntegratedDashboardPage() {
           {orderModalData && (
             <Box sx={{ display: 'grid', gridTemplateColumns: '88px 1fr', rowGap: 2, columnGap: 2 }}>
               {[
-                { label: '주문번호', value: orderModalData.order_number, copy: orderModalData.order_number },
-                { label: '상품명',   value: orderModalData.product_name, copy: orderModalData.product_name },
-                { label: '고객명',   value: orderModalData.customer_name, copy: orderModalData.customer_name },
-                { label: '수령인',   value: orderModalData.receiver_name, copy: orderModalData.receiver_name },
-                { label: '연락처',   value: orderModalData.receiver_tel, copy: orderModalData.receiver_tel },
-                { label: '배송주소', value: orderModalData.shipping_address, copy: orderModalData.shipping_address },
+                { label: '주문번호', value: orderModalData.order_number, copy: orderModalData.order_number, copyable: true },
+                { label: '상품명',   value: orderModalData.product_name, copy: '', copyable: false },
+                { label: '고객명',   value: orderModalData.customer_name, copy: orderModalData.customer_name, copyable: true },
+                { label: '수령인',   value: orderModalData.receiver_name, copy: orderModalData.receiver_name, copyable: true },
+                { label: '연락처',   value: orderModalData.receiver_tel, copy: orderModalData.receiver_tel, copyable: true },
+                { label: '배송주소', value: orderModalData.shipping_address, copy: orderModalData.shipping_address, copyable: true },
                 {
                   label: '송장번호',
                   value: orderModalData.tracking_number ? formatTrackingNumber(orderModalData.tracking_number) : '-',
                   copy: orderModalData.tracking_number ? formatTrackingNumber(orderModalData.tracking_number) : '',
+                  copyable: true,
                 },
-                { label: '쇼핑몰',   value: getStandardChannelName(orderModalData.channel), copy: getStandardChannelName(orderModalData.channel) },
-              ].map(({ label, value, copy }) => {
+                { label: '쇼핑몰',   value: getStandardChannelName(orderModalData.channel), copy: '', copyable: false },
+              ].map(({ label, value, copy, copyable }) => {
                 const key = `modal-${label}`;
-                const canCopy = !!(copy && copy !== '-');
+                const canCopy = copyable && !!(copy && copy !== '-');
                 return (
                   <React.Fragment key={`row-${label}`}>
                     <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 700, fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.5px', pt: '2px' }}>{label}</Typography>
