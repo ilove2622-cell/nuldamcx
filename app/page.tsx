@@ -1121,10 +1121,10 @@ export default function IntegratedDashboardPage() {
                                         옵션: {it.option}
                                       </Typography>
                                     )}
-                                    {/* 단품명 */}
+                                    {/* 확정옵션명 (사방넷 P_PRODUCT_NAME) */}
                                     {it.unitName && (
-                                      <Typography sx={{ color: '#64748b', fontSize: '0.68rem', mt: 0.2 }}>
-                                        단품: {it.unitName}
+                                      <Typography sx={{ color: '#a78bfa', fontSize: '0.7rem', mt: 0.3, fontWeight: 500 }}>
+                                        ✓ 확정옵션: <span style={{ color: '#e9d5ff' }}>{it.unitName}</span>
                                       </Typography>
                                     )}
                                   </Box>
@@ -1462,7 +1462,7 @@ export default function IntegratedDashboardPage() {
                         it.mallProductId && `쇼핑몰상품코드: ${it.mallProductId}`,
                         it.skuAlias && `품번: ${it.skuAlias}`,
                         it.option && `옵션: ${it.option}`,
-                        it.unitName && `단품: ${it.unitName}`,
+                        it.unitName && `확정옵션: ${it.unitName}`,
                         it.barcode && `바코드: ${it.barcode}`,
                         `수량: ${it.qty || 1}`,
                       ].filter(Boolean).join('\n');
@@ -1561,11 +1561,13 @@ export default function IntegratedDashboardPage() {
                           )}
                           {it.unitName && (
                             <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.5 }}>
-                              <Typography sx={{ color: '#64748b', fontSize: '0.7rem', flex: 1 }}>단품: {it.unitName}</Typography>
+                              <Typography sx={{ color: '#a78bfa', fontSize: '0.74rem', flex: 1, fontWeight: 500 }}>
+                                ✓ 확정옵션: <span style={{ color: '#e9d5ff' }}>{it.unitName}</span>
+                              </Typography>
                               <IconButton
                                 size="small"
                                 onClick={() => copyToClipboard(String(it.unitName), `item-${idx}-unitName`)}
-                                title="단품명 복사"
+                                title="확정옵션명 복사"
                                 sx={{
                                   p: 0.3,
                                   color: copiedKey === `item-${idx}-unitName` ? '#34d399' : '#64748b',

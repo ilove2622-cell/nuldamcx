@@ -29,7 +29,7 @@ export async function GET(req: Request) {
     'SKU_ALIAS_NO',      // 품번(SKU)코드
     'SKU_NO',            // SKU 번호
     'SKU_VALUE',         // 수집옵션선택
-    'EXPECTED_PAYOUT',   // 단품명/단품코드 영역에 노출되는 케이스
+    'P_PRODUCT_NAME',    // ✅ 확정옵션명/처리 단품명 (예: "널담 네모바게트 호두크랜베리 6개입")
     'SALE_CNT',          // 수량
     'BARCODE',           // 바코드(있으면)
     'GIFT_NAME',         // 사은품명 (사은품 분리행 식별)
