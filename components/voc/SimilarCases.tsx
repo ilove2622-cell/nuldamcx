@@ -28,6 +28,25 @@ function toImgSrc(b64: string): string {
 
 export default function SimilarCases({ cases }: Props) {
   const [zoomSrc, setZoomSrc] = useState<string | null>(null);
+  const [zoomLoading, setZoomLoading] = useState(false);
+
+  // 썸네일 클릭 → /api/voc/cases/[id]/image 에서 원본 가져와 확대
+  const openZoom = async (caseId: number, fallbackThumb: string) => {
+    setZoomSrc(fallbackThumb); // 즉시 썸네일이라도 띄움
+    setZoomLoading(true);
+    try {
+      const res = await fetch(`/api/voc/cases/${caseId}/image`);
+      if (!res.ok) return;
+      const json = await res.json();
+      if (json?.imageBase64) {
+        setZoomSrc(toImgSrc(json.imageBase64));
+      }
+    } catch {
+      /* 실패해도 썸네일은 떠있음 */
+    } finally {
+      setZoomLoading(false);
+    }
+  };
 
   if (!cases || cases.length === 0) return null;
 
@@ -43,7 +62,7 @@ export default function SimilarCases({ cases }: Props) {
         <div className="space-y-3">
           {cases.map((c) => {
             const risk = riskLabel[c.riskLevel] ?? { text: c.riskLevel, color: 'bg-slate-700/50', style: { color: '#cbd5e1' } };
-            const imgSrc = c.imageBase64 ? toImgSrc(c.imageBase64) : null;
+            const thumbSrc = c.imageThumbnail ? toImgSrc(c.imageThumbnail) : null;
             return (
               <div
                 key={c.id}
@@ -53,16 +72,16 @@ export default function SimilarCases({ cases }: Props) {
                 onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(15,23,42,0.5)'; }}
               >
                 {/* 썸네일 */}
-                {imgSrc ? (
+                {thumbSrc ? (
                   <button
                     type="button"
-                    onClick={() => setZoomSrc(imgSrc)}
+                    onClick={() => openZoom(c.id, thumbSrc)}
                     className="flex-shrink-0 w-20 h-20 sm:w-24 sm:h-24 rounded-lg overflow-hidden border bg-transparent p-0 cursor-zoom-in transition-transform hover:scale-105"
                     style={{ borderColor: 'rgba(255,255,255,0.1)' }}
                     aria-label="사진 확대 보기"
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={imgSrc} alt={c.substanceType} className="w-full h-full object-cover" />
+                    <img src={thumbSrc} alt={c.substanceType} className="w-full h-full object-cover" />
                   </button>
                 ) : (
                   <div
@@ -115,13 +134,24 @@ export default function SimilarCases({ cases }: Props) {
           className="fixed inset-0 z-[1000] flex items-center justify-center p-4 cursor-zoom-out"
           style={{ background: 'rgba(0,0,0,0.85)' }}
         >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={zoomSrc}
-            alt="확대 보기"
-            className="max-w-full max-h-full rounded-lg shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          />
+          <div className="relative" onClick={(e) => e.stopPropagation()}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={zoomSrc}
+              alt="확대 보기"
+              className="max-w-[90vw] max-h-[90vh] rounded-lg shadow-2xl"
+            />
+            {zoomLoading && (
+              <div
+                className="absolute inset-0 flex items-center justify-center rounded-lg"
+                style={{ background: 'rgba(0,0,0,0.4)' }}
+              >
+                <span className="text-white text-sm font-medium px-3 py-1.5 rounded-full" style={{ background: 'rgba(15,23,42,0.8)' }}>
+                  원본 불러오는 중…
+                </span>
+              </div>
+            )}
+          </div>
           <button
             type="button"
             onClick={() => setZoomSrc(null)}

@@ -1,16 +1,19 @@
 import { createClient } from '@supabase/supabase-js';
 import type { AnalysisResult, RiskLevel, SimilarCase } from '@/types/voc';
+import { makeThumbnail } from './voc-image';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// 저장
+// 저장 — 원본 + 256px 썸네일을 함께 저장
 export async function saveCase(
   productName: string | undefined,
   result: AnalysisResult,
   imageBase64?: string
 ): Promise<number> {
+  const thumb = await makeThumbnail(imageBase64);
+
   const { data, error } = await supabase
     .from('substance_cases')
     .insert({
@@ -21,6 +24,7 @@ export async function saveCase(
       recommended_actions: result.recommendedActions,
       cs_script: result.csScript,
       image_base64: imageBase64 ?? null,
+      image_thumbnail: thumb,
     })
     .select('id')
     .single();
@@ -57,9 +61,11 @@ export async function findSimilarCases(
   excludeId?: number,
   limit = 3
 ): Promise<SimilarCase[]> {
+  // 🚀 image_base64는 너무 무거워서 SELECT하지 않음 — 썸네일만 가져옴
+  // 썸네일이 없는 과거 데이터는 사진이 보이지 않음(허용)
   let query = supabase
     .from('substance_cases')
-    .select('id, created_at, product_name, substance_type, risk_level, characteristics, cs_script, image_base64')
+    .select('id, created_at, product_name, substance_type, risk_level, characteristics, cs_script, image_thumbnail')
     .or(`substance_type.ilike.%${substanceType}%,risk_level.eq.${riskLevel}`)
     .order('created_at', { ascending: false })
     .limit(limit);
@@ -79,7 +85,7 @@ export async function findSimilarCases(
     riskLevel: row.risk_level as RiskLevel,
     characteristics: row.characteristics,
     csScript: row.cs_script,
-    imageBase64: row.image_base64,
+    imageThumbnail: row.image_thumbnail,
   }));
 }
 
@@ -103,7 +109,7 @@ export async function findExactMatchCase(
 
   const { data, error } = await supabase
     .from('substance_cases')
-    .select('id, created_at, product_name, substance_type, risk_level, characteristics, cs_script, image_base64')
+    .select('id, created_at, product_name, substance_type, risk_level, characteristics, cs_script, image_thumbnail')
     .ilike('substance_type', `%${primary}%`)
     .not('cs_script', 'is', null)
     .not('cs_script', 'eq', '')
@@ -125,7 +131,7 @@ export async function findExactMatchCase(
     riskLevel: row.risk_level as RiskLevel,
     characteristics: row.characteristics,
     csScript: row.cs_script,
-    imageBase64: row.image_base64,
+    imageThumbnail: row.image_thumbnail,
   };
 }
 
