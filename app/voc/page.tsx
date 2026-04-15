@@ -164,8 +164,8 @@ export default function VocPage() {
         top: 0,
         zIndex: 50
       }}>
-        <Container maxWidth="xl" sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 2, px: { xs: 2, sm: 3, lg: 4 } }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+        <Container maxWidth="xl" sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 2, px: { xs: 3, sm: 4, lg: 6 } }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, pl: { xs: 0.5, sm: 1 } }}>
             <Button
               onClick={() => router.push('/')}
               startIcon={<ArrowBackIcon fontSize="small" />}
