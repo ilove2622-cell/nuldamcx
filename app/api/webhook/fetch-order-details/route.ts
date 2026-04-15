@@ -55,7 +55,7 @@ export async function POST(req: Request) {
           skuAlias:      i.SKU_ALIAS_NO ? String(i.SKU_ALIAS_NO) : '',
           sku:           i.SKU_NO ? String(i.SKU_NO) : '',
           option:        i.SKU_VALUE ? String(i.SKU_VALUE) : '',
-          unitName:      i.P_PRODUCT_NAME ? String(i.P_PRODUCT_NAME) : (i.EXPECTED_PAYOUT ? String(i.EXPECTED_PAYOUT) : ''),
+          unitName:      i.P_PRODUCT_NAME ? String(i.P_PRODUCT_NAME) : (i.PRODUCT_NAME ? String(i.PRODUCT_NAME) : ''),
           barcode:       i.BARCODE ? String(i.BARCODE) : '',
           qty:           Number(i.SALE_CNT) || 1,
           gift:          isGift,
