@@ -33,7 +33,9 @@ import {
   Link as LinkIcon,
   UploadFile as UploadFileIcon,
   DocumentScanner as DocumentScannerIcon, // 💡 [추가] OCR용 스캐너 아이콘
-  Biotech as BiotechIcon // VOC 이물질 분석 아이콘
+  Biotech as BiotechIcon, // VOC 이물질 분석 아이콘
+  ContentCopy as ContentCopyIcon,
+  Check as CheckIcon
 } from '@mui/icons-material';
 
 // ==========================================
@@ -356,6 +358,27 @@ export default function IntegratedDashboardPage() {
       }
       fetchDataAndCounts();
     } finally { setIsTriggeringBot(false); }
+  };
+
+  // 모달 항목 복사 — 어떤 키가 방금 복사됐는지 표시 (체크 아이콘 깜빡임용)
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const copyToClipboard = async (text: string, key: string) => {
+    if (!text || text === '-') return;
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      // fallback: textarea
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.left = '-9999px';
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); } catch {}
+      document.body.removeChild(ta);
+    }
+    setCopiedKey(key);
+    setTimeout(() => setCopiedKey(prev => (prev === key ? null : prev)), 1200);
   };
 
   // 사방넷 주문 상세(상품/배송) 재조회
@@ -1382,48 +1405,184 @@ export default function IntegratedDashboardPage() {
           {orderModalData && (
             <Box sx={{ display: 'grid', gridTemplateColumns: '88px 1fr', rowGap: 2, columnGap: 2 }}>
               {[
-                { label: '주문번호', value: orderModalData.order_number },
-                { label: '상품명',   value: orderModalData.product_name },
-                { label: '고객명',   value: orderModalData.customer_name },
-                { label: '수령인',   value: orderModalData.receiver_name },
-                { label: '연락처',   value: orderModalData.receiver_tel },
-                { label: '배송주소', value: orderModalData.shipping_address },
-                { label: '송장번호', value: orderModalData.tracking_number ? formatTrackingNumber(orderModalData.tracking_number) : '-' },
-                { label: '쇼핑몰',   value: getStandardChannelName(orderModalData.channel) },
-              ].map(({ label, value }) => (
-                <>
-                  <Typography key={`lbl-${label}`} variant="body2" sx={{ color: '#64748b', fontWeight: 700, fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.5px', pt: '2px' }}>{label}</Typography>
-                  <Typography key={`val-${label}`} variant="body2" sx={{ color: '#f8fafc', wordBreak: 'break-all', fontSize: '0.875rem' }}>{value || '-'}</Typography>
-                </>
-              ))}
+                { label: '주문번호', value: orderModalData.order_number, copy: orderModalData.order_number },
+                { label: '상품명',   value: orderModalData.product_name, copy: orderModalData.product_name },
+                { label: '고객명',   value: orderModalData.customer_name, copy: orderModalData.customer_name },
+                { label: '수령인',   value: orderModalData.receiver_name, copy: orderModalData.receiver_name },
+                { label: '연락처',   value: orderModalData.receiver_tel, copy: orderModalData.receiver_tel },
+                { label: '배송주소', value: orderModalData.shipping_address, copy: orderModalData.shipping_address },
+                {
+                  label: '송장번호',
+                  value: orderModalData.tracking_number ? formatTrackingNumber(orderModalData.tracking_number) : '-',
+                  copy: orderModalData.tracking_number ? formatTrackingNumber(orderModalData.tracking_number) : '',
+                },
+                { label: '쇼핑몰',   value: getStandardChannelName(orderModalData.channel), copy: getStandardChannelName(orderModalData.channel) },
+              ].map(({ label, value, copy }) => {
+                const key = `modal-${label}`;
+                const canCopy = !!(copy && copy !== '-');
+                return (
+                  <React.Fragment key={`row-${label}`}>
+                    <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 700, fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.5px', pt: '2px' }}>{label}</Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, minWidth: 0 }}>
+                      <Typography variant="body2" sx={{ color: '#f8fafc', wordBreak: 'break-all', fontSize: '0.875rem', flex: 1, minWidth: 0 }}>
+                        {value || '-'}
+                      </Typography>
+                      {canCopy && (
+                        <IconButton
+                          size="small"
+                          onClick={() => copyToClipboard(String(copy), key)}
+                          title={`${label} 복사`}
+                          sx={{
+                            flexShrink: 0,
+                            p: 0.4,
+                            color: copiedKey === key ? '#34d399' : '#64748b',
+                            '&:hover': { color: '#60a5fa', bgcolor: 'rgba(59, 130, 246, 0.1)' },
+                          }}
+                        >
+                          {copiedKey === key
+                            ? <CheckIcon sx={{ fontSize: 14 }} />
+                            : <ContentCopyIcon sx={{ fontSize: 14 }} />}
+                        </IconButton>
+                      )}
+                    </Box>
+                  </React.Fragment>
+                );
+              })}
 
               {/* 사방넷 주문 상품 목록 */}
               {Array.isArray(orderModalData.order_items) && orderModalData.order_items.length > 0 && (
-                <>
+                <React.Fragment>
                   <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 700, fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.5px', pt: '2px' }}>주문상품</Typography>
                   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.8 }}>
-                    {orderModalData.order_items.map((it, idx) => (
-                      <Box key={idx} sx={{
-                        p: 1, borderRadius: '6px',
-                        bgcolor: it.gift ? 'rgba(251, 191, 36, 0.06)' : 'rgba(15, 23, 42, 0.5)',
-                        border: it.gift ? '1px dashed rgba(251, 191, 36, 0.3)' : '1px solid rgba(255,255,255,0.05)',
-                      }}>
-                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 0.5 }}>
-                          {it.skuAlias && <Chip size="small" label={`품번 ${it.skuAlias}`} sx={{ height: 18, fontSize: '0.65rem', bgcolor: 'rgba(59,130,246,0.15)', color: '#93c5fd' }} />}
-                          {it.productId && <Chip size="small" label={`자체 ${it.productId}`} sx={{ height: 18, fontSize: '0.65rem', bgcolor: 'rgba(255,255,255,0.06)', color: '#cbd5e1' }} />}
-                          {it.mallProductId && <Chip size="small" label={`쇼핑몰 ${it.mallProductId}`} sx={{ height: 18, fontSize: '0.65rem', bgcolor: 'rgba(255,255,255,0.06)', color: '#cbd5e1' }} />}
-                          {it.gift && <Chip size="small" label="🎁 사은품" sx={{ height: 18, fontSize: '0.65rem', bgcolor: 'rgba(251,191,36,0.2)', color: '#fbbf24', fontWeight: 700 }} />}
-                          <Chip size="small" label={`× ${it.qty || 1}`} sx={{ height: 18, fontSize: '0.65rem', bgcolor: 'rgba(59,130,246,0.15)', color: '#60a5fa', fontWeight: 700 }} />
+                    {orderModalData.order_items.map((it, idx) => {
+                      // 각 상품의 통합 복사 텍스트 (전체 정보 한번에)
+                      const fullText = [
+                        it.giftName ? `[사은품] ${it.giftName}` : it.productName,
+                        it.productId && `자체상품코드: ${it.productId}`,
+                        it.mallProductId && `쇼핑몰상품코드: ${it.mallProductId}`,
+                        it.skuAlias && `품번: ${it.skuAlias}`,
+                        it.option && `옵션: ${it.option}`,
+                        it.unitName && `단품: ${it.unitName}`,
+                        it.barcode && `바코드: ${it.barcode}`,
+                        `수량: ${it.qty || 1}`,
+                      ].filter(Boolean).join('\n');
+
+                      return (
+                        <Box key={idx} sx={{
+                          p: 1, borderRadius: '6px', position: 'relative',
+                          bgcolor: it.gift ? 'rgba(251, 191, 36, 0.06)' : 'rgba(15, 23, 42, 0.5)',
+                          border: it.gift ? '1px dashed rgba(251, 191, 36, 0.3)' : '1px solid rgba(255,255,255,0.05)',
+                        }}>
+                          {/* 우상단: 이 항목 전체 복사 */}
+                          <IconButton
+                            size="small"
+                            onClick={() => copyToClipboard(fullText, `item-${idx}-all`)}
+                            title="이 상품 정보 전체 복사"
+                            sx={{
+                              position: 'absolute', top: 4, right: 4,
+                              p: 0.4,
+                              color: copiedKey === `item-${idx}-all` ? '#34d399' : '#64748b',
+                              '&:hover': { color: '#60a5fa', bgcolor: 'rgba(59, 130, 246, 0.1)' },
+                            }}
+                          >
+                            {copiedKey === `item-${idx}-all`
+                              ? <CheckIcon sx={{ fontSize: 14 }} />
+                              : <ContentCopyIcon sx={{ fontSize: 14 }} />}
+                          </IconButton>
+
+                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 0.5, pr: 4 }}>
+                            {it.skuAlias && (
+                              <Chip
+                                size="small" label={`품번 ${it.skuAlias}`}
+                                onClick={() => copyToClipboard(String(it.skuAlias), `item-${idx}-skuAlias`)}
+                                title="품번 복사"
+                                sx={{ height: 18, fontSize: '0.65rem', cursor: 'pointer', bgcolor: copiedKey === `item-${idx}-skuAlias` ? 'rgba(52,211,153,0.25)' : 'rgba(59,130,246,0.15)', color: copiedKey === `item-${idx}-skuAlias` ? '#34d399' : '#93c5fd' }}
+                              />
+                            )}
+                            {it.productId && (
+                              <Chip
+                                size="small" label={`자체 ${it.productId}`}
+                                onClick={() => copyToClipboard(String(it.productId), `item-${idx}-productId`)}
+                                title="자체상품코드 복사"
+                                sx={{ height: 18, fontSize: '0.65rem', cursor: 'pointer', bgcolor: copiedKey === `item-${idx}-productId` ? 'rgba(52,211,153,0.25)' : 'rgba(255,255,255,0.06)', color: copiedKey === `item-${idx}-productId` ? '#34d399' : '#cbd5e1' }}
+                              />
+                            )}
+                            {it.mallProductId && (
+                              <Chip
+                                size="small" label={`쇼핑몰 ${it.mallProductId}`}
+                                onClick={() => copyToClipboard(String(it.mallProductId), `item-${idx}-mallProductId`)}
+                                title="쇼핑몰상품코드 복사"
+                                sx={{ height: 18, fontSize: '0.65rem', cursor: 'pointer', bgcolor: copiedKey === `item-${idx}-mallProductId` ? 'rgba(52,211,153,0.25)' : 'rgba(255,255,255,0.06)', color: copiedKey === `item-${idx}-mallProductId` ? '#34d399' : '#cbd5e1' }}
+                              />
+                            )}
+                            {it.gift && <Chip size="small" label="🎁 사은품" sx={{ height: 18, fontSize: '0.65rem', bgcolor: 'rgba(251,191,36,0.2)', color: '#fbbf24', fontWeight: 700 }} />}
+                            <Chip size="small" label={`× ${it.qty || 1}`} sx={{ height: 18, fontSize: '0.65rem', bgcolor: 'rgba(59,130,246,0.15)', color: '#60a5fa', fontWeight: 700 }} />
+                          </Box>
+
+                          {(it.productName || it.giftName) && (
+                            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.5 }}>
+                              <Typography sx={{ color: '#f1f5f9', fontSize: '0.82rem', fontWeight: 500, flex: 1, wordBreak: 'break-word' }}>
+                                {it.giftName || it.productName}
+                              </Typography>
+                              <IconButton
+                                size="small"
+                                onClick={() => copyToClipboard(String(it.giftName || it.productName), `item-${idx}-name`)}
+                                title="상품명 복사"
+                                sx={{
+                                  p: 0.3,
+                                  color: copiedKey === `item-${idx}-name` ? '#34d399' : '#64748b',
+                                  '&:hover': { color: '#60a5fa' },
+                                }}
+                              >
+                                {copiedKey === `item-${idx}-name`
+                                  ? <CheckIcon sx={{ fontSize: 12 }} />
+                                  : <ContentCopyIcon sx={{ fontSize: 12 }} />}
+                              </IconButton>
+                            </Box>
+                          )}
+                          {it.option && (
+                            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.5, mt: 0.3 }}>
+                              <Typography sx={{ color: '#94a3b8', fontSize: '0.72rem', flex: 1 }}>옵션: {it.option}</Typography>
+                              <IconButton
+                                size="small"
+                                onClick={() => copyToClipboard(String(it.option), `item-${idx}-option`)}
+                                title="옵션 복사"
+                                sx={{
+                                  p: 0.3,
+                                  color: copiedKey === `item-${idx}-option` ? '#34d399' : '#64748b',
+                                  '&:hover': { color: '#60a5fa' },
+                                }}
+                              >
+                                {copiedKey === `item-${idx}-option`
+                                  ? <CheckIcon sx={{ fontSize: 12 }} />
+                                  : <ContentCopyIcon sx={{ fontSize: 12 }} />}
+                              </IconButton>
+                            </Box>
+                          )}
+                          {it.unitName && (
+                            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.5 }}>
+                              <Typography sx={{ color: '#64748b', fontSize: '0.7rem', flex: 1 }}>단품: {it.unitName}</Typography>
+                              <IconButton
+                                size="small"
+                                onClick={() => copyToClipboard(String(it.unitName), `item-${idx}-unitName`)}
+                                title="단품명 복사"
+                                sx={{
+                                  p: 0.3,
+                                  color: copiedKey === `item-${idx}-unitName` ? '#34d399' : '#64748b',
+                                  '&:hover': { color: '#60a5fa' },
+                                }}
+                              >
+                                {copiedKey === `item-${idx}-unitName`
+                                  ? <CheckIcon sx={{ fontSize: 12 }} />
+                                  : <ContentCopyIcon sx={{ fontSize: 12 }} />}
+                              </IconButton>
+                            </Box>
+                          )}
                         </Box>
-                        {(it.productName || it.giftName) && (
-                          <Typography sx={{ color: '#f1f5f9', fontSize: '0.82rem', fontWeight: 500 }}>{it.giftName || it.productName}</Typography>
-                        )}
-                        {it.option && <Typography sx={{ color: '#94a3b8', fontSize: '0.72rem', mt: 0.3 }}>옵션: {it.option}</Typography>}
-                        {it.unitName && <Typography sx={{ color: '#64748b', fontSize: '0.7rem' }}>단품: {it.unitName}</Typography>}
-                      </Box>
-                    ))}
+                      );
+                    })}
                   </Box>
-                </>
+                </React.Fragment>
               )}
             </Box>
           )}
