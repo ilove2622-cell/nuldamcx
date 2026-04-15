@@ -15,7 +15,9 @@ export async function POST(req: Request) {
     const record = body.record;
     const orderId = record?.order_number;
 
-    if (!orderId || orderId === '-') return NextResponse.json({ message: 'No Order ID' });
+    if (!orderId || orderId === '-' || String(orderId).trim() === '') {
+      return NextResponse.json({ message: 'No Order ID' });
+    }
 
     console.log(`[사방넷 주문 조회] 주문번호: ${orderId}`);
 
@@ -39,23 +41,44 @@ export async function POST(req: Request) {
     const dataList = jsonObj?.SABANG_ORDER_LIST?.DATA;
 
     if (dataList && dataList.length > 0) {
-      // 결과값 파싱
-      const info = dataList[0].ITEM || dataList[0];
+      // 첫 행에서 고객/배송 공통 정보 추출 (모든 분리행이 같은 ORDER_ID 기준)
+      const head = dataList[0].ITEM || dataList[0];
 
-      // 3. DB 업데이트
+      // 모든 ITEM(분리행, 사은품 포함)을 order_items 배열로 직렬화
+      const orderItems = dataList.map((d: any) => {
+        const i = d.ITEM || d;
+        const isGift = !!(i.GIFT_NAME && String(i.GIFT_NAME).trim());
+        return {
+          productId:     i.PRODUCT_ID ? String(i.PRODUCT_ID) : '',
+          mallProductId: i.MALL_PRODUCT_ID ? String(i.MALL_PRODUCT_ID) : '',
+          productName:   i.PRODUCT_NAME ? String(i.PRODUCT_NAME) : '',
+          skuAlias:      i.SKU_ALIAS_NO ? String(i.SKU_ALIAS_NO) : '',
+          sku:           i.SKU_NO ? String(i.SKU_NO) : '',
+          option:        i.SKU_VALUE ? String(i.SKU_VALUE) : '',
+          unitName:      i.EXPECTED_PAYOUT ? String(i.EXPECTED_PAYOUT) : '',
+          barcode:       i.BARCODE ? String(i.BARCODE) : '',
+          qty:           Number(i.SALE_CNT) || 1,
+          gift:          isGift,
+          giftName:      isGift ? String(i.GIFT_NAME) : '',
+        };
+      });
+
+      // 3. 같은 ORDER_ID를 가진 모든 inquiries 행에 동기화
+      //    (사방넷이 분리한 NUM 별로 우리 DB도 행이 분리되어 있으므로)
       const { error } = await supabase
         .from('inquiries')
         .update({
-          orderer_name: info.USER_NAME || '',
-          receiver_name: info.RECEIVE_NAME || '',
-          receiver_tel: info.RECEIVE_TEL || info.USER_TEL || '',
-          shipping_address: info.RECEIVE_ZIPCODE ? `(${info.RECEIVE_ZIPCODE}) ${info.RECEIVE_ADDR}` : (info.RECEIVE_ADDR || ''),
-          tracking_number: info.INVOICE_NO || ''
+          orderer_name:     head.USER_NAME || '',
+          receiver_name:    head.RECEIVE_NAME || '',
+          receiver_tel:     head.RECEIVE_TEL || head.USER_TEL || '',
+          shipping_address: head.RECEIVE_ZIPCODE ? `(${head.RECEIVE_ZIPCODE}) ${head.RECEIVE_ADDR}` : (head.RECEIVE_ADDR || ''),
+          tracking_number:  head.INVOICE_NO || '',
+          order_items:      orderItems,
         })
-        .eq('id', record.id);
+        .eq('order_number', orderId);
 
       if (error) throw error;
-      console.log(`✅ [${orderId}] 고객 정보 업데이트 성공!`);
+      console.log(`✅ [${orderId}] 고객/상품 정보 업데이트 성공! (items=${orderItems.length})`);
     } else {
       console.log(`⚠️ [${orderId}] 사방넷에서 주문 정보를 찾을 수 없습니다.`);
     }

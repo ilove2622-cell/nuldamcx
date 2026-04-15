@@ -126,7 +126,23 @@ interface DBInquiry {
   receiver_tel?: string;
   shipping_address?: string;
   tracking_number?: string;
-  product_name?: string; 
+  product_name?: string;
+  /** 사방넷에서 가져온 주문 상품 목록 (분리행/사은품 포함) */
+  order_items?: OrderItem[] | null;
+}
+
+export interface OrderItem {
+  productId?: string;
+  mallProductId?: string;
+  productName?: string;
+  skuAlias?: string;
+  sku?: string;
+  option?: string;
+  unitName?: string;
+  barcode?: string;
+  qty?: number;
+  gift?: boolean;
+  giftName?: string;
 }
 
 export default function IntegratedDashboardPage() {
@@ -340,6 +356,33 @@ export default function IntegratedDashboardPage() {
       }
       fetchDataAndCounts();
     } finally { setIsTriggeringBot(false); }
+  };
+
+  // 사방넷 주문 상세(상품/배송) 재조회
+  const [isRefetchingOrder, setIsRefetchingOrder] = useState<Record<string, boolean>>({});
+  const handleRefetchOrder = async (item: DBInquiry) => {
+    if (!item.order_number || item.order_number === '-') {
+      alert('주문번호가 없어 사방넷 조회가 불가합니다.');
+      return;
+    }
+    setIsRefetchingOrder(prev => ({ ...prev, [item.id]: true }));
+    try {
+      const res = await fetch('/api/order-details/refetch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: item.id, orderNumber: item.order_number }),
+      });
+      const json = await res.json();
+      if (!json.success) {
+        alert(`사방넷 조회 실패: ${json.error || '알 수 없는 오류'}`);
+      } else {
+        await fetchDataAndCounts();
+      }
+    } catch (e: any) {
+      alert(`재조회 실패: ${e?.message || e}`);
+    } finally {
+      setIsRefetchingOrder(prev => ({ ...prev, [item.id]: false }));
+    }
   };
 
   const handleForceComplete = async (id: string) => {
@@ -907,6 +950,23 @@ export default function IntegratedDashboardPage() {
                               >
                                 {isSavingSheet[mainItem.id] ? '저장 중...' : '시트 저장'}
                               </Button>
+
+                              <Button
+                                size="small"
+                                disabled={isRefetchingOrder[mainItem.id]}
+                                onClick={() => handleRefetchOrder(mainItem)}
+                                startIcon={isRefetchingOrder[mainItem.id] ? <CircularProgress size={10} color="inherit" /> : <LaunchIcon sx={{ fontSize: 14 }} />}
+                                sx={{
+                                  bgcolor: 'rgba(59, 130, 246, 0.1)', color: '#60a5fa',
+                                  fontWeight: 600, fontSize: '0.65rem', height: '22px', py: 0, px: 1,
+                                  borderRadius: '4px',
+                                  '&:hover': { bgcolor: 'rgba(59, 130, 246, 0.2)' },
+                                  '&.Mui-disabled': { opacity: 0.5, color: '#60a5fa' }
+                                }}
+                                title="사방넷에서 주문 상품/배송 정보 다시 가져오기"
+                              >
+                                {isRefetchingOrder[mainItem.id] ? '조회 중...' : '상품정보'}
+                              </Button>
                             </Stack>
                           </Box>
 
@@ -987,7 +1047,80 @@ export default function IntegratedDashboardPage() {
                             )}
                           </Box>
                         )}
-                        
+
+                        {/* 사방넷 주문 상품 목록 (다중 아이템 / 사은품 분리행 포함) */}
+                        {Array.isArray(mainItem.order_items) && mainItem.order_items.length > 0 && (
+                          <Box sx={{
+                            p: 1, px: 1.5,
+                            bgcolor: 'rgba(15, 23, 42, 0.4)',
+                            borderRadius: '8px',
+                            border: '1px solid rgba(168, 85, 247, 0.15)',
+                          }}>
+                            <Typography sx={{ color: '#a78bfa', fontWeight: 700, fontSize: '0.7rem', mb: 0.8, letterSpacing: '0.3px' }}>
+                              📦 주문 상품 {mainItem.order_items.length}건
+                            </Typography>
+                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.7 }}>
+                              {mainItem.order_items.map((it, idx) => (
+                                <Box key={idx} sx={{
+                                  display: 'grid',
+                                  gridTemplateColumns: { xs: '1fr', sm: '1fr auto' },
+                                  gap: 0.5,
+                                  p: 0.8,
+                                  bgcolor: it.gift ? 'rgba(251, 191, 36, 0.06)' : 'rgba(15, 23, 42, 0.5)',
+                                  border: it.gift ? '1px dashed rgba(251, 191, 36, 0.3)' : '1px solid rgba(255,255,255,0.04)',
+                                  borderRadius: '6px',
+                                }}>
+                                  <Box sx={{ minWidth: 0 }}>
+                                    {/* 코드 라인 */}
+                                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 0.3 }}>
+                                      {it.skuAlias && (
+                                        <Chip size="small" label={`품번 ${it.skuAlias}`} sx={{ height: 18, fontSize: '0.65rem', bgcolor: 'rgba(59,130,246,0.15)', color: '#93c5fd' }} />
+                                      )}
+                                      {it.productId && (
+                                        <Chip size="small" label={`자체 ${it.productId}`} sx={{ height: 18, fontSize: '0.65rem', bgcolor: 'rgba(255,255,255,0.06)', color: '#cbd5e1' }} />
+                                      )}
+                                      {it.mallProductId && (
+                                        <Chip size="small" label={`쇼핑몰 ${it.mallProductId}`} sx={{ height: 18, fontSize: '0.65rem', bgcolor: 'rgba(255,255,255,0.06)', color: '#cbd5e1' }} />
+                                      )}
+                                      {it.gift && (
+                                        <Chip size="small" label="🎁 사은품" sx={{ height: 18, fontSize: '0.65rem', bgcolor: 'rgba(251,191,36,0.2)', color: '#fbbf24', fontWeight: 700 }} />
+                                      )}
+                                    </Box>
+                                    {/* 상품명 */}
+                                    {(it.productName || it.giftName) && (
+                                      <Typography sx={{ color: '#f1f5f9', fontSize: '0.78rem', fontWeight: 500, lineHeight: 1.4, wordBreak: 'break-word' }}>
+                                        {it.giftName || it.productName}
+                                      </Typography>
+                                    )}
+                                    {/* 옵션 */}
+                                    {it.option && (
+                                      <Typography sx={{ color: '#94a3b8', fontSize: '0.7rem', mt: 0.2, lineHeight: 1.4 }}>
+                                        옵션: {it.option}
+                                      </Typography>
+                                    )}
+                                    {/* 단품명 */}
+                                    {it.unitName && (
+                                      <Typography sx={{ color: '#64748b', fontSize: '0.68rem', mt: 0.2 }}>
+                                        단품: {it.unitName}
+                                      </Typography>
+                                    )}
+                                  </Box>
+                                  {/* 수량 */}
+                                  <Box sx={{
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    minWidth: 36, alignSelf: { xs: 'flex-start', sm: 'center' },
+                                    px: 1, py: 0.3, borderRadius: '4px',
+                                    bgcolor: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa',
+                                    fontSize: '0.72rem', fontWeight: 700,
+                                  }}>
+                                    × {it.qty || 1}
+                                  </Box>
+                                </Box>
+                              ))}
+                            </Box>
+                          </Box>
+                        )}
+
                         <Box sx={{ bgcolor: 'rgba(15, 23, 42, 0.6)', p: { xs: 1, md: 1.5 }, borderRadius: '8px', border: '1px solid rgba(255,255,255,0.03)' }}>
                           <Box
                             onClick={() => setExpandedContent(prev => ({ ...prev, [mainItem.id]: !prev[mainItem.id] }))}
@@ -1263,6 +1396,35 @@ export default function IntegratedDashboardPage() {
                   <Typography key={`val-${label}`} variant="body2" sx={{ color: '#f8fafc', wordBreak: 'break-all', fontSize: '0.875rem' }}>{value || '-'}</Typography>
                 </>
               ))}
+
+              {/* 사방넷 주문 상품 목록 */}
+              {Array.isArray(orderModalData.order_items) && orderModalData.order_items.length > 0 && (
+                <>
+                  <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 700, fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.5px', pt: '2px' }}>주문상품</Typography>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.8 }}>
+                    {orderModalData.order_items.map((it, idx) => (
+                      <Box key={idx} sx={{
+                        p: 1, borderRadius: '6px',
+                        bgcolor: it.gift ? 'rgba(251, 191, 36, 0.06)' : 'rgba(15, 23, 42, 0.5)',
+                        border: it.gift ? '1px dashed rgba(251, 191, 36, 0.3)' : '1px solid rgba(255,255,255,0.05)',
+                      }}>
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 0.5 }}>
+                          {it.skuAlias && <Chip size="small" label={`품번 ${it.skuAlias}`} sx={{ height: 18, fontSize: '0.65rem', bgcolor: 'rgba(59,130,246,0.15)', color: '#93c5fd' }} />}
+                          {it.productId && <Chip size="small" label={`자체 ${it.productId}`} sx={{ height: 18, fontSize: '0.65rem', bgcolor: 'rgba(255,255,255,0.06)', color: '#cbd5e1' }} />}
+                          {it.mallProductId && <Chip size="small" label={`쇼핑몰 ${it.mallProductId}`} sx={{ height: 18, fontSize: '0.65rem', bgcolor: 'rgba(255,255,255,0.06)', color: '#cbd5e1' }} />}
+                          {it.gift && <Chip size="small" label="🎁 사은품" sx={{ height: 18, fontSize: '0.65rem', bgcolor: 'rgba(251,191,36,0.2)', color: '#fbbf24', fontWeight: 700 }} />}
+                          <Chip size="small" label={`× ${it.qty || 1}`} sx={{ height: 18, fontSize: '0.65rem', bgcolor: 'rgba(59,130,246,0.15)', color: '#60a5fa', fontWeight: 700 }} />
+                        </Box>
+                        {(it.productName || it.giftName) && (
+                          <Typography sx={{ color: '#f1f5f9', fontSize: '0.82rem', fontWeight: 500 }}>{it.giftName || it.productName}</Typography>
+                        )}
+                        {it.option && <Typography sx={{ color: '#94a3b8', fontSize: '0.72rem', mt: 0.3 }}>옵션: {it.option}</Typography>}
+                        {it.unitName && <Typography sx={{ color: '#64748b', fontSize: '0.7rem' }}>단품: {it.unitName}</Typography>}
+                      </Box>
+                    ))}
+                  </Box>
+                </>
+              )}
             </Box>
           )}
         </DialogContent>

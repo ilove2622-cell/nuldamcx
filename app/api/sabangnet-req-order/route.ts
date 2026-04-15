@@ -17,8 +17,23 @@ export async function GET(req: Request) {
     return `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}`;
   };
 
-  // 요청할 필드: 주문번호|주문자명|수취인명|주문자전화|수취인전화|우편번호|주소|송장번호
-  const ordField = 'ORDER_ID|USER_NAME|RECEIVE_NAME|USER_TEL|RECEIVE_TEL|RECEIVE_ZIPCODE|RECEIVE_ADDR|INVOICE_NO';
+  // 요청할 필드: 고객/배송 + 상품 정보(다중 아이템·사은품 포함)
+  const ordField = [
+    // 고객/배송
+    'ORDER_ID', 'USER_NAME', 'RECEIVE_NAME', 'USER_TEL', 'RECEIVE_TEL',
+    'RECEIVE_ZIPCODE', 'RECEIVE_ADDR', 'INVOICE_NO',
+    // 상품 (한 주문에 여러 ITEM이 분리되어 내려옴)
+    'PRODUCT_ID',        // 자체상품코드
+    'MALL_PRODUCT_ID',   // 쇼핑몰상품코드
+    'PRODUCT_NAME',      // 수집상품명
+    'SKU_ALIAS_NO',      // 품번(SKU)코드
+    'SKU_NO',            // SKU 번호
+    'SKU_VALUE',         // 수집옵션선택
+    'EXPECTED_PAYOUT',   // 단품명/단품코드 영역에 노출되는 케이스
+    'SALE_CNT',          // 수량
+    'BARCODE',           // 바코드(있으면)
+    'GIFT_NAME',         // 사은품명 (사은품 분리행 식별)
+  ].join('|');
 
   // XML 문자열 조립
   const xmlData = `<?xml version="1.0" encoding="utf-8"?>
