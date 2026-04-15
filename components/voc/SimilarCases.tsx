@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import type { SimilarCase } from '@/types/voc';
 
 interface Props {
@@ -18,56 +19,120 @@ function formatDate(iso: string) {
   });
 }
 
+// base64에 mime 프리픽스 자동 추가 (이미 있으면 그대로)
+function toImgSrc(b64: string): string {
+  if (b64.startsWith('data:')) return b64;
+  // jpg/png 둘 다 브라우저가 자동 디코딩 — jpeg로 통일
+  return `data:image/jpeg;base64,${b64}`;
+}
+
 export default function SimilarCases({ cases }: Props) {
+  const [zoomSrc, setZoomSrc] = useState<string | null>(null);
+
   if (!cases || cases.length === 0) return null;
 
   return (
-    <div
-      className="backdrop-blur rounded-[12px] border p-6 space-y-4"
-      style={{ background: 'rgba(30,41,59,0.6)', borderColor: 'rgba(255,255,255,0.08)' }}
-    >
-      <h2 className="text-base font-semibold" style={{ color: '#f8fafc' }}>
-        📋 유사 과거 사례 {cases.length}건
-      </h2>
-      <div className="space-y-3">
-        {cases.map((c) => {
-          const risk = riskLabel[c.riskLevel] ?? { text: c.riskLevel, color: 'bg-slate-700/50', style: { color: '#cbd5e1' } };
-          return (
-            <div
-              key={c.id}
-              className="border rounded-lg p-4 space-y-2 transition-colors"
-              style={{ borderColor: 'rgba(255,255,255,0.08)', background: 'rgba(15,23,42,0.5)' }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(15,23,42,0.7)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(15,23,42,0.5)'; }}
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium" style={{ color: '#f8fafc' }}>
-                  {c.substanceType}
-                </span>
-                <span
-                  className={`text-xs px-2 py-0.5 rounded-full font-medium ${risk.color}`}
-                  style={risk.style}
-                >
-                  위험도 {risk.text}
-                </span>
-              </div>
-              <div className="flex items-center gap-3 text-xs" style={{ color: '#94a3b8' }}>
-                <span>📅 {formatDate(c.createdAt)}</span>
-                {c.productName && <span>📦 {c.productName}</span>}
-              </div>
-              <p className="text-xs line-clamp-2" style={{ color: '#cbd5e1' }}>{c.characteristics}</p>
-              {c.csScript && (
-                <div className="mt-2 pt-2 border-t" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
-                  <p className="text-[11px] font-medium text-blue-400 mb-1">💬 CS 응대 스크립트</p>
-                  <p className="text-xs leading-relaxed whitespace-pre-wrap" style={{ color: '#cbd5e1' }}>
-                    {c.csScript}
-                  </p>
+    <>
+      <div
+        className="backdrop-blur rounded-[12px] border p-6 space-y-4"
+        style={{ background: 'rgba(30,41,59,0.6)', borderColor: 'rgba(255,255,255,0.08)' }}
+      >
+        <h2 className="text-base font-semibold" style={{ color: '#f8fafc' }}>
+          📋 유사 과거 사례 {cases.length}건
+        </h2>
+        <div className="space-y-3">
+          {cases.map((c) => {
+            const risk = riskLabel[c.riskLevel] ?? { text: c.riskLevel, color: 'bg-slate-700/50', style: { color: '#cbd5e1' } };
+            const imgSrc = c.imageBase64 ? toImgSrc(c.imageBase64) : null;
+            return (
+              <div
+                key={c.id}
+                className="border rounded-lg p-4 transition-colors flex gap-4"
+                style={{ borderColor: 'rgba(255,255,255,0.08)', background: 'rgba(15,23,42,0.5)' }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(15,23,42,0.7)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(15,23,42,0.5)'; }}
+              >
+                {/* 썸네일 */}
+                {imgSrc ? (
+                  <button
+                    type="button"
+                    onClick={() => setZoomSrc(imgSrc)}
+                    className="flex-shrink-0 w-20 h-20 sm:w-24 sm:h-24 rounded-lg overflow-hidden border bg-transparent p-0 cursor-zoom-in transition-transform hover:scale-105"
+                    style={{ borderColor: 'rgba(255,255,255,0.1)' }}
+                    aria-label="사진 확대 보기"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={imgSrc} alt={c.substanceType} className="w-full h-full object-cover" />
+                  </button>
+                ) : (
+                  <div
+                    className="flex-shrink-0 w-20 h-20 sm:w-24 sm:h-24 rounded-lg border flex items-center justify-center text-xs"
+                    style={{ borderColor: 'rgba(255,255,255,0.08)', background: 'rgba(15,23,42,0.3)', color: '#64748b' }}
+                  >
+                    사진 없음
+                  </div>
+                )}
+
+                {/* 본문 */}
+                <div className="flex-1 min-w-0 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-medium truncate" style={{ color: '#f8fafc' }}>
+                      {c.substanceType}
+                    </span>
+                    <span
+                      className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${risk.color}`}
+                      style={risk.style}
+                    >
+                      위험도 {risk.text}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3 text-xs flex-wrap" style={{ color: '#94a3b8' }}>
+                    <span>📅 {formatDate(c.createdAt)}</span>
+                    {c.productName && <span>📦 {c.productName}</span>}
+                  </div>
+                  <p className="text-xs line-clamp-2" style={{ color: '#cbd5e1' }}>{c.characteristics}</p>
+                  {c.csScript && (
+                    <div className="mt-2 pt-2 border-t" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
+                      <p className="text-[11px] font-medium text-blue-400 mb-1">💬 CS 응대 스크립트</p>
+                      <p className="text-xs leading-relaxed whitespace-pre-wrap line-clamp-4" style={{ color: '#cbd5e1' }}>
+                        {c.csScript}
+                      </p>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-          );
-        })}
+              </div>
+            );
+          })}
+        </div>
       </div>
-    </div>
+
+      {/* 이미지 확대 모달 */}
+      {zoomSrc && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setZoomSrc(null)}
+          className="fixed inset-0 z-[1000] flex items-center justify-center p-4 cursor-zoom-out"
+          style={{ background: 'rgba(0,0,0,0.85)' }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={zoomSrc}
+            alt="확대 보기"
+            className="max-w-full max-h-full rounded-lg shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          />
+          <button
+            type="button"
+            onClick={() => setZoomSrc(null)}
+            className="absolute top-4 right-4 w-10 h-10 rounded-full flex items-center justify-center text-white text-xl font-bold border"
+            style={{ background: 'rgba(15,23,42,0.8)', borderColor: 'rgba(255,255,255,0.2)' }}
+            aria-label="닫기"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+    </>
   );
 }

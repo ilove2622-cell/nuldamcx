@@ -18,6 +18,8 @@ export interface SimilarCase {
   riskLevel: RiskLevel;
   characteristics: string;
   csScript: string;
+  /** Base64 인코딩된 이미지 (mime 프리픽스 없이 순수 base64) */
+  imageBase64?: string | null;
 }
 
 export interface AnalyzeRequest {

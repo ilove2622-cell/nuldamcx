@@ -59,7 +59,7 @@ export async function findSimilarCases(
 ): Promise<SimilarCase[]> {
   let query = supabase
     .from('substance_cases')
-    .select('id, created_at, product_name, substance_type, risk_level, characteristics, cs_script')
+    .select('id, created_at, product_name, substance_type, risk_level, characteristics, cs_script, image_base64')
     .or(`substance_type.ilike.%${substanceType}%,risk_level.eq.${riskLevel}`)
     .order('created_at', { ascending: false })
     .limit(limit);
@@ -79,6 +79,7 @@ export async function findSimilarCases(
     riskLevel: row.risk_level as RiskLevel,
     characteristics: row.characteristics,
     csScript: row.cs_script,
+    imageBase64: row.image_base64,
   }));
 }
 
@@ -102,7 +103,7 @@ export async function findExactMatchCase(
 
   const { data, error } = await supabase
     .from('substance_cases')
-    .select('id, created_at, product_name, substance_type, risk_level, characteristics, cs_script')
+    .select('id, created_at, product_name, substance_type, risk_level, characteristics, cs_script, image_base64')
     .ilike('substance_type', `%${primary}%`)
     .not('cs_script', 'is', null)
     .not('cs_script', 'eq', '')
@@ -124,6 +125,7 @@ export async function findExactMatchCase(
     riskLevel: row.risk_level as RiskLevel,
     characteristics: row.characteristics,
     csScript: row.cs_script,
+    imageBase64: row.image_base64,
   };
 }
 
