@@ -30,5 +30,7 @@ export interface AnalyzeResponse {
   success: boolean;
   data?: AnalysisResult;
   similarCases?: SimilarCase[];
+  /** DB에 동일 이물질 사례가 있어 csScript를 재사용한 경우의 원본 사례 ID */
+  matchedCaseId?: number;
   error?: string;
 }

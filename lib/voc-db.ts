@@ -82,6 +82,51 @@ export async function findSimilarCases(
   }));
 }
 
+// 🎯 동일 이물질 정확 매칭 — 저장된 사례 중 substance_type이 일치하는 가장 최근 1건 반환
+// "식물성 섬유질 (줄기 추정)" 같은 표기 차이를 흡수하기 위해 핵심 키워드만 추출해 ILIKE 검색
+export async function findExactMatchCase(
+  substanceType: string
+): Promise<SimilarCase | null> {
+  if (!substanceType) return null;
+
+  // 정규화: 괄호/기호 제거, 공백 정리
+  const normalized = substanceType
+    .replace(/[()[\]{}「」『』,.·•\-/|]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!normalized) return null;
+
+  // 첫 번째 의미 토큰(2자 이상) 기준 검색 — "식물성", "플라스틱" 등
+  const tokens = normalized.split(' ').filter((t) => t.length >= 2);
+  const primary = tokens[0] || normalized;
+
+  const { data, error } = await supabase
+    .from('substance_cases')
+    .select('id, created_at, product_name, substance_type, risk_level, characteristics, cs_script')
+    .ilike('substance_type', `%${primary}%`)
+    .not('cs_script', 'is', null)
+    .not('cs_script', 'eq', '')
+    .order('created_at', { ascending: false })
+    .limit(1);
+
+  if (error) {
+    console.warn('[findExactMatchCase]', error.message);
+    return null;
+  }
+  if (!data || data.length === 0) return null;
+
+  const row = data[0];
+  return {
+    id: row.id,
+    createdAt: row.created_at,
+    productName: row.product_name,
+    substanceType: row.substance_type,
+    riskLevel: row.risk_level as RiskLevel,
+    characteristics: row.characteristics,
+    csScript: row.cs_script,
+  };
+}
+
 // 참조용 CS 스크립트 조회
 export async function getReferenceScripts(limit = 5): Promise<string[]> {
   const { data, error } = await supabase

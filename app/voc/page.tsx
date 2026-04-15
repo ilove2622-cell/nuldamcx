@@ -38,6 +38,7 @@ export default function VocPage() {
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [regenerating, setRegenerating] = useState(false);
+  const [matchedCaseId, setMatchedCaseId] = useState<number | null>(null);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -62,6 +63,7 @@ export default function VocPage() {
       setResult(null);
       setSimilarCases([]);
       setSavedCaseId(null);
+      setMatchedCaseId(null);
       setSaveMessage(null);
       setError(null);
       setStatus('idle');
@@ -76,6 +78,7 @@ export default function VocPage() {
     setResult(null);
     setSimilarCases([]);
     setSavedCaseId(null);
+    setMatchedCaseId(null);
     setSaveMessage(null);
 
     try {
@@ -88,6 +91,7 @@ export default function VocPage() {
       if (!res.ok || !json.success) throw new Error(json.error || '분석에 실패했습니다.');
       setResult(json.data);
       setSimilarCases(json.similarCases ?? []);
+      setMatchedCaseId(json.matchedCaseId ?? null);
       setStatus('success');
     } catch (err) {
       setError(err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다.');
@@ -109,6 +113,7 @@ export default function VocPage() {
       if (!res.ok || !json.success) throw new Error(json.error || '재분석 실패');
       setResult(json.data);
       setSimilarCases(json.similarCases ?? []);
+      setMatchedCaseId(json.matchedCaseId ?? null);
     } catch (err) {
       setError(err instanceof Error ? err.message : '재분석 실패');
     } finally {
@@ -283,9 +288,32 @@ export default function VocPage() {
                 regenerating={regenerating}
               />
               <SimilarCases cases={similarCases} />
+              {matchedCaseId !== null && (
+                <Alert
+                  severity="info"
+                  sx={{
+                    bgcolor: 'rgba(59, 130, 246, 0.1)',
+                    color: '#93c5fd',
+                    border: '1px solid rgba(59, 130, 246, 0.3)',
+                    borderRadius: '12px',
+                    '& .MuiAlert-icon': { color: '#60a5fa' },
+                  }}
+                >
+                  <Typography sx={{ fontWeight: 700, fontSize: '0.85rem' }}>
+                    🔗 DB 저장 사례의 CS 스크립트를 재사용합니다
+                  </Typography>
+                  <Typography sx={{ fontSize: '0.8rem', mt: 0.5, color: '#cbd5e1' }}>
+                    동일 이물질({result.substanceType})의 기존 사례(ID: {matchedCaseId})가 있어, 일관성을 위해 저장된 스크립트를 그대로 사용합니다. 필요 시 수정해서 저장하면 새 버전으로 덮어써집니다.
+                  </Typography>
+                </Alert>
+              )}
               <CsScript
                 script={result.csScript}
-                onChange={(s) => setResult({ ...result, csScript: s })}
+                onChange={(s) => {
+                  setResult({ ...result, csScript: s });
+                  // 수정이 발생하면 "재사용" 배지 해제 — 새 버전이 됨
+                  if (matchedCaseId !== null) setMatchedCaseId(null);
+                }}
               />
 
               {/* 저장 카드 */}
