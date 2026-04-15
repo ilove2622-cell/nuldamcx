@@ -1071,70 +1071,17 @@ export default function IntegratedDashboardPage() {
                           </Box>
                         )}
 
-                        {/* 사방넷 주문 상품 목록 (다중 아이템 / 사은품 분리행 포함) */}
-                        {Array.isArray(mainItem.order_items) && mainItem.order_items.length > 0 && (
-                          <Box sx={{
-                            p: 1, px: 1.5,
-                            bgcolor: 'rgba(15, 23, 42, 0.4)',
-                            borderRadius: '8px',
-                            border: '1px solid rgba(168, 85, 247, 0.15)',
-                          }}>
-                            <Typography sx={{ color: '#a78bfa', fontWeight: 700, fontSize: '0.7rem', mb: 0.8, letterSpacing: '0.3px' }}>
-                              📦 주문 상품 {mainItem.order_items.length}건
-                            </Typography>
-                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.7 }}>
-                              {mainItem.order_items.map((it, idx) => (
-                                <Box key={idx} sx={{
-                                  display: 'grid',
-                                  gridTemplateColumns: { xs: '1fr', sm: '1fr auto' },
-                                  gap: 0.5,
-                                  p: 0.8,
-                                  bgcolor: it.gift ? 'rgba(251, 191, 36, 0.06)' : 'rgba(15, 23, 42, 0.5)',
-                                  border: it.gift ? '1px dashed rgba(251, 191, 36, 0.3)' : '1px solid rgba(255,255,255,0.04)',
-                                  borderRadius: '6px',
-                                }}>
-                                  <Box sx={{ minWidth: 0 }}>
-                                    {/* 코드 라인 */}
-                                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 0.3 }}>
-                                      {it.mallProductId && (
-                                        <Chip size="small" label={`쇼핑몰 ${it.mallProductId}`} sx={{ height: 18, fontSize: '0.65rem', bgcolor: 'rgba(255,255,255,0.06)', color: '#cbd5e1' }} />
-                                      )}
-                                      {it.gift && (
-                                        <Chip size="small" label="🎁 사은품" sx={{ height: 18, fontSize: '0.65rem', bgcolor: 'rgba(251,191,36,0.2)', color: '#fbbf24', fontWeight: 700 }} />
-                                      )}
-                                    </Box>
-                                    {/* 상품명 */}
-                                    {(it.productName || it.giftName) && (
-                                      <Typography sx={{ color: '#f1f5f9', fontSize: '0.78rem', fontWeight: 500, lineHeight: 1.4, wordBreak: 'break-word' }}>
-                                        {it.giftName || it.productName}
-                                      </Typography>
-                                    )}
-                                    {/* 옵션 */}
-                                    {it.option && (
-                                      <Typography sx={{ color: '#94a3b8', fontSize: '0.7rem', mt: 0.2, lineHeight: 1.4 }}>
-                                        옵션: {it.option}
-                                      </Typography>
-                                    )}
-                                    {/* 확정옵션명 (사방넷 P_PRODUCT_NAME) */}
-                                    {it.unitName && (
-                                      <Typography sx={{ color: '#a78bfa', fontSize: '0.7rem', mt: 0.3, fontWeight: 500 }}>
-                                        ✓ 확정옵션: <span style={{ color: '#e9d5ff' }}>{it.unitName}</span>
-                                      </Typography>
-                                    )}
-                                  </Box>
-                                  {/* 수량 */}
-                                  <Box sx={{
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                    minWidth: 36, alignSelf: { xs: 'flex-start', sm: 'center' },
-                                    px: 1, py: 0.3, borderRadius: '4px',
-                                    bgcolor: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa',
-                                    fontSize: '0.72rem', fontWeight: 700,
-                                  }}>
-                                    × {it.qty || 1}
-                                  </Box>
-                                </Box>
-                              ))}
-                            </Box>
+                        {/* 확정옵션 요약 (상세는 클릭 시 모달에서 확인) */}
+                        {Array.isArray(mainItem.order_items) && mainItem.order_items.length > 0 && mainItem.order_items.some((it) => it.unitName) && (
+                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                            {mainItem.order_items.filter((it) => !it.gift && it.unitName).map((it, idx) => (
+                              <Chip
+                                key={idx}
+                                size="small"
+                                label={`${it.unitName} ${it.qty || 1}EA(확정)`}
+                                sx={{ height: 20, fontSize: '0.68rem', fontWeight: 600, bgcolor: 'rgba(168, 85, 247, 0.15)', color: '#e9d5ff', borderRadius: '4px' }}
+                              />
+                            ))}
                           </Box>
                         )}
 
