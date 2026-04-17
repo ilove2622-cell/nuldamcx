@@ -35,7 +35,8 @@ import {
   DocumentScanner as DocumentScannerIcon, // 💡 [추가] OCR용 스캐너 아이콘
   Biotech as BiotechIcon, // VOC 이물질 분석 아이콘
   ContentCopy as ContentCopyIcon,
-  Check as CheckIcon
+  Check as CheckIcon,
+  HeadsetMic as HeadsetMicIcon,
 } from '@mui/icons-material';
 
 // ==========================================
@@ -719,6 +720,22 @@ export default function IntegratedDashboardPage() {
               }}
             >
               VOC
+            </Button>
+            <Button
+              onClick={() => router.push('/chat')}
+              startIcon={<HeadsetMicIcon fontSize="small" />}
+              sx={{
+                color: '#cbd5e1',
+                fontWeight: 600,
+                fontSize: { xs: '0.75rem', md: '0.875rem' },
+                px: { xs: 1, md: 2 },
+                minWidth: 0,
+                borderRadius: '8px',
+                '& .MuiButton-startIcon': { mr: { xs: 0.3, md: 1 } },
+                '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.05)' }
+              }}
+            >
+              채팅상담
             </Button>
 
             <Button
