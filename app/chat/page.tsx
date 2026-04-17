@@ -2,8 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
-import { format, startOfDay, endOfDay, subDays } from 'date-fns';
+import { format } from 'date-fns';
 
 import {
   Box, Container, Typography, Button, Card, CardContent, Stack,
@@ -110,17 +109,17 @@ export default function ChatDashboardPage() {
 
   const fetchData = useCallback(async () => {
     setLoading(true);
-    const since = subDays(new Date(), days).toISOString();
-
-    const [sessRes, aiRes, escRes] = await Promise.all([
-      supabase.from('chat_sessions').select('*').gte('created_at', since).order('created_at', { ascending: false }).limit(500),
-      supabase.from('ai_responses').select('*').gte('created_at', since).order('created_at', { ascending: false }).limit(1000),
-      supabase.from('escalations').select('*').gte('created_at', since).limit(500),
-    ]);
-
-    setSessions(sessRes.data || []);
-    setAiResponses(aiRes.data || []);
-    setEscalations(escRes.data || []);
+    try {
+      const [sessRes, extraRes] = await Promise.all([
+        fetch(`/api/chat/sessions?days=${days}`).then(r => r.json()),
+        fetch(`/api/chat/messages?days=${days}`).then(r => r.json()),
+      ]);
+      setSessions(Array.isArray(sessRes) ? sessRes : []);
+      setAiResponses(extraRes.aiResponses || []);
+      setEscalations(extraRes.escalations || []);
+    } catch (e) {
+      console.error('데이터 로드 실패:', e);
+    }
     setLoading(false);
   }, [days]);
 
@@ -169,12 +168,13 @@ export default function ChatDashboardPage() {
       return;
     }
     setExpandedId(sessionId);
-    const [msgRes, aiRes] = await Promise.all([
-      supabase.from('chat_messages').select('*').eq('session_id', sessionId).order('created_at', { ascending: true }),
-      supabase.from('ai_responses').select('*').eq('session_id', sessionId).order('created_at', { ascending: true }),
-    ]);
-    setExpandedMessages(msgRes.data || []);
-    setExpandedAI(aiRes.data || []);
+    try {
+      const res = await fetch(`/api/chat/messages?sessionId=${sessionId}`).then(r => r.json());
+      setExpandedMessages(res.messages || []);
+      setExpandedAI(res.aiResponses || []);
+    } catch (e) {
+      console.error('상세 로드 실패:', e);
+    }
   };
 
   const cardSx = {

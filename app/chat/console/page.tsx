@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
 import { format } from 'date-fns';
 
 import {
@@ -113,25 +112,26 @@ function ChatConsolePage() {
 
   // ─── 세션 목록 로드 ───
   const fetchSessions = useCallback(async () => {
-    const { data } = await supabase
-      .from('chat_sessions')
-      .select('*')
-      .in('status', ['open', 'escalated'])
-      .order('created_at', { ascending: false })
-      .limit(100);
-    setSessions(data || []);
+    try {
+      const data = await fetch('/api/chat/sessions?days=7').then(r => r.json());
+      const active = (Array.isArray(data) ? data : []).filter((s: Session) => s.status === 'open' || s.status === 'escalated');
+      setSessions(active);
+    } catch (e) {
+      console.error('세션 로드 실패:', e);
+    }
     setSessionsLoading(false);
   }, []);
 
   // ─── 메시지 & AI 응답 로드 ───
   const fetchChat = useCallback(async (sessionId: number) => {
     setMessagesLoading(true);
-    const [msgRes, aiRes] = await Promise.all([
-      supabase.from('chat_messages').select('*').eq('session_id', sessionId).order('created_at', { ascending: true }),
-      supabase.from('ai_responses').select('*').eq('session_id', sessionId).order('created_at', { ascending: true }),
-    ]);
-    setMessages(msgRes.data || []);
-    setAiResponses(aiRes.data || []);
+    try {
+      const res = await fetch(`/api/chat/messages?sessionId=${sessionId}`).then(r => r.json());
+      setMessages(res.messages || []);
+      setAiResponses(res.aiResponses || []);
+    } catch (e) {
+      console.error('채팅 로드 실패:', e);
+    }
     setMessagesLoading(false);
   }, []);
 
