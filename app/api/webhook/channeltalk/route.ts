@@ -25,18 +25,19 @@ const CONFIDENCE_THRESHOLD = Number(process.env.AUTO_REPLY_CONFIDENCE_THRESHOLD)
 export async function POST(req: NextRequest) {
   const rawBody = await req.text();
 
-  // 1. 서명 검증
+  // 1. 서명 검증 (실패해도 200 반환 — 채널톡 차단 방지)
   const signature = req.headers.get('x-signature') || '';
   if (!verifyWebhookSignature(rawBody, signature)) {
-    console.warn('⚠️ 웹훅 서명 검증 실패');
-    return NextResponse.json({ error: 'invalid signature' }, { status: 401 });
+    console.warn('⚠️ 웹훅 서명 검증 실패 — signature:', signature.slice(0, 20), 'body length:', rawBody.length);
+    return NextResponse.json({ ok: true });
   }
 
   let payload: any;
   try {
     payload = JSON.parse(rawBody);
   } catch {
-    return NextResponse.json({ error: 'invalid json' }, { status: 400 });
+    console.warn('⚠️ 웹훅 JSON 파싱 실패');
+    return NextResponse.json({ ok: true });
   }
 
   const event = payload.event;
