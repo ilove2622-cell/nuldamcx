@@ -92,12 +92,16 @@ export async function addNote(userChatId: string, text: string) {
 /** 웹훅 HMAC-SHA256 서명 검증 */
 export function verifyWebhookSignature(rawBody: string, signature: string): boolean {
   if (!WEBHOOK_TOKEN || !signature) return false;
-  const expected = crypto
-    .createHmac('sha256', WEBHOOK_TOKEN)
-    .update(rawBody)
-    .digest('base64');
-  return crypto.timingSafeEqual(
-    Buffer.from(expected),
-    Buffer.from(signature)
-  );
+  try {
+    const expected = crypto
+      .createHmac('sha256', WEBHOOK_TOKEN)
+      .update(rawBody)
+      .digest('base64');
+    const a = Buffer.from(expected);
+    const b = Buffer.from(signature);
+    if (a.length !== b.length) return false;
+    return crypto.timingSafeEqual(a, b);
+  } catch {
+    return false;
+  }
 }

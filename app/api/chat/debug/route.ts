@@ -6,12 +6,18 @@ export async function GET() {
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
+  const webhookToken = process.env.CHANNELTALK_WEBHOOK_TOKEN;
+  const geminiKey = process.env.GEMINI_API_KEY;
+
   const results: Record<string, any> = {
     hasUrl: !!url,
     hasAnonKey: !!anonKey,
     hasServiceKey: !!serviceKey,
     urlPrefix: url?.slice(0, 30),
     anonKeyPrefix: anonKey?.slice(0, 20),
+    hasWebhookToken: !!webhookToken,
+    webhookTokenPrefix: webhookToken?.slice(0, 8),
+    hasGeminiKey: !!geminiKey,
   };
 
   try {

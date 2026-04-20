@@ -27,10 +27,12 @@ export async function POST(req: NextRequest) {
 
   // 1. 서명 검증 (실패해도 200 반환 — 채널톡 차단 방지)
   const signature = req.headers.get('x-signature') || '';
+  console.log(`🔑 웹훅 수신 — body length: ${rawBody.length}, sig: ${signature.slice(0, 20)}..., token set: ${!!process.env.CHANNELTALK_WEBHOOK_TOKEN}`);
   if (!verifyWebhookSignature(rawBody, signature)) {
     console.warn('⚠️ 웹훅 서명 검증 실패 — signature:', signature.slice(0, 20), 'body length:', rawBody.length);
     return NextResponse.json({ ok: true });
   }
+  console.log('✅ 서명 검증 통과');
 
   let payload: any;
   try {
@@ -44,11 +46,14 @@ export async function POST(req: NextRequest) {
   // 채널톡은 refers에 entity 정보를 담아줌
   const refers = payload.refers || {};
 
+  console.log(`📨 이벤트: ${event}`);
   try {
     if (event === 'userChat.created') {
       await handleChatCreated(payload, refers);
     } else if (event === 'message.created') {
       await handleMessageCreated(payload, refers);
+    } else {
+      console.log(`⏩ 미처리 이벤트: ${event}`);
     }
   } catch (err: any) {
     console.error(`❌ 웹훅 처리 오류 [${event}]:`, err);
