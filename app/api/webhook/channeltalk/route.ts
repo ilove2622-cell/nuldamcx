@@ -24,9 +24,20 @@ const CONFIDENCE_THRESHOLD = Number(process.env.AUTO_REPLY_CONFIDENCE_THRESHOLD)
 /** 채널톡 웹훅 핸들러 */
 export async function POST(req: NextRequest) {
   const rawBody = await req.text();
+  const signature = req.headers.get('x-signature') || '';
+
+  // 모든 웹훅 수신을 DB에 기록 (디버깅용)
+  try {
+    const parsed = JSON.parse(rawBody);
+    await supabase.from('webhook_logs').insert({
+      event: parsed.event || 'unknown',
+      signature_ok: verifyWebhookSignature(rawBody, signature),
+      body_preview: rawBody.slice(0, 500),
+      created_at: new Date().toISOString(),
+    }).then(() => {});
+  } catch {}
 
   // 1. 서명 검증 (실패해도 200 반환 — 채널톡 차단 방지)
-  const signature = req.headers.get('x-signature') || '';
   console.log(`🔑 웹훅 수신 — body length: ${rawBody.length}, sig: ${signature.slice(0, 20)}..., token set: ${!!process.env.CHANNELTALK_WEBHOOK_TOKEN}`);
   if (!verifyWebhookSignature(rawBody, signature)) {
     console.warn('⚠️ 웹훅 서명 검증 실패 — signature:', signature.slice(0, 20), 'body length:', rawBody.length);
