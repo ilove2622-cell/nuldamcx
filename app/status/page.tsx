@@ -646,8 +646,8 @@ const totalsArray = currentStats.map((stat: any) => stat.autoCount + stat.manual
                 </Card>
               </Box>
 
-              {/* 👉 우측 패널: 수기 작성 (일별 모드 전용) */}
-              {viewMode === 'daily' && (
+              {/* 👉 우측 패널: 총유입호/응대콜 + 수기 작성 */}
+              {viewMode === 'daily' ? (
                 <Box sx={{ flex: 1.5, display: 'flex', flexDirection: 'column', gap: 2 }}>
                   <Box sx={{ display: 'flex', gap: 2 }}>
                     <Card elevation={0} sx={{ flex: 1, bgcolor: 'rgba(30, 41, 59, 0.4)', border: '1px solid rgba(255, 255, 255, 0.05)', borderRadius: '12px' }}>
@@ -657,10 +657,10 @@ const totalsArray = currentStats.map((stat: any) => stat.autoCount + stat.manual
                           <TextField
                             variant="standard" value={callStats.inflow === 0 ? '' : callStats.inflow} placeholder="0" type="number"
                             onChange={(e) => setCallStats({...callStats, inflow: Number(e.target.value)})}
-                            onKeyDown={handleKeyDown} 
+                            onKeyDown={handleKeyDown}
                             onWheel={(e) => (e.target as HTMLElement).blur()}
                             InputProps={{ disableUnderline: true, style: { fontSize: '1.5rem', fontWeight: 800, color: '#f8fafc' } }}
-                            sx={{ 
+                            sx={{
                               width: '80px',
                               '& input[type=number]::-webkit-inner-spin-button, & input[type=number]::-webkit-outer-spin-button': { WebkitAppearance: 'none', margin: 0 },
                               '& input[type=number]': { MozAppearance: 'textfield' }
@@ -670,7 +670,7 @@ const totalsArray = currentStats.map((stat: any) => stat.autoCount + stat.manual
                         <Box sx={{ bgcolor: 'rgba(59, 130, 246, 0.15)', p: 1, borderRadius: '8px', color: '#3b82f6' }}><PhoneIcon fontSize="small" /></Box>
                       </CardContent>
                     </Card>
-                    
+
                     <Card elevation={0} sx={{ flex: 1, bgcolor: 'rgba(30, 41, 59, 0.4)', border: '1px solid rgba(255, 255, 255, 0.05)', borderRadius: '12px' }}>
                       <CardContent sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: '16px !important' }}>
                         <Box>
@@ -678,10 +678,10 @@ const totalsArray = currentStats.map((stat: any) => stat.autoCount + stat.manual
                           <TextField
                             variant="standard" value={callStats.response === 0 ? '' : callStats.response} placeholder="0" type="number"
                             onChange={(e) => setCallStats({...callStats, response: Number(e.target.value)})}
-                            onKeyDown={handleKeyDown} 
+                            onKeyDown={handleKeyDown}
                             onWheel={(e) => (e.target as HTMLElement).blur()}
                             InputProps={{ disableUnderline: true, style: { fontSize: '1.5rem', fontWeight: 800, color: '#10b981' } }}
-                            sx={{ 
+                            sx={{
                               width: '80px',
                               '& input[type=number]::-webkit-inner-spin-button, & input[type=number]::-webkit-outer-spin-button': { WebkitAppearance: 'none', margin: 0 },
                               '& input[type=number]': { MozAppearance: 'textfield' }
@@ -762,6 +762,31 @@ const totalsArray = currentStats.map((stat: any) => stat.autoCount + stat.manual
                       </TableBody>
                     </Table>
                   </TableContainer>
+                </Box>
+              ) : (
+                /* 월별/기간/선택 모드: 총유입호·응대콜 합산 표시 (읽기 전용) */
+                <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <Box sx={{ display: 'flex', gap: 2 }}>
+                    <Card elevation={0} sx={{ flex: 1, bgcolor: 'rgba(30, 41, 59, 0.4)', border: '1px solid rgba(255, 255, 255, 0.05)', borderRadius: '12px' }}>
+                      <CardContent sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: '16px !important' }}>
+                        <Box>
+                          <Typography variant="caption" sx={{ fontWeight: 600, mb: 0.5, color: '#94a3b8', display: 'block' }}>📞 총 유입호 (합산)</Typography>
+                          <Typography sx={{ fontSize: '1.5rem', fontWeight: 800, color: '#f8fafc' }}>{callStats.inflow}</Typography>
+                        </Box>
+                        <Box sx={{ bgcolor: 'rgba(59, 130, 246, 0.15)', p: 1, borderRadius: '8px', color: '#3b82f6' }}><PhoneIcon fontSize="small" /></Box>
+                      </CardContent>
+                    </Card>
+
+                    <Card elevation={0} sx={{ flex: 1, bgcolor: 'rgba(30, 41, 59, 0.4)', border: '1px solid rgba(255, 255, 255, 0.05)', borderRadius: '12px' }}>
+                      <CardContent sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: '16px !important' }}>
+                        <Box>
+                          <Typography variant="caption" sx={{ fontWeight: 600, mb: 0.5, color: '#94a3b8', display: 'block' }}>🗣️ 총 응대콜 (합산)</Typography>
+                          <Typography sx={{ fontSize: '1.5rem', fontWeight: 800, color: '#10b981' }}>{callStats.response}</Typography>
+                        </Box>
+                        <Box sx={{ bgcolor: 'rgba(16, 185, 129, 0.15)', p: 1, borderRadius: '8px', color: '#10b981' }}><HeadsetIcon fontSize="small" /></Box>
+                      </CardContent>
+                    </Card>
+                  </Box>
                 </Box>
               )}
             </Box>
