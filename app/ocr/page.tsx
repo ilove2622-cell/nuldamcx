@@ -317,24 +317,7 @@ export default function OcrPage() {
     <Box sx={{ minHeight: '100vh', bgcolor: '#0f172a', color: '#f8fafc', display: 'flex', flexDirection: 'column' }}>
       
       {/* 🌟 헤더 */}
-      <Box component="header" sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(10px)', bgcolor: 'rgba(15, 23, 42, 0.8)', position: 'sticky', top: 0, zIndex: 50 }}>
-        <Container maxWidth="xl" sx={{ py: 1.5, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            <Link href="/" passHref style={{ textDecoration: 'none' }}>
-              <IconButton edge="start" size="small" sx={{ color: '#cbd5e1', '&:hover': { color: '#fff', bgcolor: 'rgba(255,255,255,0.1)' } }}>
-                <ArrowBackIcon fontSize="small" />
-              </IconButton>
-            </Link>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Box sx={{ width: 28, height: 28, borderRadius: 1.5, background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>📋</Box>
-              <Box>
-                <Typography sx={{ fontSize: '0.95rem', fontWeight: 700, lineHeight: 1.2 }}>널담 OCR 도우미</Typography>
-                <Typography sx={{ fontSize: '0.7rem', color: '#94a3b8' }}>사진 → 스프레드시트 자동 입력</Typography>
-              </Box>
-            </Box>
-          </Box>
-        </Container>
-      </Box>
+      {/* 네비게이션은 layout.tsx의 NavBar에서 공통 제공 */}
 
       <Container maxWidth="xl" sx={{ mt: 3, mb: 8, flex: 1, display: 'flex', flexDirection: 'column', gap: 3 }}>
         

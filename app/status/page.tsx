@@ -427,57 +427,47 @@ const totalsArray = currentStats.map((stat: any) => stat.autoCount + stat.manual
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: '#0f172a', color: '#f8fafc', display: 'flex', flexDirection: 'column' }}>
       
-      <Box component="header" sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(10px)', bgcolor: 'rgba(15, 23, 42, 0.8)', position: 'sticky', top: 0, zIndex: 50 }}>
-        <Container maxWidth="lg" sx={{ py: 1.5 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-              <Link href="/" passHref style={{ textDecoration: 'none' }}>
-                <IconButton edge="start" size="small" sx={{ color: '#cbd5e1', '&:hover': { color: '#fff', bgcolor: 'rgba(255,255,255,0.1)' } }}>
-                  <ArrowBackIcon fontSize="small" />
-                </IconButton>
-              </Link>
-              <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#f8fafc', letterSpacing: '-0.5px' }}>
-                📊 문의 수량 추이 및 현황 입력
-              </Typography>
-            </Box>
-            
-            {/* 💡 상단 우측 컨트롤 바 */}
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <Button 
-                size="small" 
-                variant="contained" 
-                startIcon={isExporting ? <CircularProgress size={14} color="inherit" /> : <ListAltIcon fontSize="small" />} 
-                onClick={handleExportToSheet} 
-                disabled={isExporting || viewMode !== 'daily'} 
-                sx={{ 
-                  bgcolor: '#10b981', color: '#fff', fontWeight: 600, 
-                  boxShadow: '0 4px 14px rgba(16, 185, 129, 0.4)',
-                  '&:hover': { bgcolor: '#059669' },
-                  '&.Mui-disabled': { bgcolor: 'rgba(16, 185, 129, 0.3)', color: '#a7f3d0' }
-                }}
-              >
-                시트에 내보내기
-              </Button>
+      {/* 서브 헤더: 컨트롤 바 */}
+      <Container maxWidth="lg" sx={{ pt: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
+          <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#f8fafc', letterSpacing: '-0.5px' }}>
+            문의 수량 추이 및 현황 입력
+          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Button
+              size="small"
+              variant="contained"
+              startIcon={isExporting ? <CircularProgress size={14} color="inherit" /> : <ListAltIcon fontSize="small" />}
+              onClick={handleExportToSheet}
+              disabled={isExporting || viewMode !== 'daily'}
+              sx={{
+                bgcolor: '#10b981', color: '#fff', fontWeight: 600,
+                boxShadow: '0 4px 14px rgba(16, 185, 129, 0.4)',
+                '&:hover': { bgcolor: '#059669' },
+                '&.Mui-disabled': { bgcolor: 'rgba(16, 185, 129, 0.3)', color: '#a7f3d0' }
+              }}
+            >
+              시트에 내보내기
+            </Button>
 
-              <ToggleButtonGroup
-                value={viewMode} exclusive onChange={handleViewModeChange} size="small"
-                sx={{
-                  bgcolor: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255,255,255,0.05)',
-                  '& .MuiToggleButton-root': {
-                    color: '#64748b', border: 'none', px: 2, py: 0.5, fontSize: '0.8rem', fontWeight: 600,
-                    '&.Mui-selected': { color: '#fff', bgcolor: '#3b82f6', '&:hover': { bgcolor: '#2563eb' } }
-                  }
-                }}
-              >
-                <ToggleButton value="daily">일별</ToggleButton>
-                <ToggleButton value="monthly">월별</ToggleButton>
-                <ToggleButton value="range">기간</ToggleButton>
-                <ToggleButton value="picker">선택</ToggleButton>
-              </ToggleButtonGroup>
-            </Box>
+            <ToggleButtonGroup
+              value={viewMode} exclusive onChange={handleViewModeChange} size="small"
+              sx={{
+                bgcolor: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255,255,255,0.05)',
+                '& .MuiToggleButton-root': {
+                  color: '#64748b', border: 'none', px: 2, py: 0.5, fontSize: '0.8rem', fontWeight: 600,
+                  '&.Mui-selected': { color: '#fff', bgcolor: '#3b82f6', '&:hover': { bgcolor: '#2563eb' } }
+                }
+              }}
+            >
+              <ToggleButton value="daily">일별</ToggleButton>
+              <ToggleButton value="monthly">월별</ToggleButton>
+              <ToggleButton value="range">기간</ToggleButton>
+              <ToggleButton value="picker">선택</ToggleButton>
+            </ToggleButtonGroup>
           </Box>
-        </Container>
-      </Box>
+        </Box>
+      </Container>
 
       <Container maxWidth="lg" sx={{ mt: 3, mb: 8, flex: 1 }}>
         <Fade in={true} timeout={500}>

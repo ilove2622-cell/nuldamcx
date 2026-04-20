@@ -155,46 +155,7 @@ export default function VocPage() {
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: '#0f172a', color: '#f8fafc', display: 'flex', flexDirection: 'column' }}>
-      {/* 헤더 - 메인 페이지와 동일한 스타일 */}
-      <Box component="header" sx={{
-        borderBottom: '1px solid rgba(255,255,255,0.05)',
-        backdropFilter: 'blur(10px)',
-        bgcolor: 'rgba(15, 23, 42, 0.6)',
-        position: 'sticky',
-        top: 0,
-        zIndex: 50
-      }}>
-        <Container maxWidth="xl" sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 2, px: { xs: 3, sm: 4, lg: 6 } }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, pl: { xs: 0.5, sm: 1 } }}>
-            <Button
-              onClick={() => router.push('/')}
-              startIcon={<ArrowBackIcon fontSize="small" />}
-              sx={{ color: '#94a3b8', fontSize: '0.85rem', '&:hover': { bgcolor: 'rgba(255,255,255,0.05)', color: '#f8fafc' } }}
-            >
-              대시보드
-            </Button>
-            <Box sx={{ width: '1px', height: 24, bgcolor: 'rgba(255,255,255,0.1)' }} />
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-              <Box sx={{
-                width: 36, height: 36, borderRadius: '10px',
-                bgcolor: 'rgba(139, 92, 246, 0.1)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                border: '1px solid rgba(139, 92, 246, 0.2)'
-              }}>
-                <BiotechIcon sx={{ color: '#a78bfa', fontSize: 20 }} />
-              </Box>
-              <Box>
-                <Typography sx={{ fontWeight: 700, fontSize: '1rem', color: '#f8fafc', lineHeight: 1.2 }}>
-                  이물질 분석 시스템
-                </Typography>
-                <Typography sx={{ fontSize: '0.7rem', color: '#64748b', lineHeight: 1.2 }}>
-                  AI 기반 식품 이물질 분석 및 CS 응대 스크립트 자동 생성
-                </Typography>
-              </Box>
-            </Box>
-          </Box>
-        </Container>
-      </Box>
+      {/* 네비게이션은 layout.tsx의 NavBar에서 공통 제공 */}
 
       {/* 메인 콘텐츠 */}
       <Container maxWidth="md" sx={{ mt: 3, mb: 8, flex: 1, px: { xs: 2, sm: 3 } }}>
