@@ -18,6 +18,7 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+const CHANNEL_ID = process.env.CHANNELTALK_CHANNEL_ID || '';
 const MODE = process.env.AUTO_REPLY_MODE || 'dryrun'; // dryrun | live
 const CONFIDENCE_THRESHOLD = Number(process.env.AUTO_REPLY_CONFIDENCE_THRESHOLD) || 0.8;
 
@@ -26,42 +27,32 @@ export async function POST(req: NextRequest) {
   const rawBody = await req.text();
   const signature = req.headers.get('x-signature') || '';
 
-  // 모든 웹훅 수신을 DB에 기록 (디버깅용)
-  try {
-    const parsed = JSON.parse(rawBody);
-    await supabase.from('webhook_logs').insert({
-      event: parsed.event || 'unknown',
-      signature_ok: verifyWebhookSignature(rawBody, signature),
-      body_preview: rawBody.slice(0, 500),
-      created_at: new Date().toISOString(),
-    }).then(() => {});
-  } catch {}
-
-  // 1. 서명 검증 (실패해도 200 반환 — 채널톡 차단 방지)
-  console.log(`🔑 웹훅 수신 — body length: ${rawBody.length}, sig: ${signature.slice(0, 20)}..., token set: ${!!process.env.CHANNELTALK_WEBHOOK_TOKEN}`);
-  if (!verifyWebhookSignature(rawBody, signature)) {
-    console.warn('⚠️ 웹훅 서명 검증 실패 — signature:', signature.slice(0, 20), 'body length:', rawBody.length);
-    return NextResponse.json({ ok: true });
-  }
-  console.log('✅ 서명 검증 통과');
-
   let payload: any;
   try {
     payload = JSON.parse(rawBody);
   } catch {
-    console.warn('⚠️ 웹훅 JSON 파싱 실패');
     return NextResponse.json({ ok: true });
   }
 
   const event = payload.event;
-  // 채널톡은 refers에 entity 정보를 담아줌
   const refers = payload.refers || {};
 
-  console.log(`📨 이벤트: ${event}`);
+  // 서명 검증: push 이벤트는 채널톡 내부 서명 방식이 다르므로 channelId로 검증
+  const sigOk = verifyWebhookSignature(rawBody, signature);
+  const isChannelTok = payload.entity?.channelId === CHANNEL_ID;
+
+  if (!sigOk && !isChannelTok) {
+    console.warn(`⚠️ 웹훅 검증 실패 — event: ${event}`);
+    return NextResponse.json({ ok: true });
+  }
+
+  console.log(`📨 웹훅 [${event}] channelId=${payload.entity?.channelId}`);
+
   try {
     if (event === 'userChat.created') {
       await handleChatCreated(payload, refers);
-    } else if (event === 'message.created') {
+    } else if (event === 'message.created' || event === 'push') {
+      // 채널톡은 push 이벤트로 메시지를 전달
       await handleMessageCreated(payload, refers);
     } else {
       console.log(`⏩ 미처리 이벤트: ${event}`);
@@ -99,9 +90,13 @@ async function handleChatCreated(payload: any, refers: any) {
   console.log(`📩 새 채팅 세션: ${userChatId} (${channelType})`);
 }
 
-// ─── message.created: 메시지 수신 시 자동응답 플로우 ───
+// ─── message.created / push: 메시지 수신 시 자동응답 플로우 ───
 async function handleMessageCreated(payload: any, refers: any) {
   const message = payload.entity || {};
+
+  // 시스템 로그 메시지 무시 (채팅 오픈/종료 등)
+  if (message.log) return;
+
   const userChatId = message.chatId || message.userChatId;
   if (!userChatId) return;
 
@@ -115,8 +110,8 @@ async function handleMessageCreated(payload: any, refers: any) {
 
   console.log(`💬 고객 메시지 수신 [${userChatId}]: ${text.slice(0, 80)}...`);
 
-  // 세션 조회/생성
-  const session = await getOrCreateSession(userChatId, refers);
+  // 세션 조회/생성 (push 이벤트에서는 entity에서 정보 추출)
+  const session = await getOrCreateSession(userChatId, refers, message);
 
   // 고객 메시지 DB 기록
   const { data: msgRow } = await supabase
@@ -216,7 +211,7 @@ function extractText(message: any): string {
   return '';
 }
 
-async function getOrCreateSession(userChatId: string, refers: any) {
+async function getOrCreateSession(userChatId: string, refers: any, message?: any) {
   const { data: existing } = await supabase
     .from('chat_sessions')
     .select('id')
@@ -229,9 +224,9 @@ async function getOrCreateSession(userChatId: string, refers: any) {
     .from('chat_sessions')
     .insert({
       user_chat_id: userChatId,
-      channel_type: refers.userChat?.source?.appType || 'native',
-      customer_id: refers.user?.id,
-      customer_name: refers.user?.profile?.name,
+      channel_type: refers.userChat?.source?.appType || message?.chatType || 'native',
+      customer_id: refers.user?.id || message?.personId || null,
+      customer_name: refers.user?.profile?.name || null,
       status: 'open',
       opened_at: new Date().toISOString(),
     })
