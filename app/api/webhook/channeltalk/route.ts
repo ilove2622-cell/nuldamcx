@@ -149,8 +149,41 @@ async function handleMessageCreated(payload: any, refers: any) {
 
   // ─── 플로우 시작 ───
 
+  // 마지막 봇/상담사 답변 이후 고객 메시지를 모아서 확인
+  const { data: allMsgs } = await supabase
+    .from('chat_messages')
+    .select('id, sender, text, created_at')
+    .eq('session_id', session.id)
+    .order('created_at', { ascending: true });
+
+  const msgList = allMsgs || [];
+
+  // 마지막 봇/상담사 답변 위치 찾기
+  let lastReplyIdx = -1;
+  for (let i = msgList.length - 1; i >= 0; i--) {
+    if (msgList[i].sender === 'bot' || msgList[i].sender === 'agent') {
+      lastReplyIdx = i;
+      break;
+    }
+  }
+
+  // 마지막 답변 이후 고객 메시지들
+  const newCustomerMsgs = msgList
+    .slice(lastReplyIdx + 1)
+    .filter(m => m.sender === 'customer');
+
+  // 전체 고객 메시지 텍스트 (LLM에 전달할 컨텍스트)
+  const fullCustomerText = newCustomerMsgs.map(m => m.text).join('\n');
+
+  // 오늘 날짜(KST) 기준 이미 답변한 적 있는지 확인 (인삿말 판단용)
+  const todayKST = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const hasRepliedToday = msgList.some(m =>
+    (m.sender === 'bot' || m.sender === 'agent') &&
+    new Date(new Date(m.created_at).getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10) === todayKST
+  );
+
   // Step 1: 주문번호 감지 → 사방넷 조회
-  const order = pickPrimaryOrder(text);
+  const order = pickPrimaryOrder(fullCustomerText);
   if (order) {
     console.log(`🔍 주문번호 감지: ${order.orderNumber} (${order.mall})`);
     try {
@@ -158,7 +191,7 @@ async function handleMessageCreated(payload: any, refers: any) {
       const reply = formatOrderReply(result);
       await recordAndSend(session.id, msgRow?.id, userChatId, reply, {
         model: 'order-lookup',
-        prompt: text,
+        prompt: fullCustomerText,
         confidence: 1.0,
         category: '주문조회',
         escalate: false,
@@ -171,31 +204,41 @@ async function handleMessageCreated(payload: any, refers: any) {
   }
 
   // Step 2: 키워드 기반 무조건 에스컬레이션 체크
-  if (hasEscalationKeyword(text)) {
-    await recordAndEscalate(session.id, msgRow?.id, userChatId, text, '키워드 감지 (환불/교환/취소/클레임 등)');
+  if (hasEscalationKeyword(fullCustomerText)) {
+    await recordAndEscalate(session.id, msgRow?.id, userChatId, fullCustomerText, '키워드 감지 (환불/교환/취소/클레임 등)');
     return;
   }
 
-  // Step 3: LLM 호출
+  // Step 3: LLM 호출 (대화 이력 + 인삿말 여부 전달)
   try {
-    const llm = await generate(text);
+    // 이전 대화 맥락 구성 (최근 10건)
+    const recentHistory = msgList.slice(-10).map(m => {
+      const role = m.sender === 'customer' ? '고객' : m.sender === 'bot' ? 'AI 봇' : '상담사';
+      return `${role}: ${m.text}`;
+    }).join('\n');
+
+    const contextParts: string[] = [];
+    if (recentHistory) contextParts.push(`[대화 이력]\n${recentHistory}`);
+    if (hasRepliedToday) contextParts.push('[오늘 이미 답변한 적 있음 — 인삿말 생략]');
+
+    const llm = await generate(fullCustomerText, contextParts.join('\n\n'));
 
     // 무조건 에스컬레이션 카테고리
     if (shouldForceEscalate(llm.category)) {
-      await recordAndEscalate(session.id, msgRow?.id, userChatId, text, `카테고리: ${llm.category}`, llm);
+      await recordAndEscalate(session.id, msgRow?.id, userChatId, fullCustomerText, `카테고리: ${llm.category}`, llm);
       return;
     }
 
     // LLM이 에스컬레이션 판단
     if (llm.escalate) {
-      await recordAndEscalate(session.id, msgRow?.id, userChatId, text, llm.reason, llm);
+      await recordAndEscalate(session.id, msgRow?.id, userChatId, fullCustomerText, llm.reason, llm);
       return;
     }
 
     // 신뢰도 체크
     if (llm.confidence < CONFIDENCE_THRESHOLD) {
       await recordAndEscalate(
-        session.id, msgRow?.id, userChatId, text,
+        session.id, msgRow?.id, userChatId, fullCustomerText,
         `신뢰도 부족 (${llm.confidence.toFixed(2)} < ${CONFIDENCE_THRESHOLD})`,
         llm
       );
@@ -205,7 +248,7 @@ async function handleMessageCreated(payload: any, refers: any) {
     // 안전 → 자동응답
     await recordAndSend(session.id, msgRow?.id, userChatId, llm.answer, {
       model: llm.model,
-      prompt: text,
+      prompt: fullCustomerText,
       confidence: llm.confidence,
       category: llm.category,
       escalate: false,
@@ -213,7 +256,7 @@ async function handleMessageCreated(payload: any, refers: any) {
     });
   } catch (err: any) {
     console.error('LLM 호출 실패:', err);
-    await recordAndEscalate(session.id, msgRow?.id, userChatId, text, `LLM 오류: ${err.message}`);
+    await recordAndEscalate(session.id, msgRow?.id, userChatId, fullCustomerText, `LLM 오류: ${err.message}`);
   }
 }
 
