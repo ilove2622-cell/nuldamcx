@@ -317,6 +317,23 @@ function extractText(message: any): string {
     }
   }
 
+  // files 배열 처리 (push 이벤트 등에서 이미지/파일이 files로 전달됨)
+  const files = message.files || [];
+  for (const f of files) {
+    if (f.type === 'image') {
+      // 공개 URL이 있으면 사용, 없으면 placeholder
+      const url = f.url || '';
+      if (url && !url.includes('pri-file')) {
+        parts.push(`[image:${url}]`);
+      } else {
+        const dims = f.width && f.height ? ` ${f.width}x${f.height}` : '';
+        parts.push(`[사진 첨부${dims}]`);
+      }
+    } else {
+      parts.push(`[파일: ${f.name || '첨부파일'}]`);
+    }
+  }
+
   if (parts.length > 0) return parts.join('\n').trim();
 
   // plainText 폴백
