@@ -226,15 +226,29 @@ function ChatConsolePage() {
   useEffect(() => {
     if (activeSessionId) {
       fetchChat(activeSessionId);
-      const session = sessions.find(s => s.id === activeSessionId) || null;
-      setActiveSession(session);
       setUnreadSessions(prev => {
         const next = new Set(prev);
         next.delete(activeSessionId);
         return next;
       });
     }
-  }, [activeSessionId, sessions, fetchChat]);
+  }, [activeSessionId, fetchChat]);
+
+  // activeSession은 sessions 변경 시에도 안정적으로 유지
+  useEffect(() => {
+    if (activeSessionId) {
+      const found = sessions.find(s => s.id === activeSessionId) || null;
+      setActiveSession(prev => {
+        // 실제 내용이 바뀐 경우에만 업데이트 (깜빡임 방지)
+        if (!found) return prev;
+        if (!prev || prev.id !== found.id || prev.status !== found.status ||
+            prev.last_message_at !== found.last_message_at) {
+          return found;
+        }
+        return prev;
+      });
+    }
+  }, [activeSessionId, sessions]);
 
   // 10초 폴링
   useEffect(() => {
@@ -775,6 +789,7 @@ function ChatConsolePage() {
                     </IconButton>
                   </Box>
                   <Box
+                    key={`desk-${activeSession.user_chat_id}`}
                     component="iframe"
                     src={`https://desk.channel.io/#/channels/35237/user_chats/${activeSession.user_chat_id}`}
                     sx={{ flex: 1, border: 'none', bgcolor: '#fff' }}
