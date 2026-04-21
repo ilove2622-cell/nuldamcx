@@ -48,3 +48,23 @@ export async function GET(req: NextRequest) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json(data);
 }
+
+/** PATCH /api/chat/sessions  — 세션 상태 변경 */
+export async function PATCH(req: NextRequest) {
+  try {
+    const { sessionId, status } = await req.json();
+    if (!sessionId || !status) {
+      return NextResponse.json({ error: 'sessionId와 status는 필수' }, { status: 400 });
+    }
+
+    const { error } = await supabase
+      .from('chat_sessions')
+      .update({ status })
+      .eq('id', sessionId);
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: true });
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
+}

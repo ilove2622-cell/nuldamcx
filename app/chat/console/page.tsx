@@ -20,6 +20,8 @@ import {
   Star as StarIcon,
   StarBorder as StarBorderIcon,
   Close as CloseIcon,
+  CheckCircle as CheckCircleIcon,
+  Replay as ReplayIcon,
 } from '@mui/icons-material';
 
 // ─── 타입 ───
@@ -317,6 +319,21 @@ function ChatConsolePage() {
     setStarred(toggleStarred(sessionId));
   };
 
+  // ─── 세션 상태 변경 ───
+  const handleStatusChange = async (sessionId: number, newStatus: string) => {
+    try {
+      const res = await fetch('/api/chat/sessions', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId, status: newStatus }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      await fetchSessions();
+    } catch (err) {
+      alert(`상태 변경 실패: ${err}`);
+    }
+  };
+
   // ─── 탭 + 검색 필터 ───
   const filteredSessions = sessions.filter(s => {
     // 탭 필터
@@ -533,6 +550,35 @@ function ChatConsolePage() {
                         color: statusColor(activeSession.status),
                       }}
                     />
+                    <Box sx={{ flex: 1 }} />
+                    <IconButton
+                      size="small"
+                      onClick={(e) => handleToggleStar(e, activeSession.id)}
+                      sx={{ color: starred.has(activeSession.id) ? '#f59e0b' : '#475569' }}
+                    >
+                      {starred.has(activeSession.id) ? <StarIcon sx={{ fontSize: 20 }} /> : <StarBorderIcon sx={{ fontSize: 20 }} />}
+                    </IconButton>
+                    {activeSession.status !== 'closed' ? (
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        startIcon={<CheckCircleIcon />}
+                        onClick={() => handleStatusChange(activeSession.id, 'closed')}
+                        sx={{ color: '#10b981', borderColor: '#10b981', textTransform: 'none', fontSize: '0.75rem' }}
+                      >
+                        완료 처리
+                      </Button>
+                    ) : (
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        startIcon={<ReplayIcon />}
+                        onClick={() => handleStatusChange(activeSession.id, 'open')}
+                        sx={{ color: '#3b82f6', borderColor: '#3b82f6', textTransform: 'none', fontSize: '0.75rem' }}
+                      >
+                        재오픈
+                      </Button>
+                    )}
                   </Stack>
                 </Box>
               )}
