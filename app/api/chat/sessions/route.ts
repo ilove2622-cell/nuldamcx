@@ -15,6 +15,7 @@ export async function GET(req: NextRequest) {
 
   const since = new Date(Date.now() - days * 86400000).toISOString();
 
+  // last_message_at 정렬 시도, 컬럼 미존재 시 created_at fallback
   let q = supabase
     .from('chat_sessions')
     .select('*')
@@ -25,7 +26,25 @@ export async function GET(req: NextRequest) {
   if (status && status !== '전체') q = q.eq('status', status);
   if (channel && channel !== '전체') q = q.eq('channel_type', channel);
 
-  const { data, error } = await q;
+  let { data, error } = await q;
+
+  // last_message_at 컬럼이 없으면 created_at으로 fallback
+  if (error && error.message.includes('last_message_at')) {
+    let fallback = supabase
+      .from('chat_sessions')
+      .select('*')
+      .gte('created_at', since)
+      .order('created_at', { ascending: false })
+      .limit(500);
+
+    if (status && status !== '전체') fallback = fallback.eq('status', status);
+    if (channel && channel !== '전체') fallback = fallback.eq('channel_type', channel);
+
+    const result = await fallback;
+    data = result.data;
+    error = result.error;
+  }
+
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json(data);
 }
