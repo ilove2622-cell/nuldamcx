@@ -6,10 +6,10 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-/** GET /api/chat/sessions?days=1&status=open&channel=appKakao */
+/** GET /api/chat/sessions?days=7&status=open&channel=appKakao */
 export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;
-  const days = Number(sp.get('days') || '1');
+  const days = Number(sp.get('days') || '7');
   const status = sp.get('status');
   const channel = sp.get('channel');
 
@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
     .from('chat_sessions')
     .select('*')
     .gte('created_at', since)
-    .order('created_at', { ascending: false })
+    .order('last_message_at', { ascending: false, nullsFirst: false })
     .limit(500);
 
   if (status && status !== '전체') q = q.eq('status', status);

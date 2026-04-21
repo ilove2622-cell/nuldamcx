@@ -47,6 +47,10 @@ export async function POST(req: NextRequest) {
         sender: 'bot',
         text,
       });
+      await supabase.from('chat_sessions').update({
+        last_message_at: new Date().toISOString(),
+        last_message_text: text.slice(0, 100),
+      }).eq('id', session.id);
     }
 
     console.log(`✅ 수동 발송 완료: [${userChatId}] ${text.slice(0, 50)}...`);

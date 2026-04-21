@@ -2,11 +2,10 @@
 
 import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { format } from 'date-fns';
 
 import {
   Box, Typography, Button, Stack, Chip, IconButton, TextField,
-  CircularProgress, Badge, Divider, InputAdornment,
+  CircularProgress, Badge, InputAdornment, Dialog,
 } from '@mui/material';
 import {
   ArrowBack as ArrowBackIcon,
@@ -17,8 +16,10 @@ import {
   SmartToy as SmartToyIcon,
   HeadsetMic as HeadsetMicIcon,
   Refresh as RefreshIcon,
-  CheckCircle as CheckCircleIcon,
   Search as SearchIcon,
+  Star as StarIcon,
+  StarBorder as StarBorderIcon,
+  Close as CloseIcon,
 } from '@mui/icons-material';
 
 // ─── 타입 ───
@@ -30,6 +31,8 @@ interface Session {
   status: string;
   opened_at: string;
   created_at: string;
+  last_message_at: string | null;
+  last_message_text: string | null;
 }
 
 interface Message {
@@ -72,6 +75,59 @@ const confidenceColor = (c: number) => {
   return '#ef4444';
 };
 
+const statusLabel = (status: string) => {
+  if (status === 'open') return '신규';
+  if (status === 'escalated') return '진행중';
+  if (status === 'closed') return '완료';
+  return status;
+};
+
+const statusColor = (status: string) => {
+  if (status === 'open') return '#3b82f6';
+  if (status === 'escalated') return '#ef4444';
+  if (status === 'closed') return '#10b981';
+  return '#64748b';
+};
+
+/** 시간 표시: 오늘=HH:mm, 어제=어제, 그 이전=MM/dd */
+function formatTime(dateStr: string | null): string {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  const now = new Date();
+  const kstOffset = 9 * 60 * 60 * 1000;
+  const toKSTDate = (t: Date) => new Date(t.getTime() + kstOffset).toISOString().slice(0, 10);
+  const today = toKSTDate(now);
+  const dateKST = toKSTDate(d);
+  const yesterday = toKSTDate(new Date(now.getTime() - 86400000));
+
+  if (dateKST === today) {
+    const h = String(d.getUTCHours() + 9).padStart(2, '0');
+    const hNum = Number(h) >= 24 ? Number(h) - 24 : Number(h);
+    const m = String(d.getUTCMinutes()).padStart(2, '0');
+    return `${String(hNum).padStart(2, '0')}:${m}`;
+  }
+  if (dateKST === yesterday) return '어제';
+  return `${dateKST.slice(5, 7)}/${dateKST.slice(8, 10)}`;
+}
+
+// 별표 로컬스토리지 관리
+function getStarredSessions(): Set<number> {
+  try {
+    const raw = localStorage.getItem('starred_sessions');
+    return new Set(raw ? JSON.parse(raw) : []);
+  } catch { return new Set(); }
+}
+
+function toggleStarred(id: number): Set<number> {
+  const starred = getStarredSessions();
+  if (starred.has(id)) starred.delete(id);
+  else starred.add(id);
+  localStorage.setItem('starred_sessions', JSON.stringify([...starred]));
+  return new Set(starred);
+}
+
+type TabKey = '전체' | '신규' | '진행중' | '완료' | '중요';
+
 // ─── 메인 ───
 export default function ChatConsolePageWrapper() {
   return (
@@ -90,6 +146,8 @@ function ChatConsolePage() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(true);
   const [sessionSearch, setSessionSearch] = useState('');
+  const [activeTab, setActiveTab] = useState<TabKey>('전체');
+  const [starred, setStarred] = useState<Set<number>>(new Set());
 
   // 선택된 세션
   const [activeSessionId, setActiveSessionId] = useState<number | null>(null);
@@ -110,12 +168,19 @@ function ChatConsolePage() {
   // 읽지 않은 세션 트래킹
   const [unreadSessions, setUnreadSessions] = useState<Set<number>>(new Set());
 
+  // 이미지 모달
+  const [imageModalUrl, setImageModalUrl] = useState<string | null>(null);
+
+  // 로컬스토리지 초기화
+  useEffect(() => {
+    setStarred(getStarredSessions());
+  }, []);
+
   // ─── 세션 목록 로드 ───
   const fetchSessions = useCallback(async () => {
     try {
       const data = await fetch('/api/chat/sessions?days=7').then(r => r.json());
-      const active = (Array.isArray(data) ? data : []).filter((s: Session) => s.status === 'open' || s.status === 'escalated');
-      setSessions(active);
+      setSessions(Array.isArray(data) ? data : []);
     } catch (e) {
       console.error('세션 로드 실패:', e);
     }
@@ -246,18 +311,44 @@ function ChatConsolePage() {
     }
   };
 
-  // 필터된 세션
-  const filteredSessions = sessionSearch
-    ? sessions.filter(s =>
-        (s.customer_name || '').toLowerCase().includes(sessionSearch.toLowerCase()) ||
-        s.user_chat_id.toLowerCase().includes(sessionSearch.toLowerCase())
-      )
-    : sessions;
+  // ─── 별표 토글 ───
+  const handleToggleStar = (e: React.MouseEvent, sessionId: number) => {
+    e.stopPropagation();
+    setStarred(toggleStarred(sessionId));
+  };
+
+  // ─── 탭 + 검색 필터 ───
+  const filteredSessions = sessions.filter(s => {
+    // 탭 필터
+    if (activeTab === '신규' && s.status !== 'open') return false;
+    if (activeTab === '진행중' && s.status !== 'escalated') return false;
+    if (activeTab === '완료' && s.status !== 'closed') return false;
+    if (activeTab === '중요' && !starred.has(s.id)) return false;
+
+    // 검색 필터
+    if (sessionSearch) {
+      const q = sessionSearch.toLowerCase();
+      return (
+        (s.customer_name || '').toLowerCase().includes(q) ||
+        s.user_chat_id.toLowerCase().includes(q) ||
+        (s.last_message_text || '').toLowerCase().includes(q)
+      );
+    }
+    return true;
+  });
 
   // 미발송 AI 초안
   const pendingDrafts = aiResponses.filter(a => !a.sent_at && a.mode?.trim() === 'dryrun');
 
   const cardBorder = '1px solid rgba(255,255,255,0.08)';
+
+  const tabs: { key: TabKey; label: string }[] = [
+    { key: '전체', label: '전체' },
+    { key: '신규', label: '신규' },
+    { key: '진행중', label: '진행중' },
+    { key: '완료', label: '완료' },
+    { key: '중요', label: '\u2B50중요' },
+  ];
 
   return (
     <Box sx={{ height: '100vh', bgcolor: '#0f172a', color: '#f8fafc', display: 'flex', flexDirection: 'column' }}>
@@ -277,12 +368,36 @@ function ChatConsolePage() {
 
       <Box sx={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
         {/* ─── 좌측: 세션 목록 ─── */}
-        <Box sx={{ width: 320, borderRight: cardBorder, display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
-          <Box sx={{ p: 1 }}>
+        <Box sx={{ width: 340, borderRight: cardBorder, display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+          {/* 탭 */}
+          <Box sx={{ px: 1, pt: 1, pb: 0.5 }}>
+            <Stack direction="row" spacing={0.5} sx={{ flexWrap: 'wrap' }}>
+              {tabs.map(t => (
+                <Chip
+                  key={t.key}
+                  label={t.label}
+                  size="small"
+                  onClick={() => setActiveTab(t.key)}
+                  sx={{
+                    cursor: 'pointer',
+                    fontSize: '0.72rem',
+                    height: 26,
+                    fontWeight: activeTab === t.key ? 700 : 400,
+                    bgcolor: activeTab === t.key ? 'rgba(59,130,246,0.2)' : 'rgba(255,255,255,0.04)',
+                    color: activeTab === t.key ? '#60a5fa' : '#94a3b8',
+                    border: activeTab === t.key ? '1px solid rgba(59,130,246,0.4)' : '1px solid rgba(255,255,255,0.08)',
+                  }}
+                />
+              ))}
+            </Stack>
+          </Box>
+
+          {/* 검색 */}
+          <Box sx={{ px: 1, pb: 1 }}>
             <TextField
               size="small"
               fullWidth
-              placeholder="세션 검색..."
+              placeholder="이름, 채팅ID, 메시지 검색..."
               value={sessionSearch}
               onChange={(e) => setSessionSearch(e.target.value)}
               slotProps={{
@@ -291,7 +406,7 @@ function ChatConsolePage() {
                 },
               }}
               sx={{
-                '& .MuiOutlinedInput-root': { color: '#f8fafc', bgcolor: 'rgba(255,255,255,0.04)' },
+                '& .MuiOutlinedInput-root': { color: '#f8fafc', bgcolor: 'rgba(255,255,255,0.04)', height: 34 },
                 '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.1)' },
               }}
             />
@@ -302,7 +417,7 @@ function ChatConsolePage() {
               <Box sx={{ textAlign: 'center', py: 4 }}><CircularProgress size={24} /></Box>
             ) : filteredSessions.length === 0 ? (
               <Typography variant="caption" sx={{ color: '#475569', p: 2, display: 'block', textAlign: 'center' }}>
-                활성 세션 없음
+                {activeTab === '중요' ? '별표된 세션이 없습니다' : '세션 없음'}
               </Typography>
             ) : (
               filteredSessions.map((session) => (
@@ -310,7 +425,7 @@ function ChatConsolePage() {
                   key={session.id}
                   onClick={() => setActiveSessionId(session.id)}
                   sx={{
-                    px: 1.5, py: 1.2,
+                    px: 1.5, py: 1,
                     cursor: 'pointer',
                     bgcolor: activeSessionId === session.id ? 'rgba(59,130,246,0.1)' : 'transparent',
                     borderLeft: activeSessionId === session.id ? '3px solid #3b82f6' : '3px solid transparent',
@@ -318,7 +433,14 @@ function ChatConsolePage() {
                     borderBottom: '1px solid rgba(255,255,255,0.04)',
                   }}
                 >
-                  <Stack direction="row" alignItems="center" spacing={1}>
+                  <Stack direction="row" alignItems="center" spacing={0.5}>
+                    <IconButton
+                      size="small"
+                      onClick={(e) => handleToggleStar(e, session.id)}
+                      sx={{ p: 0.3, color: starred.has(session.id) ? '#f59e0b' : '#475569' }}
+                    >
+                      {starred.has(session.id) ? <StarIcon sx={{ fontSize: 16 }} /> : <StarBorderIcon sx={{ fontSize: 16 }} />}
+                    </IconButton>
                     <Badge
                       variant="dot"
                       invisible={!unreadSessions.has(session.id)}
@@ -330,28 +452,46 @@ function ChatConsolePage() {
                         sx={{
                           bgcolor: `${channelColor(session.channel_type)}22`,
                           color: channelColor(session.channel_type),
-                          fontSize: '0.65rem',
-                          height: 20,
+                          fontSize: '0.6rem',
+                          height: 18,
                         }}
                       />
                     </Badge>
-                    <Typography variant="body2" sx={{ flex: 1, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <Typography variant="body2" sx={{ flex: 1, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.82rem' }}>
                       {session.customer_name || session.user_chat_id.slice(0, 16)}
                     </Typography>
                     <Chip
-                      label={session.status}
+                      label={statusLabel(session.status)}
                       size="small"
                       sx={{
-                        fontSize: '0.6rem',
+                        fontSize: '0.58rem',
                         height: 18,
-                        bgcolor: session.status === 'escalated' ? 'rgba(239,68,68,0.15)' : 'rgba(59,130,246,0.1)',
-                        color: session.status === 'escalated' ? '#ef4444' : '#3b82f6',
+                        bgcolor: `${statusColor(session.status)}22`,
+                        color: statusColor(session.status),
                       }}
                     />
+                    <Typography variant="caption" sx={{ color: '#475569', fontSize: '0.68rem', whiteSpace: 'nowrap' }}>
+                      {formatTime(session.last_message_at || session.created_at)}
+                    </Typography>
                   </Stack>
-                  <Typography variant="caption" sx={{ color: '#475569', mt: 0.3, display: 'block' }}>
-                    {format(new Date(session.created_at), 'MM/dd HH:mm')}
-                  </Typography>
+                  {/* 마지막 메시지 미리보기 */}
+                  {session.last_message_text && (
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        color: '#64748b',
+                        mt: 0.3,
+                        display: 'block',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        fontSize: '0.72rem',
+                        pl: 3.5,
+                      }}
+                    >
+                      {session.last_message_text}
+                    </Typography>
+                  )}
                 </Box>
               ))
             )}
@@ -386,11 +526,11 @@ function ChatConsolePage() {
                       {activeSession.customer_name || activeSession.user_chat_id}
                     </Typography>
                     <Chip
-                      label={activeSession.status}
+                      label={statusLabel(activeSession.status)}
                       size="small"
                       sx={{
-                        bgcolor: activeSession.status === 'escalated' ? 'rgba(239,68,68,0.15)' : 'rgba(59,130,246,0.1)',
-                        color: activeSession.status === 'escalated' ? '#ef4444' : '#3b82f6',
+                        bgcolor: `${statusColor(activeSession.status)}22`,
+                        color: statusColor(activeSession.status),
                       }}
                     />
                   </Stack>
@@ -429,14 +569,22 @@ function ChatConsolePage() {
                                 {isCustomer ? '고객' : msg.sender === 'bot' ? 'AI 봇' : '상담사'}
                               </Typography>
                               <Typography variant="caption" sx={{ color: '#475569' }}>
-                                {format(new Date(msg.created_at), 'HH:mm')}
+                                {formatTime(msg.created_at)}
                               </Typography>
                             </Stack>
                             <Typography variant="body2" component="div" sx={{ whiteSpace: 'pre-wrap', fontSize: '0.85rem', color: isCustomer ? '#fef3c7' : '#e2e8f0' }}>
                               {msg.text.split('\n').map((line: string, i: number) => {
                                 const imgMatch = line.match(/^\[image:(.*)\]$/);
                                 if (imgMatch) {
-                                  return <Box key={i} component="img" src={imgMatch[1]} sx={{ maxWidth: '100%', maxHeight: 200, borderRadius: 1, mt: 0.5 }} />;
+                                  return (
+                                    <Box
+                                      key={i}
+                                      component="img"
+                                      src={imgMatch[1]}
+                                      onClick={() => setImageModalUrl(imgMatch[1])}
+                                      sx={{ maxWidth: '100%', maxHeight: 200, borderRadius: 1, mt: 0.5, cursor: 'pointer', '&:hover': { opacity: 0.85 } }}
+                                    />
+                                  );
                                 }
                                 return <span key={i}>{line}{i < msg.text.split('\n').length - 1 ? '\n' : ''}</span>;
                               })}
@@ -638,6 +786,32 @@ function ChatConsolePage() {
           )}
         </Box>
       </Box>
+
+      {/* 이미지 확대 모달 */}
+      <Dialog
+        open={!!imageModalUrl}
+        onClose={() => setImageModalUrl(null)}
+        maxWidth={false}
+        slotProps={{
+          paper: {
+            sx: { bgcolor: 'rgba(0,0,0,0.95)', boxShadow: 'none', maxWidth: '90vw', maxHeight: '90vh' },
+          },
+        }}
+      >
+        <IconButton
+          onClick={() => setImageModalUrl(null)}
+          sx={{ position: 'absolute', top: 8, right: 8, color: '#fff', zIndex: 1 }}
+        >
+          <CloseIcon />
+        </IconButton>
+        {imageModalUrl && (
+          <Box
+            component="img"
+            src={imageModalUrl}
+            sx={{ maxWidth: '90vw', maxHeight: '85vh', objectFit: 'contain', display: 'block' }}
+          />
+        )}
+      </Dialog>
     </Box>
   );
 }

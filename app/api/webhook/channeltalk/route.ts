@@ -124,6 +124,10 @@ async function handleMessageCreated(payload: any, refers: any) {
       message_id: message.id,
       text,
     });
+    await supabase.from('chat_sessions').update({
+      last_message_at: new Date().toISOString(),
+      last_message_text: text.slice(0, 100),
+    }).eq('id', session.id);
     console.log(`💬 ${sender} 메시지 기록 [${userChatId}]: ${text.slice(0, 80)}`);
     return;
   }
@@ -146,6 +150,12 @@ async function handleMessageCreated(payload: any, refers: any) {
     .single();
 
   if (msgErr) console.error(`❌ 메시지 저장 실패:`, msgErr.message);
+
+  // 세션에 마지막 메시지 정보 업데이트
+  await supabase.from('chat_sessions').update({
+    last_message_at: new Date().toISOString(),
+    last_message_text: text.slice(0, 100),
+  }).eq('id', session.id);
 
   // ─── 플로우 시작 ───
 
