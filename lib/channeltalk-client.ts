@@ -20,9 +20,7 @@ export async function sendMessage(userChatId: string, text: string) {
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify({
-      dto: {
-        blocks: [{ type: 'text', value: text }],
-      },
+      blocks: [{ type: 'text', value: text }],
     }),
   });
   if (!res.ok) {
@@ -77,10 +75,8 @@ export async function addNote(userChatId: string, text: string) {
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify({
-      dto: {
-        blocks: [{ type: 'text', value: text }],
-        options: ['only_manager'],
-      },
+      blocks: [{ type: 'text', value: text }],
+      options: ['private'],
     }),
   });
   if (!res.ok) {
