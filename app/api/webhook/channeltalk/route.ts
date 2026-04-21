@@ -371,6 +371,13 @@ async function recordAndSend(
   answer: string,
   meta: AIResponseMeta
 ) {
+  // 이전 미발송 초안 삭제 (최신 초안으로 교체)
+  await supabase
+    .from('ai_responses')
+    .delete()
+    .eq('session_id', sessionId)
+    .is('sent_at', null);
+
   const sentAt = MODE === 'live' ? new Date().toISOString() : null;
 
   await supabase.from('ai_responses').insert({
@@ -403,6 +410,13 @@ async function recordAndEscalate(
   reason: string,
   llm?: { model: string; answer: string; confidence: number; category: string; reason: string }
 ) {
+  // 이전 미발송 초안 삭제 (최신 초안으로 교체)
+  await supabase
+    .from('ai_responses')
+    .delete()
+    .eq('session_id', sessionId)
+    .is('sent_at', null);
+
   // AI 응답 기록 (있으면)
   if (llm) {
     await supabase.from('ai_responses').insert({
