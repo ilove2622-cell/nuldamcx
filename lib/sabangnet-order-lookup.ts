@@ -16,6 +16,8 @@ export interface OrderLookupResult {
   trackingNumber?: string;
   receiverName?: string;
   receiverAddr?: string;
+  orderDate?: string;
+  shipDate?: string;
   itemCount?: number;
 }
 
@@ -101,6 +103,8 @@ export async function lookupOrderBySabangnet(
       trackingNumber: formatTrackingNumber(head.INVOICE_NO),
       receiverName: String(head.RECEIVE_NAME || '').trim(),
       receiverAddr: String(head.RECEIVE_ADDR || '').trim(),
+      orderDate: String(head.ORDER_DATE || '').trim(),
+      shipDate: String(head.SHIP_DATE || head.SHIP_HOPE_DATE || '').trim(),
       itemCount: dataList.length,
     };
   } catch (err: any) {

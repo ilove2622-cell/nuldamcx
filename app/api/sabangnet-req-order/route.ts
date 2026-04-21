@@ -27,6 +27,9 @@ export async function GET(req: Request) {
     'DELV_STATUS',       // 배송상태 코드
     'DELIVERY_METHOD',   // 택배사
     'DELIVERY_COMPANY',  // 택배사 (대안 필드)
+    'SHIP_HOPE_DATE',    // 출고예정일
+    'SHIP_DATE',         // 출고일
+    'ORDER_DATE',        // 주문일
     // 상품 (한 주문에 여러 ITEM이 분리되어 내려옴)
     'PRODUCT_ID',        // 자체상품코드
     'MALL_PRODUCT_ID',   // 쇼핑몰상품코드

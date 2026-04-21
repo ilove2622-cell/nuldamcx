@@ -196,15 +196,20 @@ async function handleMessageCreated(payload: any, refers: any) {
           : result.trackingNumber
             ? `송장번호: ${result.trackingNumber}`
             : '송장 미등록';
+        // 오늘 KST 날짜
+        const todayStr = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10).replace(/-/g, '');
         orderContext = [
           `[사방넷 주문조회 결과]`,
           `주문번호: ${result.orderNumber}`,
           `수신자: ${result.receiverName || '미확인'}`,
           `배송지: ${result.receiverAddr || '미확인'}`,
           `상품: ${product}`,
-          `주문상태: ${result.status}`,
+          `주문상태(내부코드): ${result.status}`,
+          result.orderDate ? `주문일: ${result.orderDate}` : '',
+          result.shipDate ? `출고일: ${result.shipDate}` : '',
           `배송정보: ${tracking}`,
           result.itemCount && result.itemCount > 1 ? `총 ${result.itemCount}건 주문` : '',
+          `오늘 날짜: ${todayStr}`,
         ].filter(Boolean).join('\n');
       } else {
         orderContext = `[사방넷 주문조회 결과]\n주문번호 ${order.orderNumber}: 조회 결과 없음 (번호 확인 필요)`;
