@@ -20,7 +20,7 @@ const supabase = createClient(
 );
 
 const CHANNEL_ID = process.env.CHANNELTALK_CHANNEL_ID || '';
-const MODE = process.env.AUTO_REPLY_MODE || 'dryrun'; // dryrun | live
+const MODE = (process.env.AUTO_REPLY_MODE || 'dryrun').trim(); // dryrun | live
 const CONFIDENCE_THRESHOLD = Number(process.env.AUTO_REPLY_CONFIDENCE_THRESHOLD) || 0.8;
 
 /** 채널톡 웹훅 핸들러 */

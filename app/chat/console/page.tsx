@@ -254,7 +254,7 @@ function ChatConsolePage() {
     : sessions;
 
   // 미발송 AI 초안
-  const pendingDrafts = aiResponses.filter(a => !a.sent_at && a.mode === 'dryrun');
+  const pendingDrafts = aiResponses.filter(a => !a.sent_at && a.mode?.trim() === 'dryrun');
 
   const cardBorder = '1px solid rgba(255,255,255,0.08)';
 
