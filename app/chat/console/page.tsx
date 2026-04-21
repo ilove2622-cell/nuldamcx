@@ -177,6 +177,9 @@ function ChatConsolePage() {
   // 이미지 모달
   const [imageModalUrl, setImageModalUrl] = useState<string | null>(null);
 
+  // 채널톡 데스크 패널
+  const [showDeskPanel, setShowDeskPanel] = useState(false);
+
   // 로컬스토리지 초기화
   useEffect(() => {
     setStarred(getStarredSessions());
@@ -555,6 +558,21 @@ function ChatConsolePage() {
                       }}
                     />
                     <Box sx={{ flex: 1 }} />
+                    <Button
+                      size="small"
+                      variant={showDeskPanel ? 'contained' : 'outlined'}
+                      startIcon={<OpenInNewIcon />}
+                      onClick={() => setShowDeskPanel(prev => !prev)}
+                      sx={{
+                        textTransform: 'none', fontSize: '0.72rem',
+                        color: showDeskPanel ? '#fff' : '#60a5fa',
+                        bgcolor: showDeskPanel ? '#3b82f6' : 'transparent',
+                        borderColor: '#3b82f6',
+                        '&:hover': { bgcolor: showDeskPanel ? '#2563eb' : 'rgba(59,130,246,0.1)' },
+                      }}
+                    >
+                      채널톡
+                    </Button>
                     <IconButton
                       size="small"
                       onClick={(e) => handleToggleStar(e, activeSession.id)}
@@ -587,6 +605,8 @@ function ChatConsolePage() {
                 </Box>
               )}
 
+              {/* 메시지 영역 (메시지 스레드 + 채널톡 데스크 패널) */}
+              <Box sx={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
               {/* 메시지 스레드 */}
               <Box sx={{ flex: 1, overflowY: 'auto', px: 2, py: 1.5 }}>
                 {messagesLoading ? (
@@ -735,6 +755,32 @@ function ChatConsolePage() {
                     <div ref={chatEndRef} />
                   </Stack>
                 )}
+              </Box>
+
+              {/* 채널톡 데스크 패널 (iframe) */}
+              {showDeskPanel && activeSession && (
+                <Box sx={{
+                  width: '50%', minWidth: 360, borderLeft: cardBorder,
+                  display: 'flex', flexDirection: 'column',
+                }}>
+                  <Box sx={{ px: 1.5, py: 0.5, borderBottom: cardBorder, bgcolor: 'rgba(255,255,255,0.02)', display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Typography variant="caption" sx={{ color: '#64748b', flex: 1 }}>
+                      채널톡 데스크 — 사진·동영상 원본 확인
+                    </Typography>
+                    <IconButton size="small" onClick={() => window.open(`https://desk.channel.io/#/channels/35237/user_chats/${activeSession.user_chat_id}`, '_blank')} sx={{ color: '#64748b' }}>
+                      <OpenInNewIcon sx={{ fontSize: 16 }} />
+                    </IconButton>
+                    <IconButton size="small" onClick={() => setShowDeskPanel(false)} sx={{ color: '#64748b' }}>
+                      <CloseIcon sx={{ fontSize: 16 }} />
+                    </IconButton>
+                  </Box>
+                  <Box
+                    component="iframe"
+                    src={`https://desk.channel.io/#/channels/35237/user_chats/${activeSession.user_chat_id}`}
+                    sx={{ flex: 1, border: 'none', bgcolor: '#fff' }}
+                  />
+                </Box>
+              )}
               </Box>
 
               {/* ─── 하단: AI 초안 영역 ─── */}
