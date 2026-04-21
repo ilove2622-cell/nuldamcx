@@ -102,6 +102,7 @@ function ChatConsolePage() {
 
   // 자유 메시지 입력
   const [freeText, setFreeText] = useState('');
+  const [selectedDraftIdx, setSelectedDraftIdx] = useState(0);
   const [sending, setSending] = useState(false);
   const [escalating, setEscalating] = useState(false);
   const [escalateReason, setEscalateReason] = useState('');
@@ -451,13 +452,40 @@ function ChatConsolePage() {
 
               {/* ─── 하단: AI 초안 영역 ─── */}
               <Box sx={{ borderTop: cardBorder, bgcolor: 'rgba(15,23,42,0.8)', maxHeight: '40%', overflowY: 'auto' }}>
-                {pendingDrafts.length > 0 ? (
-                  pendingDrafts.map((draft) => (
-                    <Box key={draft.id} sx={{ p: 2, borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                {pendingDrafts.length > 0 ? (() => {
+                  const idx = Math.min(selectedDraftIdx, pendingDrafts.length - 1);
+                  const draft = pendingDrafts[idx];
+                  return (
+                    <Box sx={{ p: 2 }}>
+                      {/* 초안 탭 선택 */}
+                      {pendingDrafts.length > 1 && (
+                        <Stack direction="row" spacing={0.5} mb={1} sx={{ flexWrap: 'wrap', gap: 0.5 }}>
+                          {pendingDrafts.map((d, i) => (
+                            <Chip
+                              key={d.id}
+                              label={`#${i + 1} ${d.category} ${(d.confidence * 100).toFixed(0)}%`}
+                              size="small"
+                              onClick={() => setSelectedDraftIdx(i)}
+                              sx={{
+                                cursor: 'pointer',
+                                fontSize: '0.7rem',
+                                height: 24,
+                                bgcolor: i === idx ? 'rgba(139,92,246,0.25)' : 'rgba(255,255,255,0.04)',
+                                color: i === idx ? '#a78bfa' : '#64748b',
+                                border: i === idx ? '1px solid rgba(139,92,246,0.5)' : '1px solid rgba(255,255,255,0.08)',
+                                fontWeight: i === idx ? 700 : 400,
+                              }}
+                            />
+                          ))}
+                        </Stack>
+                      )}
+
                       {/* 메타 정보 */}
                       <Stack direction="row" spacing={1} alignItems="center" mb={1}>
                         <SmartToyIcon sx={{ fontSize: 16, color: '#8b5cf6' }} />
-                        <Typography variant="caption" sx={{ color: '#a78bfa', fontWeight: 600 }}>AI 초안</Typography>
+                        <Typography variant="caption" sx={{ color: '#a78bfa', fontWeight: 600 }}>
+                          AI 초안{pendingDrafts.length > 1 ? ` (${idx + 1}/${pendingDrafts.length})` : ''}
+                        </Typography>
                         <Chip label={draft.category} size="small" sx={{ bgcolor: 'rgba(139,92,246,0.15)', color: '#a78bfa', fontSize: '0.65rem', height: 20 }} />
                         <Chip
                           label={`${(draft.confidence * 100).toFixed(0)}%`}
@@ -487,6 +515,8 @@ function ChatConsolePage() {
                           mb: 1,
                           fontSize: '0.85rem',
                           color: '#cbd5e1',
+                          maxHeight: 120,
+                          overflowY: 'auto',
                         }}
                       >
                         {draft.answer}
@@ -525,8 +555,8 @@ function ChatConsolePage() {
                         </Button>
                       </Stack>
                     </Box>
-                  ))
-                ) : (
+                  );
+                })() : (
                   <Box sx={{ p: 2 }}>
                     <Typography variant="caption" sx={{ color: '#475569' }}>
                       {aiResponses.length > 0 ? '모든 AI 초안이 발송되었습니다' : '대기 중인 AI 초안이 없습니다'}
