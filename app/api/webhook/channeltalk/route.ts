@@ -182,24 +182,32 @@ async function handleMessageCreated(payload: any, refers: any) {
     new Date(new Date(m.created_at).getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10) === todayKST
   );
 
-  // Step 1: 주문번호 감지 → 사방넷 조회
+  // Step 1: 주문번호 감지 → 사방넷 조회 (결과를 LLM 컨텍스트로 전달)
+  let orderContext = '';
   const order = pickPrimaryOrder(fullCustomerText);
   if (order) {
     console.log(`🔍 주문번호 감지: ${order.orderNumber} (${order.mall})`);
     try {
       const result = await lookupOrderBySabangnet(order.orderNumber);
-      const reply = formatOrderReply(result);
-      await recordAndSend(session.id, msgRow?.id, userChatId, reply, {
-        model: 'order-lookup',
-        prompt: fullCustomerText,
-        confidence: 1.0,
-        category: '주문조회',
-        escalate: false,
-        reason: `${order.mall} 주문번호 자동조회`,
-      });
-      return;
+      if (result.found) {
+        const product = result.productName + (result.optionName ? ` (${result.optionName})` : '');
+        const tracking = result.courier && result.trackingNumber
+          ? `택배사: ${result.courier}, 송장번호: ${result.trackingNumber}`
+          : '송장 미등록';
+        orderContext = [
+          `[사방넷 주문조회 결과]`,
+          `주문번호: ${result.orderNumber}`,
+          `상품: ${product}`,
+          `주문상태: ${result.status}`,
+          `배송정보: ${tracking}`,
+          result.itemCount && result.itemCount > 1 ? `총 ${result.itemCount}건 주문` : '',
+        ].filter(Boolean).join('\n');
+      } else {
+        orderContext = `[사방넷 주문조회 결과]\n주문번호 ${order.orderNumber}: 조회 결과 없음 (번호 확인 필요)`;
+      }
     } catch (err) {
-      console.warn('사방넷 조회 실패, LLM으로 넘김:', err);
+      console.warn('사방넷 조회 실패:', err);
+      orderContext = `[사방넷 주문조회 결과]\n주문번호 ${order.orderNumber}: 조회 실패 (시스템 오류)`;
     }
   }
 
@@ -209,7 +217,7 @@ async function handleMessageCreated(payload: any, refers: any) {
     return;
   }
 
-  // Step 3: LLM 호출 (대화 이력 + 인삿말 여부 전달)
+  // Step 3: LLM 호출 (대화 이력 + 주문정보 + 인삿말 여부 전달)
   try {
     // 이전 대화 맥락 구성 (최근 10건)
     const recentHistory = msgList.slice(-10).map(m => {
@@ -219,6 +227,7 @@ async function handleMessageCreated(payload: any, refers: any) {
 
     const contextParts: string[] = [];
     if (recentHistory) contextParts.push(`[대화 이력]\n${recentHistory}`);
+    if (orderContext) contextParts.push(orderContext);
     if (hasRepliedToday) contextParts.push('[오늘 이미 답변한 적 있음 — 인삿말 생략]');
 
     const llm = await generate(fullCustomerText, contextParts.join('\n\n'));
