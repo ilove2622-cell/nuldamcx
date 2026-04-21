@@ -22,6 +22,10 @@ import {
   Close as CloseIcon,
   CheckCircle as CheckCircleIcon,
   Replay as ReplayIcon,
+  PhotoCamera as PhotoCameraIcon,
+  Videocam as VideocamIcon,
+  AttachFile as AttachFileIcon,
+  OpenInNew as OpenInNewIcon,
 } from '@mui/icons-material';
 
 // ─── 타입 ───
@@ -620,7 +624,8 @@ function ChatConsolePage() {
                             </Stack>
                             <Typography variant="body2" component="div" sx={{ whiteSpace: 'pre-wrap', fontSize: '0.85rem', color: isCustomer ? '#fef3c7' : '#e2e8f0' }}>
                               {msg.text.split('\n').map((line: string, i: number) => {
-                                const imgMatch = line.match(/^\[image:(.*)\]$/);
+                                // 공개 URL 이미지
+                                const imgMatch = line.match(/^\[image:(https?:\/\/.+)\]$/);
                                 if (imgMatch) {
                                   return (
                                     <Box
@@ -630,6 +635,74 @@ function ChatConsolePage() {
                                       onClick={() => setImageModalUrl(imgMatch[1])}
                                       sx={{ maxWidth: '100%', maxHeight: 200, borderRadius: 1, mt: 0.5, cursor: 'pointer', '&:hover': { opacity: 0.85 } }}
                                     />
+                                  );
+                                }
+                                // 채널톡 private 사진: [photo:chatId:fileId:dims:name]
+                                const photoMatch = line.match(/^\[photo:([^:]*):([^:]*):([^:]*):([^\]]*)\]$/);
+                                if (photoMatch) {
+                                  const [, chatId, , dims, name] = photoMatch;
+                                  const deskUrl = `https://desk.channel.io/#/channels/35237/user_chats/${chatId}`;
+                                  return (
+                                    <Box key={i} onClick={() => window.open(deskUrl, '_blank')} sx={{
+                                      mt: 0.5, p: 1.2, borderRadius: 1.5, cursor: 'pointer',
+                                      bgcolor: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)',
+                                      display: 'flex', alignItems: 'center', gap: 1,
+                                      '&:hover': { bgcolor: 'rgba(59,130,246,0.15)' },
+                                    }}>
+                                      <PhotoCameraIcon sx={{ fontSize: 28, color: '#60a5fa' }} />
+                                      <Box sx={{ flex: 1 }}>
+                                        <Typography variant="caption" sx={{ color: '#93c5fd', fontWeight: 600, display: 'block' }}>
+                                          사진 첨부{dims ? ` (${dims})` : ''}
+                                        </Typography>
+                                        {name && <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.65rem' }}>{name}</Typography>}
+                                      </Box>
+                                      <OpenInNewIcon sx={{ fontSize: 16, color: '#64748b' }} />
+                                    </Box>
+                                  );
+                                }
+                                // 채널톡 private 동영상: [video:chatId:fileId:dur:name]
+                                const videoMatch = line.match(/^\[video:([^:]*):([^:]*):([^:]*):([^\]]*)\]$/);
+                                if (videoMatch) {
+                                  const [, chatId, , dur, name] = videoMatch;
+                                  const deskUrl = `https://desk.channel.io/#/channels/35237/user_chats/${chatId}`;
+                                  return (
+                                    <Box key={i} onClick={() => window.open(deskUrl, '_blank')} sx={{
+                                      mt: 0.5, p: 1.2, borderRadius: 1.5, cursor: 'pointer',
+                                      bgcolor: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)',
+                                      display: 'flex', alignItems: 'center', gap: 1,
+                                      '&:hover': { bgcolor: 'rgba(139,92,246,0.15)' },
+                                    }}>
+                                      <VideocamIcon sx={{ fontSize: 28, color: '#a78bfa' }} />
+                                      <Box sx={{ flex: 1 }}>
+                                        <Typography variant="caption" sx={{ color: '#c4b5fd', fontWeight: 600, display: 'block' }}>
+                                          동영상 첨부{dur ? ` (${dur})` : ''}
+                                        </Typography>
+                                        {name && <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.65rem' }}>{name}</Typography>}
+                                      </Box>
+                                      <OpenInNewIcon sx={{ fontSize: 16, color: '#64748b' }} />
+                                    </Box>
+                                  );
+                                }
+                                // 채널톡 private 파일: [file:chatId:fileId:size:name]
+                                const fileMatch = line.match(/^\[file:([^:]*):([^:]*):([^:]*):([^\]]*)\]$/);
+                                if (fileMatch) {
+                                  const [, chatId, , size, name] = fileMatch;
+                                  const deskUrl = `https://desk.channel.io/#/channels/35237/user_chats/${chatId}`;
+                                  return (
+                                    <Box key={i} onClick={() => window.open(deskUrl, '_blank')} sx={{
+                                      mt: 0.5, p: 1.2, borderRadius: 1.5, cursor: 'pointer',
+                                      bgcolor: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
+                                      display: 'flex', alignItems: 'center', gap: 1,
+                                      '&:hover': { bgcolor: 'rgba(255,255,255,0.08)' },
+                                    }}>
+                                      <AttachFileIcon sx={{ fontSize: 24, color: '#94a3b8' }} />
+                                      <Box sx={{ flex: 1 }}>
+                                        <Typography variant="caption" sx={{ color: '#cbd5e1', fontWeight: 600, display: 'block' }}>
+                                          {name || '첨부파일'}{size ? ` (${size})` : ''}
+                                        </Typography>
+                                      </Box>
+                                      <OpenInNewIcon sx={{ fontSize: 16, color: '#64748b' }} />
+                                    </Box>
                                   );
                                 }
                                 return <span key={i}>{line}{i < msg.text.split('\n').length - 1 ? '\n' : ''}</span>;

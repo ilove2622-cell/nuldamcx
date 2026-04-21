@@ -319,18 +319,22 @@ function extractText(message: any): string {
 
   // files 배열 처리 (push 이벤트 등에서 이미지/파일이 files로 전달됨)
   const files = message.files || [];
+  const chatId = message.chatId || message.userChatId || '';
   for (const f of files) {
     if (f.type === 'image') {
-      // 공개 URL이 있으면 사용, 없으면 placeholder
       const url = f.url || '';
       if (url && !url.includes('pri-file')) {
         parts.push(`[image:${url}]`);
       } else {
-        const dims = f.width && f.height ? ` ${f.width}x${f.height}` : '';
-        parts.push(`[사진 첨부${dims}]`);
+        const dims = f.width && f.height ? `${f.width}x${f.height}` : '';
+        parts.push(`[photo:${chatId}:${f.id || ''}:${dims}:${f.name || ''}]`);
       }
+    } else if (f.type === 'video' || f.contentType?.startsWith('video/')) {
+      const dur = f.duration ? `${Math.round(f.duration)}초` : '';
+      parts.push(`[video:${chatId}:${f.id || ''}:${dur}:${f.name || ''}]`);
     } else {
-      parts.push(`[파일: ${f.name || '첨부파일'}]`);
+      const size = f.size ? `${(f.size / 1024).toFixed(0)}KB` : '';
+      parts.push(`[file:${chatId}:${f.id || ''}:${size}:${f.name || '첨부파일'}]`);
     }
   }
 
