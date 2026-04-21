@@ -111,7 +111,7 @@ async function handleMessageCreated(payload: any, refers: any) {
 
   // 텍스트 추출
   const personType = message.personType;
-  const text = extractText(message);
+  const text = await extractText(message);
   if (!text) return;
 
   // 봇/매니저 메시지는 기록만 하고 자동응답 플로우는 타지 않음
@@ -298,7 +298,7 @@ function normalizeChannelType(raw: string | undefined | null): string {
   return 'native'; // 채널톡
 }
 
-function extractText(message: any): string {
+async function extractText(message: any): Promise<string> {
   // blocks 배열에서 text + 이미지/파일 추출
   const blocks = message.blocks || [];
   const parts: string[] = [];
@@ -321,17 +321,23 @@ function extractText(message: any): string {
   const files = message.files || [];
   const chatId = message.chatId || message.userChatId || '';
   for (const f of files) {
+    // Supabase Storage에 업로드 시도
+    const publicUrl = await tryUploadToStorage(f, chatId);
+
     if (f.type === 'image') {
-      const url = f.url || '';
-      if (url && !url.includes('pri-file')) {
-        parts.push(`[image:${url}]`);
+      if (publicUrl) {
+        parts.push(`[image:${publicUrl}]`);
       } else {
         const dims = f.width && f.height ? `${f.width}x${f.height}` : '';
         parts.push(`[photo:${chatId}:${f.id || ''}:${dims}:${f.name || ''}]`);
       }
     } else if (f.type === 'video' || f.contentType?.startsWith('video/')) {
-      const dur = f.duration ? `${Math.round(f.duration)}초` : '';
-      parts.push(`[video:${chatId}:${f.id || ''}:${dur}:${f.name || ''}]`);
+      if (publicUrl) {
+        parts.push(`[video-url:${publicUrl}]`);
+      } else {
+        const dur = f.duration ? `${Math.round(f.duration)}초` : '';
+        parts.push(`[video:${chatId}:${f.id || ''}:${dur}:${f.name || ''}]`);
+      }
     } else {
       const size = f.size ? `${(f.size / 1024).toFixed(0)}KB` : '';
       parts.push(`[file:${chatId}:${f.id || ''}:${size}:${f.name || '첨부파일'}]`);
@@ -344,6 +350,53 @@ function extractText(message: any): string {
   if (message.plainText) return message.plainText.trim();
 
   return '';
+}
+
+/** 채널톡 파일을 Supabase Storage에 업로드. 성공 시 공개 URL 반환, 실패 시 null */
+async function tryUploadToStorage(file: any, chatId: string): Promise<string | null> {
+  if (!file.bucket || !file.key) return null;
+
+  const ext = file.name?.split('.').pop() || (file.type === 'video' ? 'mp4' : 'jpg');
+  const storagePath = `${chatId || 'unknown'}/${file.id || Date.now()}.${ext}`;
+
+  // 여러 URL 패턴으로 다운로드 시도
+  const urls = [
+    `https://${file.bucket}/${file.key}`,
+    `https://${file.bucket}/${file.key}.${ext}`,
+  ];
+
+  for (const url of urls) {
+    try {
+      const res = await fetch(url, { redirect: 'follow' });
+      if (!res.ok) continue;
+
+      const buffer = Buffer.from(await res.arrayBuffer());
+      if (buffer.length < 100) continue; // 너무 작으면 에러 응답
+
+      const { error } = await supabase.storage
+        .from('chat-images')
+        .upload(storagePath, buffer, {
+          contentType: file.contentType || 'application/octet-stream',
+          upsert: true,
+        });
+
+      if (error) {
+        console.warn(`Storage 업로드 실패:`, error.message);
+        continue;
+      }
+
+      const { data: urlData } = supabase.storage
+        .from('chat-images')
+        .getPublicUrl(storagePath);
+
+      console.log(`✅ 파일 업로드 성공: ${storagePath}`);
+      return urlData.publicUrl;
+    } catch (err: any) {
+      console.warn(`파일 다운로드 시도 실패 (${url}):`, err.message);
+    }
+  }
+
+  return null;
 }
 
 async function getOrCreateSession(userChatId: string, refers: any, message?: any) {

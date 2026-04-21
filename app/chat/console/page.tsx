@@ -640,46 +640,66 @@ function ChatConsolePage() {
                                 // 채널톡 private 사진: [photo:chatId:fileId:dims:name]
                                 const photoMatch = line.match(/^\[photo:([^:]*):([^:]*):([^:]*):([^\]]*)\]$/);
                                 if (photoMatch) {
-                                  const [, chatId, , dims, name] = photoMatch;
-                                  const deskUrl = `https://desk.channel.io/#/channels/35237/user_chats/${chatId}`;
+                                  const [, pChatId, pFileId, dims] = photoMatch;
+                                  const proxyUrl = `/api/chat/file-proxy?chatId=${pChatId}&fileId=${pFileId}`;
+                                  const deskUrl = `https://desk.channel.io/#/channels/35237/user_chats/${pChatId}`;
                                   return (
-                                    <Box key={i} onClick={() => window.open(deskUrl, '_blank')} sx={{
-                                      mt: 0.5, p: 1.2, borderRadius: 1.5, cursor: 'pointer',
-                                      bgcolor: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)',
-                                      display: 'flex', alignItems: 'center', gap: 1,
-                                      '&:hover': { bgcolor: 'rgba(59,130,246,0.15)' },
-                                    }}>
-                                      <PhotoCameraIcon sx={{ fontSize: 28, color: '#60a5fa' }} />
-                                      <Box sx={{ flex: 1 }}>
-                                        <Typography variant="caption" sx={{ color: '#93c5fd', fontWeight: 600, display: 'block' }}>
-                                          사진 첨부{dims ? ` (${dims})` : ''}
-                                        </Typography>
-                                        {name && <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.65rem' }}>{name}</Typography>}
+                                    <Box key={i} sx={{ mt: 0.5 }}>
+                                      <Box
+                                        component="img"
+                                        src={proxyUrl}
+                                        onClick={() => setImageModalUrl(proxyUrl)}
+                                        onError={(e: any) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
+                                        sx={{ maxWidth: '100%', maxHeight: 200, borderRadius: 1, cursor: 'pointer', display: 'block', '&:hover': { opacity: 0.85 } }}
+                                      />
+                                      <Box onClick={() => window.open(deskUrl, '_blank')} sx={{
+                                        display: 'none', p: 1.2, borderRadius: 1.5, cursor: 'pointer',
+                                        bgcolor: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)',
+                                        alignItems: 'center', gap: 1, '&:hover': { bgcolor: 'rgba(59,130,246,0.15)' },
+                                      }}>
+                                        <PhotoCameraIcon sx={{ fontSize: 28, color: '#60a5fa' }} />
+                                        <Box sx={{ flex: 1 }}>
+                                          <Typography variant="caption" sx={{ color: '#93c5fd', fontWeight: 600 }}>
+                                            사진 첨부{dims ? ` (${dims})` : ''} — 클릭하여 채널톡에서 보기
+                                          </Typography>
+                                        </Box>
+                                        <OpenInNewIcon sx={{ fontSize: 16, color: '#64748b' }} />
                                       </Box>
-                                      <OpenInNewIcon sx={{ fontSize: 16, color: '#64748b' }} />
                                     </Box>
+                                  );
+                                }
+                                // 재생 가능한 동영상: [video-url:URL]
+                                const videoUrlMatch = line.match(/^\[video-url:(https?:\/\/.+)\]$/);
+                                if (videoUrlMatch) {
+                                  return (
+                                    <Box key={i} component="video" controls src={videoUrlMatch[1]}
+                                      sx={{ maxWidth: '100%', maxHeight: 240, borderRadius: 1, mt: 0.5 }} />
                                   );
                                 }
                                 // 채널톡 private 동영상: [video:chatId:fileId:dur:name]
                                 const videoMatch = line.match(/^\[video:([^:]*):([^:]*):([^:]*):([^\]]*)\]$/);
                                 if (videoMatch) {
-                                  const [, chatId, , dur, name] = videoMatch;
-                                  const deskUrl = `https://desk.channel.io/#/channels/35237/user_chats/${chatId}`;
+                                  const [, vChatId, vFileId, dur, name] = videoMatch;
+                                  const proxyUrl = `/api/chat/file-proxy?chatId=${vChatId}&fileId=${vFileId}`;
+                                  const deskUrl = `https://desk.channel.io/#/channels/35237/user_chats/${vChatId}`;
                                   return (
-                                    <Box key={i} onClick={() => window.open(deskUrl, '_blank')} sx={{
-                                      mt: 0.5, p: 1.2, borderRadius: 1.5, cursor: 'pointer',
-                                      bgcolor: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)',
-                                      display: 'flex', alignItems: 'center', gap: 1,
-                                      '&:hover': { bgcolor: 'rgba(139,92,246,0.15)' },
-                                    }}>
-                                      <VideocamIcon sx={{ fontSize: 28, color: '#a78bfa' }} />
-                                      <Box sx={{ flex: 1 }}>
-                                        <Typography variant="caption" sx={{ color: '#c4b5fd', fontWeight: 600, display: 'block' }}>
-                                          동영상 첨부{dur ? ` (${dur})` : ''}
-                                        </Typography>
-                                        {name && <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.65rem' }}>{name}</Typography>}
+                                    <Box key={i} sx={{ mt: 0.5 }}>
+                                      <Box component="video" controls src={proxyUrl}
+                                        onError={(e: any) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
+                                        sx={{ maxWidth: '100%', maxHeight: 240, borderRadius: 1, display: 'block' }} />
+                                      <Box onClick={() => window.open(deskUrl, '_blank')} sx={{
+                                        display: 'none', p: 1.2, borderRadius: 1.5, cursor: 'pointer',
+                                        bgcolor: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)',
+                                        alignItems: 'center', gap: 1, '&:hover': { bgcolor: 'rgba(139,92,246,0.15)' },
+                                      }}>
+                                        <VideocamIcon sx={{ fontSize: 28, color: '#a78bfa' }} />
+                                        <Box sx={{ flex: 1 }}>
+                                          <Typography variant="caption" sx={{ color: '#c4b5fd', fontWeight: 600 }}>
+                                            동영상{dur ? ` (${dur})` : ''}{name ? ` — ${name}` : ''} — 클릭하여 채널톡에서 보기
+                                          </Typography>
+                                        </Box>
+                                        <OpenInNewIcon sx={{ fontSize: 16, color: '#64748b' }} />
                                       </Box>
-                                      <OpenInNewIcon sx={{ fontSize: 16, color: '#64748b' }} />
                                     </Box>
                                   );
                                 }
