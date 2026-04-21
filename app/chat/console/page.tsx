@@ -394,8 +394,8 @@ function ChatConsolePage() {
                             maxWidth: '65%',
                             px: 1.5, py: 1,
                             borderRadius: 2,
-                            bgcolor: isCustomer ? 'rgba(255,255,255,0.06)' : 'rgba(59,130,246,0.12)',
-                            border: isCustomer ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(59,130,246,0.25)',
+                            bgcolor: isCustomer ? 'rgba(251,191,36,0.10)' : 'rgba(59,130,246,0.12)',
+                            border: isCustomer ? '1px solid rgba(251,191,36,0.25)' : '1px solid rgba(59,130,246,0.25)',
                           }}>
                             <Stack direction="row" spacing={0.5} alignItems="center" mb={0.3}>
                               {isCustomer
@@ -411,8 +411,14 @@ function ChatConsolePage() {
                                 {format(new Date(msg.created_at), 'HH:mm')}
                               </Typography>
                             </Stack>
-                            <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', fontSize: '0.85rem' }}>
-                              {msg.text}
+                            <Typography variant="body2" component="div" sx={{ whiteSpace: 'pre-wrap', fontSize: '0.85rem', color: isCustomer ? '#fef3c7' : '#e2e8f0' }}>
+                              {msg.text.split('\n').map((line: string, i: number) => {
+                                const imgMatch = line.match(/^\[image:(.*)\]$/);
+                                if (imgMatch) {
+                                  return <Box key={i} component="img" src={imgMatch[1]} sx={{ maxWidth: '100%', maxHeight: 200, borderRadius: 1, mt: 0.5 }} />;
+                                }
+                                return <span key={i}>{line}{i < msg.text.split('\n').length - 1 ? '\n' : ''}</span>;
+                              })}
                             </Typography>
                           </Box>
                         </Box>

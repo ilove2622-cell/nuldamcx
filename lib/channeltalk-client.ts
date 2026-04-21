@@ -89,6 +89,17 @@ export async function addNote(userChatId: string, text: string) {
   }
 }
 
+/** 유저챗 정보 조회 (채널 유형 등) */
+export async function getUserChat(userChatId: string): Promise<any> {
+  const res = await fetch(`${BASE_URL}/user-chats/${userChatId}`, {
+    method: 'GET',
+    headers: authHeaders(),
+  });
+  if (!res.ok) return null;
+  const json = await res.json();
+  return json.userChat || null;
+}
+
 /** 웹훅 HMAC-SHA256 서명 검증 */
 export function verifyWebhookSignature(rawBody: string, signature: string): boolean {
   if (!WEBHOOK_TOKEN || !signature) return false;

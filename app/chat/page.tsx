@@ -359,110 +359,98 @@ export default function ChatDashboardPage() {
                   {/* 확장 상세 */}
                   <Collapse in={isExpanded} onClick={(e) => e.stopPropagation()}>
                     <Box sx={{ mt: 2, pt: 2, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                      {/* 메시지 타임라인 */}
+                      {/* 통합 대화 타임라인 */}
                       <Typography variant="caption" sx={{ color: '#64748b', mb: 1, display: 'block' }}>
-                        메시지 타임라인
+                        대화 타임라인
                       </Typography>
-                      <Stack spacing={1} sx={{ mb: 2, maxHeight: 300, overflowY: 'auto' }}>
-                        {expandedMessages.map((msg) => (
-                          <Box
-                            key={msg.id}
-                            sx={{
-                              display: 'flex',
-                              justifyContent: msg.sender === 'customer' ? 'flex-start' : 'flex-end',
-                            }}
-                          >
-                            <Box
-                              sx={{
-                                maxWidth: '70%',
-                                px: 1.5, py: 0.8,
-                                borderRadius: 2,
-                                bgcolor: msg.sender === 'customer'
-                                  ? 'rgba(255,255,255,0.06)'
-                                  : 'rgba(59,130,246,0.15)',
-                                border: msg.sender === 'customer'
-                                  ? '1px solid rgba(255,255,255,0.08)'
-                                  : '1px solid rgba(59,130,246,0.3)',
-                              }}
-                            >
-                              <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mb: 0.3 }}>
-                                {msg.sender === 'customer' ? '고객' : msg.sender === 'bot' ? 'AI 봇' : '상담사'}
-                                {' '}
-                                {format(new Date(msg.created_at), 'HH:mm:ss')}
-                              </Typography>
-                              <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', fontSize: '0.85rem' }}>
-                                {msg.text}
-                              </Typography>
-                            </Box>
-                          </Box>
-                        ))}
-                        {expandedMessages.length === 0 && (
-                          <Typography variant="caption" sx={{ color: '#475569' }}>메시지 없음</Typography>
-                        )}
-                      </Stack>
+                      <Stack spacing={1} sx={{ mb: 2, maxHeight: 400, overflowY: 'auto' }}>
+                        {(() => {
+                          const timeline: Array<
+                            | { type: 'message'; data: Message }
+                            | { type: 'ai'; data: AIResponse }
+                          > = [
+                            ...expandedMessages.map(m => ({ type: 'message' as const, data: m })),
+                            ...expandedAI.map(a => ({ type: 'ai' as const, data: a })),
+                          ].sort((a, b) => new Date(a.data.created_at).getTime() - new Date(b.data.created_at).getTime());
 
-                      {/* AI 응답 상세 */}
-                      {expandedAI.length > 0 && (
-                        <>
-                          <Typography variant="caption" sx={{ color: '#64748b', mb: 1, display: 'block' }}>
-                            AI 응답 내역
-                          </Typography>
-                          <Stack spacing={1}>
-                            {expandedAI.map((ai) => (
-                              <Box
-                                key={ai.id}
-                                sx={{
-                                  p: 1.5,
-                                  borderRadius: 1.5,
-                                  bgcolor: 'rgba(139,92,246,0.06)',
-                                  border: '1px solid rgba(139,92,246,0.15)',
-                                }}
-                              >
-                                <Stack direction="row" spacing={1} alignItems="center" mb={0.5}>
-                                  <Chip
-                                    label={ai.category}
-                                    size="small"
-                                    sx={{ bgcolor: 'rgba(139,92,246,0.15)', color: '#a78bfa', fontSize: '0.7rem' }}
-                                  />
-                                  <Chip
-                                    label={`${(ai.confidence * 100).toFixed(0)}%`}
-                                    size="small"
+                          if (timeline.length === 0) {
+                            return <Typography variant="caption" sx={{ color: '#475569' }}>메시지 없음</Typography>;
+                          }
+
+                          return timeline.map((item) => {
+                            if (item.type === 'message') {
+                              const msg = item.data as Message;
+                              const isCustomer = msg.sender === 'customer';
+                              return (
+                                <Box key={`msg-${msg.id}`} sx={{ display: 'flex', justifyContent: isCustomer ? 'flex-start' : 'flex-end' }}>
+                                  <Box
                                     sx={{
-                                      bgcolor: `${confidenceColor(ai.confidence)}22`,
-                                      color: confidenceColor(ai.confidence),
-                                      fontWeight: 700,
-                                      fontSize: '0.7rem',
+                                      maxWidth: '70%',
+                                      px: 1.5, py: 0.8,
+                                      borderRadius: 2,
+                                      bgcolor: isCustomer ? 'rgba(251,191,36,0.10)' : 'rgba(59,130,246,0.15)',
+                                      border: isCustomer ? '1px solid rgba(251,191,36,0.25)' : '1px solid rgba(59,130,246,0.3)',
                                     }}
-                                  />
-                                  <Chip
-                                    label={ai.mode}
-                                    size="small"
-                                    variant="outlined"
-                                    sx={{ color: ai.mode === 'live' ? '#10b981' : '#f59e0b', borderColor: ai.mode === 'live' ? '#10b981' : '#f59e0b', fontSize: '0.65rem' }}
-                                  />
-                                  {ai.sent_at && (
-                                    <Chip label="발송됨" size="small" sx={{ bgcolor: 'rgba(16,185,129,0.15)', color: '#10b981', fontSize: '0.65rem' }} />
-                                  )}
-                                  {ai.escalate && (
-                                    <Chip label="에스컬레이션" size="small" sx={{ bgcolor: 'rgba(239,68,68,0.15)', color: '#ef4444', fontSize: '0.65rem' }} />
-                                  )}
-                                  <Typography variant="caption" sx={{ color: '#64748b', ml: 'auto' }}>
-                                    {format(new Date(ai.created_at), 'HH:mm:ss')}
-                                  </Typography>
-                                </Stack>
-                                <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', fontSize: '0.83rem', color: '#cbd5e1' }}>
-                                  {ai.answer}
-                                </Typography>
-                                {ai.reason && (
-                                  <Typography variant="caption" sx={{ color: '#64748b', mt: 0.5, display: 'block' }}>
-                                    사유: {ai.reason}
-                                  </Typography>
-                                )}
-                              </Box>
-                            ))}
-                          </Stack>
-                        </>
-                      )}
+                                  >
+                                    <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mb: 0.3 }}>
+                                      {isCustomer ? '고객' : msg.sender === 'bot' ? (
+                                        <><SmartToyIcon sx={{ fontSize: 12, mr: 0.3, verticalAlign: 'middle' }} />AI 봇</>
+                                      ) : (
+                                        <><HeadsetMicIcon sx={{ fontSize: 12, mr: 0.3, verticalAlign: 'middle' }} />상담사</>
+                                      )}
+                                      {' '}{format(new Date(msg.created_at), 'HH:mm:ss')}
+                                    </Typography>
+                                    <Typography variant="body2" component="div" sx={{ whiteSpace: 'pre-wrap', fontSize: '0.85rem', color: isCustomer ? '#fef3c7' : '#e2e8f0' }}>
+                                      {msg.text.split('\n').map((line: string, i: number) => {
+                                        const imgMatch = line.match(/^\[image:(.*)\]$/);
+                                        if (imgMatch) {
+                                          return <Box key={i} component="img" src={imgMatch[1]} sx={{ maxWidth: '100%', maxHeight: 200, borderRadius: 1, mt: 0.5 }} />;
+                                        }
+                                        return <span key={i}>{line}{i < msg.text.split('\n').length - 1 ? '\n' : ''}</span>;
+                                      })}
+                                    </Typography>
+                                  </Box>
+                                </Box>
+                              );
+                            } else {
+                              const ai = item.data as AIResponse;
+                              return (
+                                <Box key={`ai-${ai.id}`} sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                                  <Box
+                                    sx={{
+                                      maxWidth: '70%',
+                                      px: 1.5, py: 0.8,
+                                      borderRadius: 2,
+                                      bgcolor: 'rgba(139,92,246,0.10)',
+                                      border: '1px solid rgba(139,92,246,0.25)',
+                                    }}
+                                  >
+                                    <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mb: 0.3 }}>
+                                      <SmartToyIcon sx={{ fontSize: 12, mr: 0.3, verticalAlign: 'middle' }} />
+                                      AI 초안 {format(new Date(ai.created_at), 'HH:mm:ss')}
+                                    </Typography>
+                                    <Stack direction="row" spacing={0.5} flexWrap="wrap" sx={{ mb: 0.5 }}>
+                                      <Chip label={ai.category} size="small" sx={{ bgcolor: 'rgba(139,92,246,0.15)', color: '#a78bfa', fontSize: '0.65rem', height: 20 }} />
+                                      <Chip label={`${(ai.confidence * 100).toFixed(0)}%`} size="small" sx={{ bgcolor: `${confidenceColor(ai.confidence)}22`, color: confidenceColor(ai.confidence), fontWeight: 700, fontSize: '0.65rem', height: 20 }} />
+                                      <Chip label={ai.mode} size="small" variant="outlined" sx={{ color: ai.mode === 'live' ? '#10b981' : '#f59e0b', borderColor: ai.mode === 'live' ? '#10b981' : '#f59e0b', fontSize: '0.6rem', height: 20 }} />
+                                      {ai.sent_at && <Chip label="발송됨" size="small" sx={{ bgcolor: 'rgba(16,185,129,0.15)', color: '#10b981', fontSize: '0.6rem', height: 20 }} />}
+                                      {ai.escalate && <Chip label="에스컬레이션" size="small" sx={{ bgcolor: 'rgba(239,68,68,0.15)', color: '#ef4444', fontSize: '0.6rem', height: 20 }} />}
+                                    </Stack>
+                                    <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', fontSize: '0.83rem', color: '#cbd5e1' }}>
+                                      {ai.answer}
+                                    </Typography>
+                                    {ai.reason && (
+                                      <Typography variant="caption" sx={{ color: '#64748b', mt: 0.5, display: 'block' }}>
+                                        사유: {ai.reason}
+                                      </Typography>
+                                    )}
+                                  </Box>
+                                </Box>
+                              );
+                            }
+                          });
+                        })()}
+                      </Stack>
 
                       {/* 콘솔 이동 */}
                       <Box sx={{ mt: 2, textAlign: 'right' }}>

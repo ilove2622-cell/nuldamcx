@@ -22,12 +22,16 @@ export async function GET() {
 
   try {
     const sb = createClient(url!, serviceKey!);
-    const { data: sessions, error: sErr } = await sb.from('chat_sessions').select('*').limit(5);
+    const { data: sessions, error: sErr } = await sb.from('chat_sessions').select('*').order('id', { ascending: false }).limit(10);
     results.sessionsCount = sessions?.length ?? 0;
     results.sessionsError = sErr?.message;
     results.sessions = sessions;
 
-    const { data: ai, error: aErr } = await sb.from('ai_responses').select('*').limit(5);
+    const { data: ai, error: aErr } = await sb.from('ai_responses').select('*').order('id', { ascending: false }).limit(10);
+    const { data: msgs, error: msErr } = await sb.from('chat_messages').select('*').order('id', { ascending: false }).limit(10);
+    results.messagesCount = msgs?.length ?? 0;
+    results.messages = msgs;
+    results.messagesError = msErr?.message;
     results.aiCount = ai?.length ?? 0;
     results.aiError = aErr?.message;
   } catch (e: any) {

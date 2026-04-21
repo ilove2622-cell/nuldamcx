@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import {
   verifyWebhookSignature,
   sendMessage,
+  getUserChat,
 } from '@/lib/channeltalk-client';
 import { pickPrimaryOrder } from '@/lib/order-parser';
 import { lookupOrderBySabangnet, formatOrderReply } from '@/lib/sabangnet-order-lookup';
@@ -37,12 +38,21 @@ export async function POST(req: NextRequest) {
   const event = payload.event;
   const refers = payload.refers || {};
 
+  // 웹훅 수신 로그 기록
+  try {
+    await supabase.from('webhook_logs').insert({
+      event,
+      signature_ok: false,
+      body_preview: rawBody.slice(0, 500),
+    });
+  } catch { /* ignore */ }
+
   // 서명 검증: push 이벤트는 채널톡 내부 서명 방식이 다르므로 channelId로 검증
   const sigOk = verifyWebhookSignature(rawBody, signature);
   const isChannelTok = payload.entity?.channelId === CHANNEL_ID;
 
   if (!sigOk && !isChannelTok) {
-    console.warn(`⚠️ 웹훅 검증 실패 — event: ${event}`);
+    console.warn(`⚠️ 웹훅 검증 실패 — event: ${event}, channelId=${payload.entity?.channelId}, expected=${CHANNEL_ID}`);
     return NextResponse.json({ ok: true });
   }
 
@@ -52,7 +62,6 @@ export async function POST(req: NextRequest) {
     if (event === 'userChat.created') {
       await handleChatCreated(payload, refers);
     } else if (event === 'message.created' || event === 'push') {
-      // 채널톡은 push 이벤트로 메시지를 전달
       await handleMessageCreated(payload, refers);
     } else {
       console.log(`⏩ 미처리 이벤트: ${event}`);
@@ -100,13 +109,24 @@ async function handleMessageCreated(payload: any, refers: any) {
   const userChatId = message.chatId || message.userChatId;
   if (!userChatId) return;
 
-  // 봇/매니저 메시지 무시 — 고객 메시지만 처리
-  const personType = message.personType;
-  if (personType !== 'user') return;
-
   // 텍스트 추출
+  const personType = message.personType;
   const text = extractText(message);
   if (!text) return;
+
+  // 봇/매니저 메시지는 기록만 하고 자동응답 플로우는 타지 않음
+  if (personType !== 'user') {
+    const session = await getOrCreateSession(userChatId, refers, message);
+    const sender = personType === 'bot' ? 'bot' : 'agent';
+    await supabase.from('chat_messages').insert({
+      session_id: session.id,
+      sender,
+      message_id: message.id,
+      text,
+    });
+    console.log(`💬 ${sender} 메시지 기록 [${userChatId}]: ${text.slice(0, 80)}`);
+    return;
+  }
 
   console.log(`💬 고객 메시지 수신 [${userChatId}]: ${text.slice(0, 80)}...`);
 
@@ -114,7 +134,7 @@ async function handleMessageCreated(payload: any, refers: any) {
   const session = await getOrCreateSession(userChatId, refers, message);
 
   // 고객 메시지 DB 기록
-  const { data: msgRow } = await supabase
+  const { data: msgRow, error: msgErr } = await supabase
     .from('chat_messages')
     .insert({
       session_id: session.id,
@@ -124,6 +144,8 @@ async function handleMessageCreated(payload: any, refers: any) {
     })
     .select('id')
     .single();
+
+  if (msgErr) console.error(`❌ 메시지 저장 실패:`, msgErr.message);
 
   // ─── 플로우 시작 ───
 
@@ -197,13 +219,34 @@ async function handleMessageCreated(payload: any, refers: any) {
 
 // ─── 헬퍼 함수들 ───
 
+/** 채널 유형을 카카오톡/네이버톡톡/채널톡 3가지로 정규화 */
+function normalizeChannelType(raw: string | undefined | null): string {
+  if (!raw) return 'native';
+  if (raw.includes('Kakao') || raw.includes('kakao')) return 'appKakao';
+  if (raw.includes('Naver') || raw.includes('naver')) return 'appNaverTalk';
+  return 'native'; // 채널톡
+}
+
 function extractText(message: any): string {
-  // blocks 배열에서 text 추출
+  // blocks 배열에서 text + 이미지/파일 추출
   const blocks = message.blocks || [];
-  const texts = blocks
-    .filter((b: any) => b.type === 'text')
-    .map((b: any) => b.value || '');
-  if (texts.length > 0) return texts.join('\n').trim();
+  const parts: string[] = [];
+
+  for (const b of blocks) {
+    if (b.type === 'text' && b.value) {
+      parts.push(b.value);
+    } else if (b.type === 'image' || b.type === 'file') {
+      const url = b.url || b.value || '';
+      const name = b.filename || b.name || '';
+      if (url) {
+        parts.push(b.type === 'image' ? `[image:${url}]` : `[file:${name || url}]`);
+      }
+    } else if (b.type === 'button' && b.value) {
+      parts.push(`[버튼: ${b.value}]`);
+    }
+  }
+
+  if (parts.length > 0) return parts.join('\n').trim();
 
   // plainText 폴백
   if (message.plainText) return message.plainText.trim();
@@ -212,27 +255,60 @@ function extractText(message: any): string {
 }
 
 async function getOrCreateSession(userChatId: string, refers: any, message?: any) {
-  const { data: existing } = await supabase
+  const { data: existing, error: findErr } = await supabase
     .from('chat_sessions')
-    .select('id')
+    .select('id, channel_type')
     .eq('user_chat_id', userChatId)
     .single();
 
-  if (existing) return existing;
+  if (existing) {
+    // 기존 세션의 channel_type이 부정확하면 API로 갱신
+    if (!['appKakao', 'appNaverTalk', 'native'].includes(existing.channel_type)) {
+      try {
+        const chatInfo = await getUserChat(userChatId);
+        const rawType = chatInfo?.source?.appMessenger?.mediumType || chatInfo?.source?.medium?.mediumType;
+        const normalized = normalizeChannelType(rawType);
+        if (normalized !== existing.channel_type) {
+          await supabase.from('chat_sessions').update({ channel_type: normalized }).eq('id', existing.id);
+        }
+      } catch { /* ignore */ }
+    }
+    return existing;
+  }
+  if (findErr) console.log(`세션 조회 결과: ${findErr.message} (정상 — 새 세션 생성)`);
 
-  const { data: created } = await supabase
+  // push 이벤트에서는 refers가 비어있으므로, 채널톡 API로 채팅 정보 조회
+  let channelType = 'native';
+  let customerName = refers.user?.profile?.name || null;
+  try {
+    const chatInfo = await getUserChat(userChatId);
+    const rawType = chatInfo?.source?.appMessenger?.mediumType || chatInfo?.source?.medium?.mediumType;
+    channelType = normalizeChannelType(rawType);
+    if (!customerName && chatInfo?.name) customerName = chatInfo.name;
+  } catch { /* ignore */ }
+
+  const insertData = {
+    user_chat_id: userChatId,
+    channel_type: channelType,
+    customer_id: refers.user?.id || message?.personId || null,
+    customer_name: customerName,
+    status: 'open',
+    opened_at: new Date().toISOString(),
+  };
+  console.log(`📝 세션 생성 시도:`, JSON.stringify(insertData));
+
+  const { data: created, error: insertErr } = await supabase
     .from('chat_sessions')
-    .insert({
-      user_chat_id: userChatId,
-      channel_type: refers.userChat?.source?.appType || message?.chatType || 'native',
-      customer_id: refers.user?.id || message?.personId || null,
-      customer_name: refers.user?.profile?.name || null,
-      status: 'open',
-      opened_at: new Date().toISOString(),
-    })
+    .insert(insertData)
     .select('id')
     .single();
 
+  if (insertErr) {
+    console.error(`❌ 세션 생성 실패:`, insertErr.message, insertErr.details, insertErr.hint);
+    throw new Error(`세션 생성 실패: ${insertErr.message}`);
+  }
+
+  console.log(`✅ 세션 생성 완료: id=${created!.id}`);
   return created!;
 }
 

@@ -53,7 +53,7 @@ export async function POST(req: Request) {
 
         let referenceText = '';
         if (matchedScripts && matchedScripts.length > 0) {
-          referenceText = matchedScripts.map((script: any, index: number) => 
+          referenceText = matchedScripts.map((script: any, index: number) =>
             `[참고 스크립트 ${index + 1}: ${script.title}]\n${script.content}`
           ).join('\n\n');
           console.log(`🔍 DB 검색 결과: ${matchedScripts.length}개의 스크립트 발견!`);
@@ -62,21 +62,39 @@ export async function POST(req: Request) {
           console.log(`🔍 DB 검색 결과: 일치하는 스크립트 없음.`);
         }
 
+        // 과거 상담 사례 RAG (동일 embedding 재사용)
+        let conversationRef = '';
+        const { data: matchedConvos } = await supabase.rpc('match_conversations', {
+          query_embedding: queryEmbedding,
+          match_threshold: 0.4,
+          match_count: 2,
+        });
+        if (matchedConvos && matchedConvos.length > 0) {
+          conversationRef = matchedConvos
+            .map((c: any, idx: number) =>
+              `[과거 유사 상담 ${idx + 1}]\n고객: ${c.customer_text}\n상담사: ${c.manager_response}`
+            )
+            .join('\n\n');
+          console.log(`🔍 과거 상담 사례: ${matchedConvos.length}건 발견!`);
+        }
+
         const systemInstruction = `
           너는 'Nuldam' 브랜드의 전문적이고 친절한 고객지원(CX) 상담원이야.
           반드시 제공된 [참고 스크립트]의 정책과 내용을 바탕으로 고객의 [문의 내용]에 대한 답변 초안을 작성해줘.
+          [과거 유사 상담 사례]가 있으면 상담사의 응대 톤과 방식을 참고해.
           답변은 고객에게 바로 보낼 수 있는 형태의 정중한 존댓말을 사용하고, 불필요한 서론은 생략해.
           인사말은 "안녕하세요, Suggest the better 널 담입니다." 로 시작해야해.
         `;
 
-        const model = genAI.getGenerativeModel({ 
+        const model = genAI.getGenerativeModel({
           model: 'gemini-2.5-flash',
-          systemInstruction: systemInstruction 
+          systemInstruction: systemInstruction
         });
 
         const prompt = `
           [참고 스크립트]
           ${referenceText}
+          ${conversationRef ? `\n[과거 유사 상담 사례]\n${conversationRef}` : ''}
 
           [고객 문의 내용]
           ${inquiryContent}

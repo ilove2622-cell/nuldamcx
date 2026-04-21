@@ -88,6 +88,21 @@ export async function generate(
         referenceText = '일치하는 안내 스크립트가 없습니다. 일반적인 CS 기준으로 친절하게 답변해주세요.';
       }
 
+      // 1-b. 과거 상담 사례 RAG (동일 embedding 재사용)
+      let conversationRef = '';
+      const { data: matchedConvos } = await supabase.rpc('match_conversations', {
+        query_embedding: queryEmbedding,
+        match_threshold: 0.4,
+        match_count: 2,
+      });
+      if (matchedConvos && matchedConvos.length > 0) {
+        conversationRef = matchedConvos
+          .map((c: any, idx: number) =>
+            `[과거 유사 상담 ${idx + 1}]\n고객: ${c.customer_text}\n상담사: ${c.manager_response}`
+          )
+          .join('\n\n');
+      }
+
       // 2. Generate
       const model = genAI.getGenerativeModel({
         model: 'gemini-2.5-flash',
@@ -97,6 +112,7 @@ export async function generate(
       const prompt = [
         '[참고 스크립트]',
         referenceText,
+        conversationRef ? `\n[과거 유사 상담 사례]\n${conversationRef}` : '',
         context ? `\n[추가 맥락]\n${context}` : '',
         `\n[고객 메시지]\n${customerMessage}`,
       ].join('\n');
