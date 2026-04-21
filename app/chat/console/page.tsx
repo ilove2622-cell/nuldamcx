@@ -100,9 +100,8 @@ function ChatConsolePage() {
   const [aiResponses, setAiResponses] = useState<AIResponse[]>([]);
   const [messagesLoading, setMessagesLoading] = useState(false);
 
-  // AI 초안 편집/발송
-  const [editingDraftId, setEditingDraftId] = useState<number | null>(null);
-  const [editText, setEditText] = useState('');
+  // 자유 메시지 입력
+  const [freeText, setFreeText] = useState('');
   const [sending, setSending] = useState(false);
   const [escalating, setEscalating] = useState(false);
   const [escalateReason, setEscalateReason] = useState('');
@@ -176,8 +175,8 @@ function ChatConsolePage() {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // ─── 발송 ───
-  const handleSend = async (aiResponse: AIResponse, text?: string) => {
+  // ─── AI 초안 승인 발송 ───
+  const handleSend = async (aiResponse: AIResponse) => {
     if (!activeSession) return;
     setSending(true);
     try {
@@ -186,13 +185,34 @@ function ChatConsolePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userChatId: activeSession.user_chat_id,
-          text: text || aiResponse.answer,
+          text: aiResponse.answer,
           aiResponseId: aiResponse.id,
         }),
       });
       if (!res.ok) throw new Error(await res.text());
-      setEditingDraftId(null);
-      setEditText('');
+      await fetchChat(activeSession.id);
+    } catch (err) {
+      alert(`발송 실패: ${err}`);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  // ─── 자유 메시지 발송 ───
+  const handleFreeSend = async () => {
+    if (!activeSession || !freeText.trim()) return;
+    setSending(true);
+    try {
+      const res = await fetch('/api/chat/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userChatId: activeSession.user_chat_id,
+          text: freeText,
+        }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      setFreeText('');
       await fetchChat(activeSession.id);
     } catch (err) {
       alert(`발송 실패: ${err}`);
@@ -455,38 +475,22 @@ function ChatConsolePage() {
                         )}
                       </Stack>
 
-                      {/* 초안 텍스트 or 편집 모드 */}
-                      {editingDraftId === draft.id ? (
-                        <TextField
-                          fullWidth
-                          multiline
-                          minRows={2}
-                          maxRows={6}
-                          value={editText}
-                          onChange={(e) => setEditText(e.target.value)}
-                          sx={{
-                            mb: 1,
-                            '& .MuiOutlinedInput-root': { color: '#f8fafc', bgcolor: 'rgba(255,255,255,0.04)' },
-                            '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(139,92,246,0.3)' },
-                          }}
-                        />
-                      ) : (
-                        <Typography
-                          variant="body2"
-                          sx={{
-                            whiteSpace: 'pre-wrap',
-                            bgcolor: 'rgba(255,255,255,0.03)',
-                            border: '1px solid rgba(255,255,255,0.06)',
-                            borderRadius: 1.5,
-                            p: 1.5,
-                            mb: 1,
-                            fontSize: '0.85rem',
-                            color: '#cbd5e1',
-                          }}
-                        >
-                          {draft.answer}
-                        </Typography>
-                      )}
+                      {/* 초안 텍스트 */}
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          whiteSpace: 'pre-wrap',
+                          bgcolor: 'rgba(255,255,255,0.03)',
+                          border: '1px solid rgba(255,255,255,0.06)',
+                          borderRadius: 1.5,
+                          p: 1.5,
+                          mb: 1,
+                          fontSize: '0.85rem',
+                          color: '#cbd5e1',
+                        }}
+                      >
+                        {draft.answer}
+                      </Typography>
 
                       {draft.reason && (
                         <Typography variant="caption" sx={{ color: '#64748b', mb: 1, display: 'block' }}>
@@ -501,42 +505,24 @@ function ChatConsolePage() {
                           variant="contained"
                           startIcon={sending ? <CircularProgress size={14} /> : <SendIcon />}
                           disabled={sending}
-                          onClick={() => {
-                            if (editingDraftId === draft.id) {
-                              handleSend(draft, editText);
-                            } else {
-                              handleSend(draft);
-                            }
-                          }}
+                          onClick={() => handleSend(draft)}
                           sx={{
                             bgcolor: '#3b82f6',
                             '&:hover': { bgcolor: '#2563eb' },
                             textTransform: 'none',
                           }}
                         >
-                          {editingDraftId === draft.id ? '수정 후 발송' : '승인 발송'}
+                          승인 발송
                         </Button>
-                        {editingDraftId !== draft.id && (
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            startIcon={<EditIcon />}
-                            onClick={() => { setEditingDraftId(draft.id); setEditText(draft.answer); }}
-                            sx={{ color: '#f59e0b', borderColor: '#f59e0b', textTransform: 'none' }}
-                          >
-                            수정
-                          </Button>
-                        )}
-                        {editingDraftId === draft.id && (
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            onClick={() => { setEditingDraftId(null); setEditText(''); }}
-                            sx={{ color: '#94a3b8', borderColor: 'rgba(255,255,255,0.15)', textTransform: 'none' }}
-                          >
-                            취소
-                          </Button>
-                        )}
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          startIcon={<EditIcon />}
+                          onClick={() => setFreeText(draft.answer)}
+                          sx={{ color: '#f59e0b', borderColor: '#f59e0b', textTransform: 'none' }}
+                        >
+                          초안 복사
+                        </Button>
                       </Stack>
                     </Box>
                   ))
@@ -547,6 +533,49 @@ function ChatConsolePage() {
                     </Typography>
                   </Box>
                 )}
+
+                {/* 메시지 입력란 */}
+                <Box sx={{ px: 2, py: 1.5, borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+                  <Stack direction="row" spacing={1} alignItems="flex-end">
+                    <TextField
+                      size="small"
+                      fullWidth
+                      multiline
+                      minRows={1}
+                      maxRows={4}
+                      placeholder="메시지를 입력하세요... (Ctrl+Enter로 발송)"
+                      value={freeText}
+                      onChange={(e) => setFreeText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && e.ctrlKey) {
+                          e.preventDefault();
+                          handleFreeSend();
+                        }
+                      }}
+                      sx={{
+                        '& .MuiOutlinedInput-root': { color: '#f8fafc', bgcolor: 'rgba(255,255,255,0.04)' },
+                        '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.1)' },
+                        '& .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(59,130,246,0.4)' },
+                        '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#3b82f6' },
+                      }}
+                    />
+                    <Button
+                      variant="contained"
+                      startIcon={sending ? <CircularProgress size={14} /> : <SendIcon />}
+                      disabled={sending || !freeText.trim()}
+                      onClick={handleFreeSend}
+                      sx={{
+                        bgcolor: '#3b82f6',
+                        '&:hover': { bgcolor: '#2563eb' },
+                        textTransform: 'none',
+                        whiteSpace: 'nowrap',
+                        minWidth: 80,
+                      }}
+                    >
+                      발송
+                    </Button>
+                  </Stack>
+                </Box>
 
                 {/* 에스컬레이션 패널 */}
                 <Box sx={{ px: 2, py: 1.5, borderTop: '1px solid rgba(255,255,255,0.04)' }}>
