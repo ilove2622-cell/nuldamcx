@@ -22,6 +22,11 @@ export async function GET(req: Request) {
     // 고객/배송
     'ORDER_ID', 'USER_NAME', 'RECEIVE_NAME', 'USER_TEL', 'RECEIVE_TEL',
     'RECEIVE_ZIPCODE', 'RECEIVE_ADDR', 'INVOICE_NO',
+    // 주문/배송 상태
+    'ORDER_STATUS',      // 주문상태 코드
+    'DELV_STATUS',       // 배송상태 코드
+    'DELIVERY_METHOD',   // 택배사
+    'DELIVERY_COMPANY',  // 택배사 (대안 필드)
     // 상품 (한 주문에 여러 ITEM이 분리되어 내려옴)
     'PRODUCT_ID',        // 자체상품코드
     'MALL_PRODUCT_ID',   // 쇼핑몰상품코드

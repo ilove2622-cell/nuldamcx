@@ -14,11 +14,12 @@ export interface OrderLookupResult {
   status?: string;          // 신규/출고대기/출고완료/배송중/배송완료
   courier?: string;
   trackingNumber?: string;
+  receiverName?: string;
+  receiverAddr?: string;
   itemCount?: number;
 }
 
 // 사방넷 주문상태 코드 → 한글 매핑 (사방넷 표준)
-// 정확한 코드는 사방넷 응답에서 확인 후 보정 필요
 const STATUS_MAP: Record<string, string> = {
   '001': '신규주문',
   '002': '주문확인',
@@ -31,9 +32,15 @@ const STATUS_MAP: Record<string, string> = {
 };
 
 function normalizeStatus(raw: string | undefined): string {
-  if (!raw) return '확인 중';
+  if (!raw) return '';
   const trimmed = String(raw).trim();
   return STATUS_MAP[trimmed] || trimmed;
+}
+
+/** 송장번호로 배송 상태 추정 */
+function inferDeliveryStatus(invoiceNo: string | undefined): string {
+  if (!invoiceNo || !String(invoiceNo).trim()) return '출고 전';
+  return '출고완료(송장등록)';
 }
 
 // 운송장 번호 포맷팅 (4자리씩 끊기)
@@ -65,18 +72,21 @@ export async function lookupOrderBySabangnet(
     const xmlText = await res.text();
     const parser = new XMLParser({ ignoreAttributes: true, isArray: (name) => name === 'DATA' });
     const parsed = parser.parse(xmlText);
+
+    // TOTAL_COUNT 확인
+    const totalCount = Number(parsed?.SABANG_ORDER_LIST?.HEADER?.TOTAL_COUNT) || 0;
     const dataList = parsed?.SABANG_ORDER_LIST?.DATA;
 
-    if (!dataList || dataList.length === 0) {
+    if (totalCount === 0 || !dataList || dataList.length === 0) {
       return { found: false, orderNumber: orderId };
     }
 
-    const head = dataList[0].ITEM || dataList[0];
+    // DATA 안에 ITEM이 있는 구조 vs DATA에 직접 필드가 있는 구조 모두 처리
+    const items = dataList.map((d: any) => d.ITEM || d);
+    const head = items[0];
 
-    // 상품명 + 옵션 조합 (여러 ITEM 있으면 첫 비-사은품 사용)
-    const mainItem = dataList
-      .map((d: any) => d.ITEM || d)
-      .find((i: any) => !i.GIFT_NAME || !String(i.GIFT_NAME).trim()) || head;
+    // 상품명 + 옵션 조합 (사은품이 아닌 첫 아이템 사용)
+    const mainItem = items.find((i: any) => !i.GIFT_NAME || !String(i.GIFT_NAME).trim()) || head;
 
     const productName = mainItem.P_PRODUCT_NAME || mainItem.PRODUCT_NAME || '';
     const optionName = mainItem.SKU_VALUE || '';
@@ -86,9 +96,11 @@ export async function lookupOrderBySabangnet(
       orderNumber: orderId,
       productName: String(productName).trim(),
       optionName: String(optionName).trim(),
-      status: normalizeStatus(head.ORDER_STATUS || head.DELV_STATUS),
-      courier: head.DELIVERY_METHOD || head.DELIVERY_COMPANY || '',
+      status: normalizeStatus(head.ORDER_STATUS || head.DELV_STATUS) || inferDeliveryStatus(head.INVOICE_NO),
+      courier: String(head.DELIVERY_METHOD || head.DELIVERY_COMPANY || '').trim(),
       trackingNumber: formatTrackingNumber(head.INVOICE_NO),
+      receiverName: String(head.RECEIVE_NAME || '').trim(),
+      receiverAddr: String(head.RECEIVE_ADDR || '').trim(),
       itemCount: dataList.length,
     };
   } catch (err: any) {

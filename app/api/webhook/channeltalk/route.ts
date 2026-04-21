@@ -193,10 +193,14 @@ async function handleMessageCreated(payload: any, refers: any) {
         const product = result.productName + (result.optionName ? ` (${result.optionName})` : '');
         const tracking = result.courier && result.trackingNumber
           ? `택배사: ${result.courier}, 송장번호: ${result.trackingNumber}`
-          : '송장 미등록';
+          : result.trackingNumber
+            ? `송장번호: ${result.trackingNumber}`
+            : '송장 미등록';
         orderContext = [
           `[사방넷 주문조회 결과]`,
           `주문번호: ${result.orderNumber}`,
+          `수신자: ${result.receiverName || '미확인'}`,
+          `배송지: ${result.receiverAddr || '미확인'}`,
           `상품: ${product}`,
           `주문상태: ${result.status}`,
           `배송정보: ${tracking}`,
