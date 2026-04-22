@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
+import { supabase } from '@/lib/supabase';
 
 import {
   Box, Container, Typography, Button, Card, CardContent, Stack,
@@ -136,10 +137,15 @@ export default function ChatDashboardPage() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // 30초 자동 갱신
+  // Supabase Realtime 구독 (DB 변경 시 즉시 갱신)
   useEffect(() => {
-    const iv = setInterval(fetchData, 30000);
-    return () => clearInterval(iv);
+    const channel = supabase
+      .channel('dashboard-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_sessions' }, () => fetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ai_responses' }, () => fetchData())
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'escalations' }, () => fetchData())
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
   }, [fetchData]);
 
   // KPI 계산
@@ -311,7 +317,7 @@ export default function ChatDashboardPage() {
               />
 
               <Typography variant="caption" sx={{ color: '#64748b' }}>
-                {filtered.length}건 / 30초 자동 갱신
+                {filtered.length}건 / 실시간 갱신
               </Typography>
             </Stack>
           </CardContent>

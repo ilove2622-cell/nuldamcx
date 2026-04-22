@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { supabase } from '@/lib/supabase';
 
 import {
   Box, Typography, Button, Stack, Chip, IconButton, TextField,
@@ -189,7 +190,19 @@ function ChatConsolePage() {
   const fetchSessions = useCallback(async () => {
     try {
       const data = await fetch('/api/chat/sessions?days=7').then(r => r.json());
-      setSessions(Array.isArray(data) ? data : []);
+      const newSessions: Session[] = Array.isArray(data) ? data : [];
+      setSessions(prev => {
+        // 내용이 동일하면 이전 state 유지 (리렌더 방지)
+        if (prev.length === newSessions.length) {
+          const same = prev.every((s, i) =>
+            s.id === newSessions[i].id &&
+            s.status === newSessions[i].status &&
+            s.last_message_at === newSessions[i].last_message_at
+          );
+          if (same) return prev;
+        }
+        return newSessions;
+      });
     } catch (e) {
       console.error('세션 로드 실패:', e);
     }
@@ -197,16 +210,34 @@ function ChatConsolePage() {
   }, []);
 
   // ─── 메시지 & AI 응답 로드 ───
-  const fetchChat = useCallback(async (sessionId: number) => {
-    setMessagesLoading(true);
+  const fetchChat = useCallback(async (sessionId: number, isPolling = false) => {
+    if (!isPolling) setMessagesLoading(true);
     try {
       const res = await fetch(`/api/chat/messages?sessionId=${sessionId}`).then(r => r.json());
-      setMessages(res.messages || []);
-      setAiResponses(res.aiResponses || []);
+      const newMsgs: Message[] = res.messages || [];
+      const newAi: AIResponse[] = res.aiResponses || [];
+      // 폴링 시 마지막 ID가 같으면 이전 state 유지 (깜빡임·스크롤 점프 방지)
+      setMessages(prev => {
+        if (isPolling &&
+            prev.length === newMsgs.length &&
+            prev[prev.length - 1]?.id === newMsgs[newMsgs.length - 1]?.id) {
+          return prev;
+        }
+        return newMsgs;
+      });
+      setAiResponses(prev => {
+        if (isPolling &&
+            prev.length === newAi.length &&
+            prev[prev.length - 1]?.id === newAi[newAi.length - 1]?.id &&
+            prev[prev.length - 1]?.sent_at === newAi[newAi.length - 1]?.sent_at) {
+          return prev;
+        }
+        return newAi;
+      });
     } catch (e) {
       console.error('채팅 로드 실패:', e);
     }
-    setMessagesLoading(false);
+    if (!isPolling) setMessagesLoading(false);
   }, []);
 
   // 초기 로드
@@ -250,18 +281,28 @@ function ChatConsolePage() {
     }
   }, [activeSessionId, sessions]);
 
-  // 10초 폴링
+  // Supabase Realtime 구독 (DB 변경 시 즉시 갱신)
   useEffect(() => {
-    const iv = setInterval(() => {
-      fetchSessions();
-      if (activeSessionId) fetchChat(activeSessionId);
-    }, 10000);
-    return () => clearInterval(iv);
+    const channel = supabase
+      .channel('console-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_sessions' }, () => fetchSessions())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_messages' }, () => {
+        if (activeSessionId) fetchChat(activeSessionId, true);
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ai_responses' }, () => {
+        if (activeSessionId) fetchChat(activeSessionId, true);
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
   }, [fetchSessions, fetchChat, activeSessionId]);
 
-  // 스크롤 하단 유지
+  // 스크롤: 새 메시지 추가 시에만 하단 이동
+  const prevMsgCountRef = useRef(0);
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (messages.length > prevMsgCountRef.current) {
+      chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+    prevMsgCountRef.current = messages.length;
   }, [messages]);
 
   // ─── AI 초안 승인 발송 ───
@@ -401,7 +442,7 @@ function ChatConsolePage() {
         <IconButton onClick={() => { fetchSessions(); if (activeSessionId) fetchChat(activeSessionId); }} sx={{ color: '#94a3b8' }}>
           <RefreshIcon />
         </IconButton>
-        <Typography variant="caption" sx={{ color: '#475569' }}>10초 자동 갱신</Typography>
+        <Typography variant="caption" sx={{ color: '#475569' }}>실시간 갱신</Typography>
       </Box>
 
       <Box sx={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
@@ -674,31 +715,21 @@ function ChatConsolePage() {
                                 // 채널톡 private 사진: [photo:chatId:fileId:dims:name]
                                 const photoMatch = line.match(/^\[photo:([^:]*):([^:]*):([^:]*):([^\]]*)\]$/);
                                 if (photoMatch) {
-                                  const [, pChatId, pFileId, dims] = photoMatch;
-                                  const proxyUrl = `/api/chat/file-proxy?chatId=${pChatId}&fileId=${pFileId}`;
-                                  const deskUrl = `https://desk.channel.io/#/channels/35237/user_chats/${pChatId}`;
+                                  const [, pChatId, , dims] = photoMatch;
                                   return (
-                                    <Box key={i} sx={{ mt: 0.5 }}>
-                                      <Box
-                                        component="img"
-                                        src={proxyUrl}
-                                        onClick={() => setImageModalUrl(proxyUrl)}
-                                        onError={(e: any) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
-                                        sx={{ maxWidth: '100%', maxHeight: 200, borderRadius: 1, cursor: 'pointer', display: 'block', '&:hover': { opacity: 0.85 } }}
-                                      />
-                                      <Box onClick={() => window.open(deskUrl, '_blank')} sx={{
-                                        display: 'none', p: 1.2, borderRadius: 1.5, cursor: 'pointer',
-                                        bgcolor: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)',
-                                        alignItems: 'center', gap: 1, '&:hover': { bgcolor: 'rgba(59,130,246,0.15)' },
-                                      }}>
-                                        <PhotoCameraIcon sx={{ fontSize: 28, color: '#60a5fa' }} />
-                                        <Box sx={{ flex: 1 }}>
-                                          <Typography variant="caption" sx={{ color: '#93c5fd', fontWeight: 600 }}>
-                                            사진 첨부{dims ? ` (${dims})` : ''} — 클릭하여 채널톡에서 보기
-                                          </Typography>
-                                        </Box>
-                                        <OpenInNewIcon sx={{ fontSize: 16, color: '#64748b' }} />
-                                      </Box>
+                                    <Box key={i} onClick={() => { setShowDeskPanel(true); }} sx={{
+                                      mt: 0.5, p: 1, borderRadius: 1.5, cursor: 'pointer',
+                                      bgcolor: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)',
+                                      display: 'inline-flex', alignItems: 'center', gap: 1,
+                                      '&:hover': { bgcolor: 'rgba(59,130,246,0.15)' },
+                                    }}>
+                                      <PhotoCameraIcon sx={{ fontSize: 22, color: '#60a5fa' }} />
+                                      <Typography variant="caption" sx={{ color: '#93c5fd', fontWeight: 600 }}>
+                                        사진 첨부{dims ? ` (${dims})` : ''}
+                                      </Typography>
+                                      <Typography variant="caption" sx={{ color: '#475569', fontSize: '0.6rem' }}>
+                                        클릭하여 확인
+                                      </Typography>
                                     </Box>
                                   );
                                 }
@@ -713,49 +744,42 @@ function ChatConsolePage() {
                                 // 채널톡 private 동영상: [video:chatId:fileId:dur:name]
                                 const videoMatch = line.match(/^\[video:([^:]*):([^:]*):([^:]*):([^\]]*)\]$/);
                                 if (videoMatch) {
-                                  const [, vChatId, vFileId, dur, name] = videoMatch;
-                                  const proxyUrl = `/api/chat/file-proxy?chatId=${vChatId}&fileId=${vFileId}`;
-                                  const deskUrl = `https://desk.channel.io/#/channels/35237/user_chats/${vChatId}`;
+                                  const [, , , dur, name] = videoMatch;
                                   return (
-                                    <Box key={i} sx={{ mt: 0.5 }}>
-                                      <Box component="video" controls src={proxyUrl}
-                                        onError={(e: any) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
-                                        sx={{ maxWidth: '100%', maxHeight: 240, borderRadius: 1, display: 'block' }} />
-                                      <Box onClick={() => window.open(deskUrl, '_blank')} sx={{
-                                        display: 'none', p: 1.2, borderRadius: 1.5, cursor: 'pointer',
-                                        bgcolor: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)',
-                                        alignItems: 'center', gap: 1, '&:hover': { bgcolor: 'rgba(139,92,246,0.15)' },
-                                      }}>
-                                        <VideocamIcon sx={{ fontSize: 28, color: '#a78bfa' }} />
-                                        <Box sx={{ flex: 1 }}>
-                                          <Typography variant="caption" sx={{ color: '#c4b5fd', fontWeight: 600 }}>
-                                            동영상{dur ? ` (${dur})` : ''}{name ? ` — ${name}` : ''} — 클릭하여 채널톡에서 보기
-                                          </Typography>
-                                        </Box>
-                                        <OpenInNewIcon sx={{ fontSize: 16, color: '#64748b' }} />
-                                      </Box>
+                                    <Box key={i} onClick={() => { setShowDeskPanel(true); }} sx={{
+                                      mt: 0.5, p: 1, borderRadius: 1.5, cursor: 'pointer',
+                                      bgcolor: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)',
+                                      display: 'inline-flex', alignItems: 'center', gap: 1,
+                                      '&:hover': { bgcolor: 'rgba(139,92,246,0.15)' },
+                                    }}>
+                                      <VideocamIcon sx={{ fontSize: 22, color: '#a78bfa' }} />
+                                      <Typography variant="caption" sx={{ color: '#c4b5fd', fontWeight: 600 }}>
+                                        동영상{dur ? ` (${dur})` : ''}{name ? ` ${name}` : ''}
+                                      </Typography>
+                                      <Typography variant="caption" sx={{ color: '#475569', fontSize: '0.6rem' }}>
+                                        클릭하여 확인
+                                      </Typography>
                                     </Box>
                                   );
                                 }
                                 // 채널톡 private 파일: [file:chatId:fileId:size:name]
                                 const fileMatch = line.match(/^\[file:([^:]*):([^:]*):([^:]*):([^\]]*)\]$/);
                                 if (fileMatch) {
-                                  const [, chatId, , size, name] = fileMatch;
-                                  const deskUrl = `https://desk.channel.io/#/channels/35237/user_chats/${chatId}`;
+                                  const [, , , size, name] = fileMatch;
                                   return (
-                                    <Box key={i} onClick={() => window.open(deskUrl, '_blank')} sx={{
-                                      mt: 0.5, p: 1.2, borderRadius: 1.5, cursor: 'pointer',
+                                    <Box key={i} onClick={() => { setShowDeskPanel(true); }} sx={{
+                                      mt: 0.5, p: 1, borderRadius: 1.5, cursor: 'pointer',
                                       bgcolor: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
-                                      display: 'flex', alignItems: 'center', gap: 1,
+                                      display: 'inline-flex', alignItems: 'center', gap: 1,
                                       '&:hover': { bgcolor: 'rgba(255,255,255,0.08)' },
                                     }}>
-                                      <AttachFileIcon sx={{ fontSize: 24, color: '#94a3b8' }} />
-                                      <Box sx={{ flex: 1 }}>
-                                        <Typography variant="caption" sx={{ color: '#cbd5e1', fontWeight: 600, display: 'block' }}>
-                                          {name || '첨부파일'}{size ? ` (${size})` : ''}
-                                        </Typography>
-                                      </Box>
-                                      <OpenInNewIcon sx={{ fontSize: 16, color: '#64748b' }} />
+                                      <AttachFileIcon sx={{ fontSize: 20, color: '#94a3b8' }} />
+                                      <Typography variant="caption" sx={{ color: '#cbd5e1', fontWeight: 600 }}>
+                                        {name || '첨부파일'}{size ? ` (${size})` : ''}
+                                      </Typography>
+                                      <Typography variant="caption" sx={{ color: '#475569', fontSize: '0.6rem' }}>
+                                        클릭하여 확인
+                                      </Typography>
                                     </Box>
                                   );
                                 }
