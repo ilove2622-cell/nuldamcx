@@ -423,6 +423,10 @@ export default function ChatDashboardPage() {
                                         if (imgMatch) {
                                           return <Box key={i} component="img" src={imgMatch[1]} sx={{ maxWidth: '100%', maxHeight: 200, borderRadius: 1, mt: 0.5 }} />;
                                         }
+                                        const videoMatch = line.match(/^\[video-url:(https?:\/\/.+)\]$/);
+                                        if (videoMatch) {
+                                          return <Box key={i} component="video" controls src={videoMatch[1]} sx={{ maxWidth: '100%', maxHeight: 200, borderRadius: 1, mt: 0.5 }} />;
+                                        }
                                         return <span key={i}>{line}{i < msg.text.split('\n').length - 1 ? '\n' : ''}</span>;
                                       })}
                                     </Typography>
