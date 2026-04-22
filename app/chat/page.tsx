@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 
@@ -107,20 +107,31 @@ export default function ChatDashboardPage() {
   const [filterCategory, setFilterCategory] = useState('전체');
   const [search, setSearch] = useState('');
 
+  const isFirstLoad = useRef(true);
+
   const fetchData = useCallback(async () => {
-    setLoading(true);
+    // 최초 로드 시에만 로딩 표시 (폴링 시 깜빡임 방지)
+    if (isFirstLoad.current) setLoading(true);
     try {
       const [sessRes, extraRes] = await Promise.all([
         fetch(`/api/chat/sessions?days=${days}`).then(r => r.json()),
         fetch(`/api/chat/messages?days=${days}`).then(r => r.json()),
       ]);
-      setSessions(Array.isArray(sessRes) ? sessRes : []);
-      setAiResponses(extraRes.aiResponses || []);
-      setEscalations(extraRes.escalations || []);
+      const newSessions = Array.isArray(sessRes) ? sessRes : [];
+      const newAiResponses = extraRes.aiResponses || [];
+      const newEscalations = extraRes.escalations || [];
+
+      // 데이터가 변경된 경우에만 상태 업데이트 (불필요한 리렌더링 방지)
+      setSessions(prev => JSON.stringify(prev) === JSON.stringify(newSessions) ? prev : newSessions);
+      setAiResponses(prev => JSON.stringify(prev) === JSON.stringify(newAiResponses) ? prev : newAiResponses);
+      setEscalations(prev => JSON.stringify(prev) === JSON.stringify(newEscalations) ? prev : newEscalations);
     } catch (e) {
       console.error('데이터 로드 실패:', e);
     }
-    setLoading(false);
+    if (isFirstLoad.current) {
+      setLoading(false);
+      isFirstLoad.current = false;
+    }
   }, [days]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
