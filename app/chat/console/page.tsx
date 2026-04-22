@@ -281,7 +281,7 @@ function ChatConsolePage() {
     }
   }, [activeSessionId, sessions]);
 
-  // Supabase Realtime 구독 (DB 변경 시 즉시 갱신)
+  // Supabase Realtime 구독 + 폴링 fallback
   useEffect(() => {
     const channel = supabase
       .channel('console-realtime')
@@ -293,7 +293,12 @@ function ChatConsolePage() {
         if (activeSessionId) fetchChat(activeSessionId, true);
       })
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    // Realtime 실패 대비 15초 폴링 fallback
+    const iv = setInterval(() => {
+      fetchSessions();
+      if (activeSessionId) fetchChat(activeSessionId, true);
+    }, 15000);
+    return () => { supabase.removeChannel(channel); clearInterval(iv); };
   }, [fetchSessions, fetchChat, activeSessionId]);
 
   // 스크롤: 새 메시지 추가 시에만 하단 이동

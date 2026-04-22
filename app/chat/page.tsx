@@ -137,7 +137,7 @@ export default function ChatDashboardPage() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // Supabase Realtime 구독 (DB 변경 시 즉시 갱신)
+  // Supabase Realtime 구독 + 폴링 fallback
   useEffect(() => {
     const channel = supabase
       .channel('dashboard-realtime')
@@ -145,7 +145,9 @@ export default function ChatDashboardPage() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ai_responses' }, () => fetchData())
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'escalations' }, () => fetchData())
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    // Realtime 실패 대비 60초 폴링 fallback
+    const iv = setInterval(fetchData, 60000);
+    return () => { supabase.removeChannel(channel); clearInterval(iv); };
   }, [fetchData]);
 
   // KPI 계산
