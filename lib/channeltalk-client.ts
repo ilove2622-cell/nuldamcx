@@ -96,6 +96,21 @@ export async function getUserChat(userChatId: string): Promise<any> {
   return json.userChat || null;
 }
 
+/** 채널톡 private 파일의 signed download URL 발급 (15분 유효) */
+export async function getSignedFileUrl(userChatId: string, fileKey: string): Promise<string | null> {
+  try {
+    const res = await fetch(
+      `${BASE_URL}/user-chats/${userChatId}/messages/file?key=${encodeURIComponent(fileKey)}`,
+      { method: 'GET', headers: authHeaders() },
+    );
+    if (!res.ok) return null;
+    const json = await res.json();
+    return json.result || null;
+  } catch {
+    return null;
+  }
+}
+
 /** 웹훅 HMAC-SHA256 서명 검증 */
 export function verifyWebhookSignature(rawBody: string, signature: string): boolean {
   if (!WEBHOOK_TOKEN || !signature) return false;

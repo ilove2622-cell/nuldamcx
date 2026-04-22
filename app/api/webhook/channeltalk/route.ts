@@ -4,6 +4,7 @@ import {
   verifyWebhookSignature,
   sendMessage,
   getUserChat,
+  getSignedFileUrl,
 } from '@/lib/channeltalk-client';
 import { pickPrimaryOrder } from '@/lib/order-parser';
 import { lookupOrderBySabangnet, formatOrderReply } from '@/lib/sabangnet-order-lookup';
@@ -328,15 +329,26 @@ async function extractText(message: any): Promise<string> {
       if (publicUrl) {
         parts.push(`[image:${publicUrl}]`);
       } else {
-        const dims = f.width && f.height ? `${f.width}x${f.height}` : '';
-        parts.push(`[photo:${chatId}:${f.id || ''}:${dims}:${f.name || ''}]`);
+        // Supabase 업로드 실패 → 원본 URL이 있으면 그대로 사용
+        const origUrl = getOriginalFileUrl(f);
+        if (origUrl) {
+          parts.push(`[image:${origUrl}]`);
+        } else {
+          const dims = f.width && f.height ? `${f.width}x${f.height}` : '';
+          parts.push(`[photo:${chatId}:${f.id || ''}:${dims}:${f.name || ''}]`);
+        }
       }
     } else if (f.type === 'video' || f.contentType?.startsWith('video/')) {
       if (publicUrl) {
         parts.push(`[video-url:${publicUrl}]`);
       } else {
-        const dur = f.duration ? `${Math.round(f.duration)}초` : '';
-        parts.push(`[video:${chatId}:${f.id || ''}:${dur}:${f.name || ''}]`);
+        const origUrl = getOriginalFileUrl(f);
+        if (origUrl) {
+          parts.push(`[video-url:${origUrl}]`);
+        } else {
+          const dur = f.duration ? `${Math.round(f.duration)}초` : '';
+          parts.push(`[video:${chatId}:${f.id || ''}:${dur}:${f.name || ''}]`);
+        }
       }
     } else {
       const size = f.size ? `${(f.size / 1024).toFixed(0)}KB` : '';
@@ -354,16 +366,27 @@ async function extractText(message: any): Promise<string> {
 
 /** 채널톡 파일을 Supabase Storage에 업로드. 성공 시 공개 URL 반환, 실패 시 null */
 async function tryUploadToStorage(file: any, chatId: string): Promise<string | null> {
-  if (!file.bucket || !file.key) return null;
-
   const ext = file.name?.split('.').pop() || (file.type === 'video' ? 'mp4' : 'jpg');
   const storagePath = `${chatId || 'unknown'}/${file.id || Date.now()}.${ext}`;
 
-  // 여러 URL 패턴으로 다운로드 시도
-  const urls = [
-    `https://${file.bucket}/${file.key}`,
-    `https://${file.bucket}/${file.key}.${ext}`,
-  ];
+  // 다운로드 가능한 URL 목록 구성 (우선순위순)
+  const urls: string[] = [];
+  // 1. 채널톡 API signed URL (pri-file은 서명 필요)
+  if (file.key && chatId) {
+    const signedUrl = await getSignedFileUrl(chatId, file.key);
+    if (signedUrl) urls.push(signedUrl);
+  }
+  // 2. 파일 객체의 url 필드
+  if (file.url) urls.push(file.url);
+  // 3. 채널톡 CDN 패턴 (pub-file만 작동, pri-file은 403)
+  if (file.key && !file.key.startsWith('pri-')) urls.push(`https://cf.channel.io/${file.key}`);
+  // 4. bucket/key 조합
+  if (file.bucket && file.key && !file.key.startsWith('pri-')) {
+    urls.push(`https://${file.bucket}/${file.key}`);
+    urls.push(`https://${file.bucket}/${file.key}.${ext}`);
+  }
+
+  if (urls.length === 0) return null;
 
   for (const url of urls) {
     try {
@@ -396,6 +419,13 @@ async function tryUploadToStorage(file: any, chatId: string): Promise<string | n
     }
   }
 
+  return null;
+}
+
+/** 채널톡 파일의 원본 URL 추출 (Supabase 업로드 실패 시 fallback용) */
+function getOriginalFileUrl(file: any): string | null {
+  if (file.url) return file.url;
+  if (file.key) return `https://cf.channel.io/${file.key}`;
   return null;
 }
 
