@@ -4,6 +4,7 @@ export interface Session {
   id: number;
   user_chat_id: string;
   channel_type: string;
+  customer_id?: string | null;
   customer_name: string | null;
   status: string;
   opened_at: string;
@@ -68,3 +69,42 @@ export type MessageBlock =
   | { type: 'video-url'; url: string }
   | { type: 'video'; chatId: string; fileId: string; duration: string; name: string }
   | { type: 'file'; chatId: string; fileId: string; size: string; name: string };
+
+// ─── 고객 사이드바 ───
+
+export interface CustomerProfile {
+  id: number;
+  customer_id: string;
+  name: string | null;
+  phone: string | null;
+  email: string | null;
+  member_id: string | null;
+  last_visit: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CustomerTag {
+  id: number;
+  customer_id: string;
+  label: string;
+  category: string;
+  color: string;
+  created_at: string;
+}
+
+export interface SessionNote {
+  id: number;
+  session_id: number;
+  text: string;
+  author: string | null;
+  created_at: string;
+}
+
+export interface FileAttachment {
+  type: 'image' | 'photo' | 'video-url' | 'video' | 'file';
+  name: string;
+  url?: string;
+  messageId: number;
+  createdAt: string;
+}

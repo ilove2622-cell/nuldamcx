@@ -15,6 +15,7 @@ import ChatThread from '@/components/chat/ChatThread';
 import DraftPanel from '@/components/chat/DraftPanel';
 import MessageInput from '@/components/chat/MessageInput';
 import EscalationPanel from '@/components/chat/EscalationPanel';
+import CustomerSidebar from '@/components/chat/CustomerSidebar';
 
 import {
   Box, Typography, Button, Stack, Chip, IconButton, Dialog,
@@ -29,6 +30,7 @@ import {
   CheckCircle as CheckCircleIcon,
   Replay as ReplayIcon,
   OpenInNew as OpenInNewIcon,
+  Person as PersonIcon,
 } from '@mui/icons-material';
 
 // ─── 메인 ───
@@ -96,6 +98,12 @@ function ChatConsolePage() {
   // 채널톡 데스크 패널
   const [showDeskPanel, setShowDeskPanel] = useState(false);
 
+  // 고객 정보 사이드바
+  const [showCustomerSidebar, setShowCustomerSidebar] = useState(() => {
+    if (typeof window !== 'undefined') return localStorage.getItem('console_customerSidebar') === 'true';
+    return false;
+  });
+
   // Realtime 연결 상태
   const [realtimeState, setRealtimeState] = useState<'connected' | 'connecting' | 'disconnected'>('connecting');
 
@@ -113,6 +121,11 @@ function ChatConsolePage() {
   useEffect(() => {
     localStorage.setItem('console_sortKey', sortKey);
   }, [sortKey]);
+
+  // 사이드바 저장
+  useEffect(() => {
+    localStorage.setItem('console_customerSidebar', String(showCustomerSidebar));
+  }, [showCustomerSidebar]);
 
   // ─── 세션 목록 로드 ───
   const fetchSessions = useCallback(async () => {
@@ -477,6 +490,21 @@ function ChatConsolePage() {
                     <Box sx={{ flex: 1 }} />
                     <Button
                       size="small"
+                      variant={showCustomerSidebar ? 'contained' : 'outlined'}
+                      startIcon={<PersonIcon />}
+                      onClick={() => setShowCustomerSidebar(prev => !prev)}
+                      sx={{
+                        textTransform: 'none', fontSize: '0.72rem',
+                        color: showCustomerSidebar ? '#fff' : '#a78bfa',
+                        bgcolor: showCustomerSidebar ? '#7c3aed' : 'transparent',
+                        borderColor: '#7c3aed',
+                        '&:hover': { bgcolor: showCustomerSidebar ? '#6d28d9' : 'rgba(124,58,237,0.1)' },
+                      }}
+                    >
+                      고객정보
+                    </Button>
+                    <Button
+                      size="small"
                       variant={showDeskPanel ? 'contained' : 'outlined'}
                       startIcon={<OpenInNewIcon />}
                       onClick={() => setShowDeskPanel(prev => !prev)}
@@ -532,6 +560,16 @@ function ChatConsolePage() {
                     </Box>
                     <Box key={`desk-${activeSession.user_chat_id}`} component="iframe" src={`https://desk.channel.io/#/channels/35237/user_chats/${activeSession.user_chat_id}`} sx={{ flex: 1, border: 'none', bgcolor: '#fff' }} />
                   </Box>
+                )}
+
+                {/* 고객 정보 사이드바 */}
+                {activeSession && (
+                  <CustomerSidebar
+                    session={activeSession}
+                    messages={messages}
+                    open={showCustomerSidebar}
+                    onToggle={() => setShowCustomerSidebar(prev => !prev)}
+                  />
                 )}
               </Box>
 
