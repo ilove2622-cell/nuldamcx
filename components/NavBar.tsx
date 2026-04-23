@@ -10,6 +10,7 @@ import HeadsetMicIcon from '@mui/icons-material/HeadsetMic';
 import BarChartIcon from '@mui/icons-material/BarChart';
 import HomeIcon from '@mui/icons-material/Home';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import SettingsIcon from '@mui/icons-material/Settings';
 import NavigateNextIcon from '@mui/icons-material/NavigateNext';
 
 const NAV_ITEMS = [
@@ -19,6 +20,7 @@ const NAV_ITEMS = [
   { path: '/chat', label: '채팅상담', icon: <HeadsetMicIcon fontSize="small" /> },
   { path: '/analytics', label: '분석', icon: <TrendingUpIcon fontSize="small" /> },
   { path: '/status', label: '문의현황', icon: <BarChartIcon fontSize="small" /> },
+  { path: '/settings', label: '설정', icon: <SettingsIcon fontSize="small" /> },
 ];
 
 // 경로 → 라벨 매핑
@@ -30,6 +32,7 @@ const BREADCRUMB_MAP: Record<string, string> = {
   '/ocr': 'OCR',
   '/voc': 'VOC',
   '/status': '문의현황',
+  '/settings': '설정',
 };
 
 export default function NavBar() {
