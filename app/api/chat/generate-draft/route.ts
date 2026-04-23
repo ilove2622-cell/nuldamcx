@@ -83,21 +83,43 @@ export async function POST(req: NextRequest) {
 
         if (result.found) {
           const product = result.productName + (result.optionName ? ` (${result.optionName})` : '');
-          const tracking = result.courier && result.trackingNumber
-            ? `택배사: ${result.courier}, 송장번호: ${result.trackingNumber}`
+          const trackingDisplay = result.courier && result.trackingNumber
+            ? `${result.courier} ${result.trackingNumber}`
             : result.trackingNumber
-              ? `송장번호: ${result.trackingNumber}`
+              ? result.trackingNumber
               : '송장 미등록';
+
+          // 택배사 실시간 배송조회
+          let deliveryStatus = '';
+          let deliverySteps = '';
+          if (result.trackingNumber) {
+            try {
+              const courierLower = (result.courier || '').toLowerCase();
+              const carrier = courierLower.includes('cj') || courierLower.includes('대한통운') ? 'cj' : 'lotte';
+              const trackNum = result.trackingNumber.replace(/[-\s]/g, '');
+              const trackRes = await fetch(`https://nuldamcx.vercel.app/api/tracking?carrier=${carrier}&num=${trackNum}`);
+              if (trackRes.ok) {
+                const trackData = await trackRes.json();
+                deliveryStatus = trackData.currentStatus || '';
+                if (trackData.steps && trackData.steps.length > 0) {
+                  const recent = trackData.steps.slice(-3);
+                  deliverySteps = recent.map((s: any) => `${s.date} ${s.location} - ${s.detail || s.step}`).join('\n');
+                }
+              }
+            } catch { /* 조회 실패해도 무시 */ }
+          }
+
           const todayStr = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10).replace(/-/g, '');
           orderContext = [
-            `[사방넷 주문조회 결과]`,
+            `[주문조회 결과]`,
             `주문번호: ${result.orderNumber}`,
             `수신자: ${result.receiverName || '미확인'}`,
             `상품: ${product}`,
-            `주문상태(내부코드): ${result.status}`,
             result.orderDate ? `주문일: ${result.orderDate}` : '',
             result.shipDate ? `출고일: ${result.shipDate}` : '',
-            `배송정보: ${tracking}`,
+            `택배: ${trackingDisplay}`,
+            deliveryStatus ? `[택배사 실시간 배송상태]: ${deliveryStatus}` : '',
+            deliverySteps ? `[최근 배송이력]\n${deliverySteps}` : '',
             `오늘 날짜: ${todayStr}`,
           ].filter(Boolean).join('\n');
         }
