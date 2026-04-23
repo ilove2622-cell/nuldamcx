@@ -22,7 +22,6 @@ import {
   Menu, MenuItem, ListItemIcon, ListItemText, Divider,
 } from '@mui/material';
 import {
-  ArrowBack as ArrowBackIcon,
   HeadsetMic as HeadsetMicIcon,
   Refresh as RefreshIcon,
   Star as StarIcon,
@@ -35,6 +34,10 @@ import {
   ExpandMore as ExpandMoreIcon,
   Snooze as SnoozeIcon,
   PlayArrow as PlayArrowIcon,
+  SmartToy as SmartToyIcon,
+  Warning as WarningIcon,
+  Speed as SpeedIcon,
+  Chat as ChatIcon,
 } from '@mui/icons-material';
 
 // ─── 메인 ───
@@ -113,6 +116,9 @@ function ChatConsolePage() {
   // Realtime 연결 상태
   const [realtimeState, setRealtimeState] = useState<'connected' | 'connecting' | 'disconnected'>('connecting');
 
+  // KPI
+  const [kpi, setKpi] = useState({ totalSessions: 0, totalAI: 0, totalEsc: 0, avgConf: 0 });
+
   // 로컬스토리지 초기화
   useEffect(() => {
     setStarred(getStarredSessions());
@@ -136,7 +142,10 @@ function ChatConsolePage() {
   // ─── 세션 목록 로드 ───
   const fetchSessions = useCallback(async () => {
     try {
-      const data = await fetch('/api/chat/sessions?days=7').then(r => r.json());
+      const [data, extraRes] = await Promise.all([
+        fetch('/api/chat/sessions?days=7').then(r => r.json()),
+        fetch('/api/chat/messages?days=1').then(r => r.json()),
+      ]);
       const newSessions: Session[] = Array.isArray(data) ? data : [];
       setSessions(prev => {
         if (prev.length === newSessions.length) {
@@ -149,6 +158,18 @@ function ChatConsolePage() {
         }
         return newSessions;
       });
+      // KPI 계산 (오늘 기준)
+      const todaySessions = newSessions.filter(s => {
+        const d = new Date(s.created_at);
+        const now = new Date();
+        return d.toDateString() === now.toDateString();
+      });
+      const aiList = extraRes.aiResponses || [];
+      const escList = extraRes.escalations || [];
+      const avgConf = aiList.length > 0
+        ? aiList.reduce((s: number, r: any) => s + (r.confidence || 0), 0) / aiList.length
+        : 0;
+      setKpi({ totalSessions: todaySessions.length, totalAI: aiList.length, totalEsc: escList.length, avgConf });
     } catch (e) {
       console.error('세션 로드 실패:', e);
     }
@@ -458,17 +479,28 @@ function ChatConsolePage() {
     <Box sx={{ height: '100vh', bgcolor: '#0f172a', color: '#f8fafc', display: 'flex', flexDirection: 'column' }}>
       {/* 헤더 */}
       <Box sx={{ px: 2, py: 1, borderBottom: cardBorder, display: 'flex', alignItems: 'center', gap: 1 }}>
-        <IconButton onClick={() => router.push('/chat')} sx={{ color: '#94a3b8' }}>
-          <ArrowBackIcon />
-        </IconButton>
         <HeadsetMicIcon sx={{ color: '#3b82f6' }} />
-        <Typography variant="h6" fontWeight={700}>실시간 상담 콘솔</Typography>
+        <Typography variant="h6" fontWeight={700}>상담 콘솔</Typography>
         <RealtimeStatus state={realtimeState} />
+        {/* KPI 스트립 */}
+        <Stack direction="row" spacing={2} sx={{ ml: 3 }}>
+          {[
+            { label: '오늘 세션', value: kpi.totalSessions, icon: <ChatIcon sx={{ fontSize: 14 }} />, color: '#3b82f6' },
+            { label: 'AI 응답', value: kpi.totalAI, icon: <SmartToyIcon sx={{ fontSize: 14 }} />, color: '#8b5cf6' },
+            { label: '에스컬레이션', value: kpi.totalEsc, icon: <WarningIcon sx={{ fontSize: 14 }} />, color: '#ef4444' },
+            { label: '평균 신뢰도', value: `${(kpi.avgConf * 100).toFixed(0)}%`, icon: <SpeedIcon sx={{ fontSize: 14 }} />, color: kpi.avgConf >= 0.8 ? '#10b981' : kpi.avgConf >= 0.5 ? '#f59e0b' : '#ef4444' },
+          ].map(k => (
+            <Stack key={k.label} direction="row" alignItems="center" spacing={0.5} sx={{ color: '#64748b', fontSize: '0.75rem' }}>
+              <Box sx={{ color: k.color }}>{k.icon}</Box>
+              <Typography variant="caption" sx={{ color: '#64748b' }}>{k.label}</Typography>
+              <Typography variant="caption" sx={{ color: k.color, fontWeight: 700 }}>{k.value}</Typography>
+            </Stack>
+          ))}
+        </Stack>
         <Box sx={{ flex: 1 }} />
         <IconButton onClick={() => { fetchSessions(); if (activeSessionId) fetchChat(activeSessionId); }} sx={{ color: '#94a3b8' }}>
           <RefreshIcon />
         </IconButton>
-        <Typography variant="caption" sx={{ color: '#475569' }}>실시간 갱신</Typography>
       </Box>
 
       <Box sx={{ flex: 1, display: 'flex', overflow: 'hidden' }}>

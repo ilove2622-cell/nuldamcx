@@ -17,7 +17,7 @@ const NAV_ITEMS = [
   { path: '/', label: '홈', icon: <HomeIcon fontSize="small" /> },
   { path: '/ocr', label: 'OCR', icon: <DocumentScannerIcon fontSize="small" /> },
   { path: '/voc', label: 'VOC', icon: <BiotechIcon fontSize="small" /> },
-  { path: '/chat', label: '채팅상담', icon: <HeadsetMicIcon fontSize="small" /> },
+  { path: '/chat/console', label: '채팅상담', icon: <HeadsetMicIcon fontSize="small" /> },
   { path: '/analytics', label: '분석', icon: <TrendingUpIcon fontSize="small" /> },
   { path: '/status', label: '문의현황', icon: <BarChartIcon fontSize="small" /> },
   { path: '/settings', label: '설정', icon: <SettingsIcon fontSize="small" /> },
@@ -26,8 +26,7 @@ const NAV_ITEMS = [
 // 경로 → 라벨 매핑
 const BREADCRUMB_MAP: Record<string, string> = {
   '/': '홈',
-  '/chat': '채팅상담',
-  '/chat/console': '실시간 콘솔',
+  '/chat/console': '채팅상담',
   '/analytics': '분석',
   '/ocr': 'OCR',
   '/voc': 'VOC',
