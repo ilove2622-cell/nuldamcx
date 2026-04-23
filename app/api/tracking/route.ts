@@ -9,8 +9,13 @@ const CARRIER_MAP: Record<string, { id: string; name: string }> = {
   lotte: { id: 'kr.lotte',       name: '롯데택배' },
 };
 
-// 택배사 이름에서 carrier key 추정 (CJ 아니면 롯데)
-function detectCarrier(courierName: string): string {
+// 택배사 판별: 송장번호 앞자리 우선, 그다음 택배사명
+// 현재 기준: 6으로 시작 → CJ대한통운, 2로 시작 → 롯데택배
+function detectCarrier(courierName: string, trackingNum?: string): string {
+  const digits = (trackingNum || '').replace(/[-\s]/g, '');
+  if (digits.startsWith('6')) return 'cj';
+  if (digits.startsWith('2')) return 'lotte';
+  // 송장번호로 판별 불가 시 택배사명으로
   const n = courierName.toLowerCase();
   if (n.includes('롯데')) return 'lotte';
   return 'cj';
@@ -35,11 +40,10 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: 'Missing tracking number' }, { status: 400 });
   }
 
-  // courierName이 있으면 자동 감지
-  if (!carrier && courierName) {
-    carrier = detectCarrier(courierName);
+  // 송장번호 앞자리 + 택배사명으로 자동 감지
+  if (!carrier) {
+    carrier = detectCarrier(courierName, trackingNum);
   }
-  if (!carrier) carrier = 'cj';
 
   const carrierInfo = CARRIER_MAP[carrier] || CARRIER_MAP.cj;
 
