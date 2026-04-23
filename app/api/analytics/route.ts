@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
   const days = Number(req.nextUrl.searchParams.get('days') || '7');
   const since = new Date(Date.now() - days * 86400000).toISOString();
 
-  const [aiRes, escRes, sessRes] = await Promise.all([
+  const [aiRes, escRes, sessRes, inqRes] = await Promise.all([
     supabase
       .from('ai_responses')
       .select('id, confidence, category, escalate, mode, sent_at, created_at')
@@ -25,11 +25,16 @@ export async function GET(req: NextRequest) {
       .from('chat_sessions')
       .select('id, status, channel_type, created_at')
       .gte('created_at', since),
+    supabase
+      .from('inquiries')
+      .select('id, status, channel, inquiry_date, collected_at')
+      .gte('collected_at', since),
   ]);
 
   const aiResponses = aiRes.data || [];
   const escalations = escRes.data || [];
   const sessions = sessRes.data || [];
+  const inquiries = inqRes.data || [];
 
   // 일별 집계
   const dailyMap = new Map<string, {
@@ -84,10 +89,43 @@ export async function GET(req: NextRequest) {
   const escalationRate = totalResponses > 0 ? totalEscalations / totalResponses : 0;
   const sentCount = aiResponses.filter(a => a.sent_at).length;
 
+  // 게시판(inquiries) 통계
+  const inqTotal = inquiries.length;
+  const inqPending = inquiries.filter(i => i.status === '신규' || i.status === '대기').length;
+  const inqSaved = inquiries.filter(i => i.status === '답변저장').length;
+  const inqCompleted = inquiries.filter(i => i.status === '처리완료').length;
+
+  // 게시판 채널 분포
+  const inqChannelMap = new Map<string, number>();
+  for (const i of inquiries) {
+    const ch = i.channel || '기타';
+    inqChannelMap.set(ch, (inqChannelMap.get(ch) || 0) + 1);
+  }
+  const inqChannels = [...inqChannelMap.entries()]
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count);
+
+  // 게시판 일별 추이
+  const inqDailyMap = new Map<string, { date: string; total: number; completed: number }>();
+  for (const i of inquiries) {
+    const dateStr = (i.collected_at || i.inquiry_date || '').slice(0, 10);
+    if (!dateStr) continue;
+    const entry = inqDailyMap.get(dateStr) || { date: dateStr, total: 0, completed: 0 };
+    entry.total++;
+    if (i.status === '처리완료') entry.completed++;
+    inqDailyMap.set(dateStr, entry);
+  }
+  const inqDaily = [...inqDailyMap.values()].sort((a, b) => a.date.localeCompare(b.date));
+
   return NextResponse.json({
     summary: { totalResponses, totalEscalations, avgConfidence, escalationRate, sentCount, totalSessions: sessions.length },
     daily,
     categories,
     channels,
+    board: {
+      summary: { total: inqTotal, pending: inqPending, saved: inqSaved, completed: inqCompleted },
+      channels: inqChannels,
+      daily: inqDaily,
+    },
   });
 }

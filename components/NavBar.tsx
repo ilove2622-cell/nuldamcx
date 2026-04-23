@@ -8,14 +8,14 @@ import DocumentScannerIcon from '@mui/icons-material/DocumentScanner';
 import BiotechIcon from '@mui/icons-material/Biotech';
 import HeadsetMicIcon from '@mui/icons-material/HeadsetMic';
 import BarChartIcon from '@mui/icons-material/BarChart';
-import HomeIcon from '@mui/icons-material/Home';
+import InboxIcon from '@mui/icons-material/Inbox';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import SettingsIcon from '@mui/icons-material/Settings';
 import NavigateNextIcon from '@mui/icons-material/NavigateNext';
 
 const NAV_ITEMS = [
-  { path: '/', label: '홈', icon: <HomeIcon fontSize="small" /> },
   { path: '/chat/console', label: '채팅상담', icon: <HeadsetMicIcon fontSize="small" /> },
+  { path: '/board', label: '게시판', icon: <InboxIcon fontSize="small" /> },
   { path: '/analytics', label: '분석', icon: <TrendingUpIcon fontSize="small" /> },
   { path: '/status', label: '문의현황', icon: <BarChartIcon fontSize="small" /> },
   { path: '/voc', label: 'VOC', icon: <BiotechIcon fontSize="small" /> },
@@ -25,8 +25,8 @@ const NAV_ITEMS = [
 
 // 경로 → 라벨 매핑
 const BREADCRUMB_MAP: Record<string, string> = {
-  '/': '홈',
   '/chat/console': '채팅상담',
+  '/board': '게시판',
   '/analytics': '분석',
   '/ocr': 'OCR',
   '/voc': 'VOC',
@@ -65,7 +65,7 @@ export default function NavBar() {
       <Container maxWidth="xl" sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 1.5, px: { xs: 1.5, sm: 3, lg: 4 }, gap: 1 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0, flexShrink: 1 }}>
           <Box
-            onClick={() => router.push('/')}
+            onClick={() => router.push('/analytics')}
             sx={{ display: 'flex', alignItems: 'baseline', gap: 1, cursor: 'pointer' }}
           >
             <Typography sx={{ fontWeight: 800, letterSpacing: '-1px', fontSize: { xs: '1.1rem', md: '1.5rem' }, whiteSpace: 'nowrap' }}>
@@ -100,7 +100,7 @@ export default function NavBar() {
         </Box>
 
         <Stack direction="row" spacing={{ xs: 0.5, md: 1.5 }} sx={{ flexShrink: 0 }}>
-          {NAV_ITEMS.filter(item => item.path !== '/').map((item) => {
+          {NAV_ITEMS.map((item) => {
             const isActive = pathname === item.path || pathname.startsWith(item.path + '/');
             return (
               <Button

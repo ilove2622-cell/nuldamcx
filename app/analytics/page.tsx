@@ -12,6 +12,10 @@ import {
   Chat as ChatIcon,
   Send as SendIcon,
   TrendingUp as TrendingUpIcon,
+  Inbox as InboxIcon,
+  HourglassEmpty as HourglassIcon,
+  CheckCircle as CheckCircleIcon,
+  Edit as EditIcon,
 } from '@mui/icons-material';
 
 interface DailyData {
@@ -20,6 +24,12 @@ interface DailyData {
   escalations: number;
   avgConfidence: number;
   sent: number;
+}
+
+interface BoardDaily {
+  date: string;
+  total: number;
+  completed: number;
 }
 
 interface AnalyticsData {
@@ -34,6 +44,11 @@ interface AnalyticsData {
   daily: DailyData[];
   categories: Array<{ name: string; count: number }>;
   channels: Array<{ name: string; count: number }>;
+  board?: {
+    summary: { total: number; pending: number; saved: number; completed: number };
+    channels: Array<{ name: string; count: number }>;
+    daily: BoardDaily[];
+  };
 }
 
 const channelLabel = (type: string) => {
@@ -83,8 +98,9 @@ export default function AnalyticsPage() {
 
   if (!data) return null;
 
-  const { summary, daily, categories, channels } = data;
+  const { summary, daily, categories, channels, board } = data;
   const maxResponses = Math.max(...daily.map(d => d.responses), 1);
+  const maxBoardDaily = board ? Math.max(...board.daily.map(d => d.total), 1) : 1;
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: '#0f172a', color: '#f8fafc', py: 3 }}>
@@ -92,7 +108,7 @@ export default function AnalyticsPage() {
         <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
           <Typography variant="h5" fontWeight={700}>
             <TrendingUpIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
-            자동응답 분석
+            종합 분석
           </Typography>
           <Select
             size="small"
@@ -206,7 +222,7 @@ export default function AnalyticsPage() {
         </Stack>
 
         {/* 채널 분포 */}
-        <Card sx={{ ...cardSx }}>
+        <Card sx={{ ...cardSx, mb: 3 }}>
           <CardContent>
             <Typography variant="subtitle2" sx={{ color: '#94a3b8', mb: 2 }}>채널별 세션 수</Typography>
             <Stack direction="row" spacing={3}>
@@ -221,6 +237,111 @@ export default function AnalyticsPage() {
             </Stack>
           </CardContent>
         </Card>
+
+        {/* ─── 게시판 문의 분석 ─── */}
+        {board && (
+          <>
+            <Typography variant="h6" fontWeight={700} sx={{ mb: 2, mt: 1 }}>
+              <InboxIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
+              게시판 문의 분석
+            </Typography>
+
+            {/* 게시판 KPI */}
+            <Stack direction="row" spacing={2} mb={3} flexWrap="wrap" useFlexGap>
+              {[
+                { label: '총 문의', value: board.summary.total, icon: <InboxIcon />, color: '#3b82f6' },
+                { label: '대기/신규', value: board.summary.pending, icon: <HourglassIcon />, color: '#f59e0b' },
+                { label: '답변저장', value: board.summary.saved, icon: <EditIcon />, color: '#8b5cf6' },
+                { label: '처리완료', value: board.summary.completed, icon: <CheckCircleIcon />, color: '#10b981' },
+              ].map(kpi => (
+                <Card key={kpi.label} sx={{ ...cardSx, flex: '1 1 160px', minWidth: 160 }}>
+                  <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
+                    <Typography variant="caption" sx={{ color: '#94a3b8' }}>{kpi.label}</Typography>
+                    <Stack direction="row" justifyContent="space-between" alignItems="center">
+                      <Typography variant="h5" fontWeight={700} sx={{ color: kpi.color }}>{kpi.value}</Typography>
+                      <Box sx={{ color: kpi.color, opacity: 0.3 }}>{kpi.icon}</Box>
+                    </Stack>
+                  </CardContent>
+                </Card>
+              ))}
+            </Stack>
+
+            <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
+              {/* 게시판 일별 추이 */}
+              <Card sx={{ ...cardSx, flex: 2 }}>
+                <CardContent>
+                  <Typography variant="subtitle2" sx={{ color: '#94a3b8', mb: 2 }}>일별 문의 추이</Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: 0.5, height: 160, overflow: 'hidden' }}>
+                    {board.daily.map(d => (
+                      <Box key={d.date} sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.3 }}>
+                        <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.6rem' }}>{d.total}</Typography>
+                        <Box sx={{
+                          width: '100%',
+                          height: `${(d.total / maxBoardDaily) * 120}px`,
+                          minHeight: 4,
+                          bgcolor: '#f59e0b',
+                          borderRadius: '3px 3px 0 0',
+                          position: 'relative',
+                        }}>
+                          {d.completed > 0 && (
+                            <Box sx={{
+                              position: 'absolute',
+                              bottom: 0,
+                              width: '100%',
+                              height: `${(d.completed / d.total) * 100}%`,
+                              bgcolor: '#10b981',
+                            }} />
+                          )}
+                        </Box>
+                        <Typography variant="caption" sx={{ color: '#475569', fontSize: '0.55rem', whiteSpace: 'nowrap' }}>
+                          {d.date.slice(5)}
+                        </Typography>
+                      </Box>
+                    ))}
+                  </Box>
+                  <Stack direction="row" spacing={2} mt={1}>
+                    <Stack direction="row" alignItems="center" spacing={0.5}>
+                      <Box sx={{ width: 10, height: 10, bgcolor: '#f59e0b', borderRadius: 0.5 }} />
+                      <Typography variant="caption" sx={{ color: '#64748b' }}>접수</Typography>
+                    </Stack>
+                    <Stack direction="row" alignItems="center" spacing={0.5}>
+                      <Box sx={{ width: 10, height: 10, bgcolor: '#10b981', borderRadius: 0.5 }} />
+                      <Typography variant="caption" sx={{ color: '#64748b' }}>처리완료</Typography>
+                    </Stack>
+                  </Stack>
+                </CardContent>
+              </Card>
+
+              {/* 게시판 채널 분포 */}
+              <Card sx={{ ...cardSx, flex: 1 }}>
+                <CardContent>
+                  <Typography variant="subtitle2" sx={{ color: '#94a3b8', mb: 2 }}>채널별 문의 수</Typography>
+                  <Stack spacing={1}>
+                    {board.channels.map(ch => {
+                      const maxCount = board.channels[0]?.count || 1;
+                      return (
+                        <Box key={ch.name}>
+                          <Stack direction="row" justifyContent="space-between" mb={0.3}>
+                            <Typography variant="caption" sx={{ color: '#cbd5e1' }}>{ch.name}</Typography>
+                            <Typography variant="caption" sx={{ color: '#64748b' }}>{ch.count}</Typography>
+                          </Stack>
+                          <Box sx={{ height: 6, bgcolor: 'rgba(255,255,255,0.05)', borderRadius: 3, overflow: 'hidden' }}>
+                            <Box sx={{
+                              height: '100%',
+                              width: `${(ch.count / maxCount) * 100}%`,
+                              bgcolor: '#f59e0b',
+                              borderRadius: 3,
+                            }} />
+                          </Box>
+                        </Box>
+                      );
+                    })}
+                  </Stack>
+                </CardContent>
+              </Card>
+            </Stack>
+          </>
+        )}
       </Container>
     </Box>
   );
