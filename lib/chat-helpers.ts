@@ -1,4 +1,5 @@
 import type { MessageBlock } from '@/types/chat';
+import { emojifyText } from '@/lib/emoji-utils';
 
 // ─── 채널 ───
 export const channelLabel = (type: string) => {
@@ -74,7 +75,7 @@ export function toggleStarred(id: number): Set<number> {
 
 // ─── 메시지 블록 파싱 (Phase 3.6) ───
 export function parseMessageBlocks(text: string): MessageBlock[] {
-  const lines = text.split('\n');
+  const lines = emojifyText(text).split('\n');
   const blocks: MessageBlock[] = [];
   let textBuf: string[] = [];
 

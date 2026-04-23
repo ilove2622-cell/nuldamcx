@@ -16,6 +16,7 @@ import {
   shouldForceEscalate,
   hasEscalationKeyword,
 } from '@/lib/escalation';
+import { emojifyText } from '@/lib/emoji-utils';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -426,10 +427,10 @@ async function extractText(message: any): Promise<string> {
     }
   }
 
-  if (parts.length > 0) return parts.join('\n').trim();
+  if (parts.length > 0) return emojifyText(parts.join('\n').trim());
 
   // plainText 폴백
-  if (message.plainText) return message.plainText.trim();
+  if (message.plainText) return emojifyText(message.plainText.trim());
 
   return '';
 }
