@@ -34,42 +34,43 @@ export default function DraftPanel({ aiResponses, selectedDraftIdx, sending, gen
     setShowContextInput(false);
   };
 
-  const contextInput = onGenerate && (
-    <Box sx={{ mt: 1 }}>
-      <Button
-        size="small" variant="text"
-        startIcon={<NoteAddIcon />}
-        onClick={() => setShowContextInput(!showContextInput)}
-        sx={{ color: '#64748b', textTransform: 'none', fontSize: '0.75rem', mb: 0.5 }}
-      >
-        {showContextInput ? '참고 내용 접기' : '참고 내용 추가'}
-      </Button>
-      <Collapse in={showContextInput}>
-        <TextField
-          multiline minRows={2} maxRows={4}
-          placeholder="AI에게 전달할 추가 참고 내용을 입력하세요 (예: 이 건은 이미 환불 처리됨, 교환 불가 상품 등)"
-          value={extraContext}
-          onChange={e => setExtraContext(e.target.value)}
-          fullWidth size="small"
-          sx={{
-            mb: 1,
-            '& .MuiOutlinedInput-root': {
-              bgcolor: 'rgba(255,255,255,0.04)', color: '#cbd5e1', fontSize: '0.8rem',
-              '& fieldset': { borderColor: 'rgba(139,92,246,0.3)' },
-              '&:hover fieldset': { borderColor: 'rgba(139,92,246,0.5)' },
-              '&.Mui-focused fieldset': { borderColor: '#8b5cf6' },
-            },
-            '& .MuiInputBase-input::placeholder': { color: '#475569', opacity: 1 },
-          }}
-        />
-      </Collapse>
-    </Box>
+  const contextToggleBtn = onGenerate && (
+    <Button
+      size="small" variant="text"
+      startIcon={<NoteAddIcon />}
+      onClick={() => setShowContextInput(!showContextInput)}
+      sx={{ color: '#10b981', textTransform: 'none', fontSize: '0.75rem', '&:hover': { bgcolor: 'rgba(16,185,129,0.1)' } }}
+    >
+      {showContextInput ? '참고 접기' : '참고 내용 추가'}
+    </Button>
+  );
+
+  const contextCollapse = onGenerate && (
+    <Collapse in={showContextInput}>
+      <TextField
+        multiline minRows={2} maxRows={4}
+        placeholder="AI에게 전달할 추가 참고 내용을 입력하세요 (예: 이 건은 이미 환불 처리됨, 교환 불가 상품 등)"
+        value={extraContext}
+        onChange={e => setExtraContext(e.target.value)}
+        fullWidth size="small"
+        sx={{
+          mt: 1,
+          '& .MuiOutlinedInput-root': {
+            bgcolor: 'rgba(255,255,255,0.04)', color: '#cbd5e1', fontSize: '0.8rem',
+            '& fieldset': { borderColor: 'rgba(16,185,129,0.3)' },
+            '&:hover fieldset': { borderColor: 'rgba(16,185,129,0.5)' },
+            '&.Mui-focused fieldset': { borderColor: '#10b981' },
+          },
+          '& .MuiInputBase-input::placeholder': { color: '#475569', opacity: 1 },
+        }}
+      />
+    </Collapse>
   );
 
   if (pendingDrafts.length === 0) {
     return (
       <Box sx={{ p: 2 }}>
-        <Stack direction="row" spacing={2} alignItems="center">
+        <Stack direction="row" spacing={1} alignItems="center">
           <Typography variant="caption" sx={{ color: '#475569' }}>
             {aiResponses.length > 0 ? '모든 AI 초안이 발송되었습니다' : '대기 중인 AI 초안이 없습니다'}
           </Typography>
@@ -84,8 +85,9 @@ export default function DraftPanel({ aiResponses, selectedDraftIdx, sending, gen
               {generating ? 'AI 생성 중...' : 'AI 초안 생성'}
             </Button>
           )}
+          {contextToggleBtn}
         </Stack>
-        {contextInput}
+        {contextCollapse}
       </Box>
     );
   }
@@ -177,8 +179,9 @@ export default function DraftPanel({ aiResponses, selectedDraftIdx, sending, gen
             {generating ? '생성 중...' : '새 초안'}
           </Button>
         )}
+        {contextToggleBtn}
       </Stack>
-      {contextInput}
+      {contextCollapse}
     </Box>
   );
 }
