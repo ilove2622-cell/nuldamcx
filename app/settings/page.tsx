@@ -11,6 +11,7 @@ import {
   Schedule as ScheduleIcon,
   SmartToy as SmartToyIcon,
   HeadsetMic as HeadsetMicIcon,
+  TimerOff as TimerOffIcon,
 } from '@mui/icons-material';
 
 // ─── 타입 ───
@@ -206,6 +207,8 @@ function ScheduleCard({ title, icon, config, onChange }: {
 export default function SettingsPage() {
   const [aiSchedule, setAiSchedule] = useState<ScheduleConfig>(defaultSchedule());
   const [humanSchedule, setHumanSchedule] = useState<ScheduleConfig>(defaultSchedule());
+  const [autoCloseEnabled, setAutoCloseEnabled] = useState(false);
+  const [autoCloseHours, setAutoCloseHours] = useState(360); // 15일 = 360시간
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -218,6 +221,10 @@ export default function SettingsPage() {
         const data = await res.json();
         if (data.ai_schedule) setAiSchedule(data.ai_schedule);
         if (data.human_schedule) setHumanSchedule(data.human_schedule);
+        if (data.auto_close) {
+          setAutoCloseEnabled(data.auto_close.enabled ?? false);
+          setAutoCloseHours(data.auto_close.hours ?? 360);
+        }
       } catch (e) {
         console.error('설정 로드 실패:', e);
       }
@@ -236,6 +243,7 @@ export default function SettingsPage() {
         body: JSON.stringify({
           ai_schedule: aiSchedule,
           human_schedule: humanSchedule,
+          auto_close: { enabled: autoCloseEnabled, hours: autoCloseHours },
         }),
       });
       if (!res.ok) throw new Error(await res.text());
@@ -274,6 +282,49 @@ export default function SettingsPage() {
               config={humanSchedule}
               onChange={setHumanSchedule}
             />
+
+            {/* 상담 자동 종료 */}
+            <Box sx={{ border: cardBorder, borderRadius: 2, bgcolor: 'rgba(255,255,255,0.02)', p: 2 }}>
+              <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1.5 }}>
+                <TimerOffIcon sx={{ color: '#f59e0b', fontSize: 22 }} />
+                <Typography sx={{ fontWeight: 700, fontSize: '0.92rem', color: '#e2e8f0' }}>상담 자동 종료</Typography>
+              </Stack>
+              <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mb: 1.5, lineHeight: 1.5 }}>
+                고객의 마지막 메시지로부터 설정된 시간이 지나면 상담을 자동으로 종료합니다. 워크플로우와 별개로 동작합니다.
+              </Typography>
+              <Stack direction="row" alignItems="center" spacing={2}>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      size="small"
+                      checked={autoCloseEnabled}
+                      onChange={(_, v) => setAutoCloseEnabled(v)}
+                      sx={{ color: '#64748b', '&.Mui-checked': { color: '#f59e0b' } }}
+                    />
+                  }
+                  label={<Typography sx={{ color: '#94a3b8', fontSize: '0.82rem' }}>자동 종료 활성화</Typography>}
+                />
+                <TextField
+                  type="number"
+                  size="small"
+                  disabled={!autoCloseEnabled}
+                  value={autoCloseHours}
+                  onChange={e => {
+                    const v = Math.max(1, Math.min(1000, Number(e.target.value) || 1));
+                    setAutoCloseHours(v);
+                  }}
+                  slotProps={{ htmlInput: { min: 1, max: 1000 } }}
+                  sx={{
+                    width: 100,
+                    ...inputSx,
+                    '&.Mui-disabled': { opacity: 0.4 },
+                  }}
+                />
+                <Typography sx={{ color: autoCloseEnabled ? '#94a3b8' : '#475569', fontSize: '0.82rem' }}>
+                  시간 ({autoCloseEnabled ? `${Math.floor(autoCloseHours / 24)}일 ${autoCloseHours % 24}시간` : '비활성'})
+                </Typography>
+              </Stack>
+            </Box>
 
             {/* 저장 */}
             <Stack direction="row" alignItems="center" spacing={2}>
