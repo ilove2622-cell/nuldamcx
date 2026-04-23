@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   Box, Container, Typography, Card, CardContent, Stack,
-  Select, MenuItem, CircularProgress,
+  Select, MenuItem, CircularProgress, Chip,
 } from '@mui/material';
 import {
   SmartToy as SmartToyIcon,
@@ -124,7 +124,7 @@ export default function AnalyticsPage() {
         </Stack>
 
         {/* KPI 카드 */}
-        <Stack direction="row" spacing={2} mb={3} flexWrap="wrap" useFlexGap>
+        <Stack direction="row" spacing={2} mb={2} flexWrap="wrap" useFlexGap>
           {[
             { label: '총 세션', value: summary.totalSessions, icon: <ChatIcon />, color: '#3b82f6' },
             { label: 'AI 응답', value: summary.totalResponses, icon: <SmartToyIcon />, color: '#8b5cf6' },
@@ -142,6 +142,24 @@ export default function AnalyticsPage() {
                 </Stack>
               </CardContent>
             </Card>
+          ))}
+        </Stack>
+
+        {/* 채널별 세션 수 (인라인) */}
+        <Stack direction="row" spacing={2} mb={3} alignItems="center">
+          <Typography variant="caption" sx={{ color: '#64748b' }}>채널별</Typography>
+          {channels.map(ch => (
+            <Chip
+              key={ch.name}
+              label={`${channelLabel(ch.name)} ${ch.count}`}
+              size="small"
+              sx={{
+                bgcolor: `${ch.name === 'appKakao' ? '#fee500' : ch.name === 'appNaverTalk' ? '#03c75a' : '#3b82f6'}18`,
+                color: ch.name === 'appKakao' ? '#fee500' : ch.name === 'appNaverTalk' ? '#03c75a' : '#3b82f6',
+                fontWeight: 700,
+                fontSize: '0.8rem',
+              }}
+            />
           ))}
         </Stack>
 
@@ -221,22 +239,6 @@ export default function AnalyticsPage() {
           </Card>
         </Stack>
 
-        {/* 채널 분포 */}
-        <Card sx={{ ...cardSx, mb: 3 }}>
-          <CardContent>
-            <Typography variant="subtitle2" sx={{ color: '#94a3b8', mb: 2 }}>채널별 세션 수</Typography>
-            <Stack direction="row" spacing={3}>
-              {channels.map(ch => (
-                <Stack key={ch.name} alignItems="center" spacing={0.5}>
-                  <Typography variant="h4" fontWeight={700} sx={{ color: ch.name === 'appKakao' ? '#fee500' : ch.name === 'appNaverTalk' ? '#03c75a' : '#3b82f6' }}>
-                    {ch.count}
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: '#94a3b8' }}>{channelLabel(ch.name)}</Typography>
-                </Stack>
-              ))}
-            </Stack>
-          </CardContent>
-        </Card>
 
         {/* ─── 게시판 문의 분석 ─── */}
         {board && (
