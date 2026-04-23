@@ -12,6 +12,9 @@ export interface Session {
   last_message_at: string | null;
   last_message_text: string | null;
   summary?: string | null;
+  assigned_agent?: string | null;
+  assigned_agent_name?: string | null;
+  tags?: string[] | null;
 }
 
 export interface Message {
@@ -50,6 +53,8 @@ export interface Escalation {
 }
 
 export type TabKey = '전체' | '신규' | '진행중' | '완료' | '중요';
+
+export type SortKey = 'last_message_at_desc' | 'last_message_at_asc' | 'created_at_desc';
 
 export type Category =
   | '주문조회' | '배송' | '환불' | '교환' | '취소'

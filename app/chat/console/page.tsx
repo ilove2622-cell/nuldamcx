@@ -8,7 +8,7 @@ import { generateIdempotencyKey, getStarredSessions, toggleStarred } from '@/lib
 import { channelLabel, channelColor, statusLabel, statusColor } from '@/lib/chat-helpers';
 import RealtimeStatus from '@/components/RealtimeStatus';
 
-import type { Session, Message, AIResponse, TabKey } from '@/types/chat';
+import type { Session, Message, AIResponse, TabKey, SortKey } from '@/types/chat';
 
 import SessionList from '@/components/chat/SessionList';
 import ChatThread from '@/components/chat/ChatThread';
@@ -74,6 +74,19 @@ function ChatConsolePage() {
   const [escalating, setEscalating] = useState(false);
   const [escalateReason, setEscalateReason] = useState('');
 
+  // 필터 & 정렬
+  const [filterUnread, setFilterUnread] = useState(false);
+  const [filterStarred, setFilterStarred] = useState(false);
+  const [filterChannel, setFilterChannel] = useState('');
+  const [filterAgent, setFilterAgent] = useState('');
+  const [filterTag, setFilterTag] = useState('');
+  const [sortKey, setSortKey] = useState<SortKey>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('console_sortKey') as SortKey) || 'last_message_at_desc';
+    }
+    return 'last_message_at_desc';
+  });
+
   // 읽지 않은 세션 트래킹
   const [unreadSessions, setUnreadSessions] = useState<Set<number>>(new Set());
 
@@ -95,6 +108,11 @@ function ChatConsolePage() {
   useEffect(() => {
     localStorage.setItem('console_activeTab', activeTab);
   }, [activeTab]);
+
+  // 정렬 저장
+  useEffect(() => {
+    localStorage.setItem('console_sortKey', sortKey);
+  }, [sortKey]);
 
   // ─── 세션 목록 로드 ───
   const fetchSessions = useCallback(async () => {
@@ -410,6 +428,18 @@ function ChatConsolePage() {
           sessionSearch={sessionSearch}
           starred={starred}
           unreadSessions={unreadSessions}
+          filterUnread={filterUnread}
+          filterStarred={filterStarred}
+          filterChannel={filterChannel}
+          filterAgent={filterAgent}
+          filterTag={filterTag}
+          sortKey={sortKey}
+          onFilterUnreadChange={setFilterUnread}
+          onFilterStarredChange={setFilterStarred}
+          onFilterChannelChange={setFilterChannel}
+          onFilterAgentChange={setFilterAgent}
+          onFilterTagChange={setFilterTag}
+          onSortKeyChange={setSortKey}
           onSelectSession={handleSelectSession}
           onTabChange={setActiveTab}
           onSearchChange={setSessionSearch}

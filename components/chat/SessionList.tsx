@@ -1,13 +1,18 @@
 'use client';
 
-import React from 'react';
-import { Box, Typography, Stack, Chip, IconButton, TextField, InputAdornment, Badge } from '@mui/material';
+import React, { useMemo } from 'react';
+import {
+  Box, Typography, Stack, Chip, IconButton, TextField, InputAdornment, Badge,
+  Select, MenuItem, FormControl,
+} from '@mui/material';
 import {
   Search as SearchIcon,
   Star as StarIcon,
   StarBorder as StarBorderIcon,
+  FiberManualRecord as DotIcon,
+  Close as CloseIcon,
 } from '@mui/icons-material';
-import type { Session, TabKey } from '@/types/chat';
+import type { Session, TabKey, SortKey } from '@/types/chat';
 import { channelLabel, channelColor, statusLabel, statusColor, formatTime } from '@/lib/chat-helpers';
 import { highlightText } from '@/lib/highlight';
 import SessionSkeleton from './SessionSkeleton';
@@ -20,6 +25,18 @@ interface SessionListProps {
   sessionSearch: string;
   starred: Set<number>;
   unreadSessions: Set<number>;
+  filterUnread: boolean;
+  filterStarred: boolean;
+  filterChannel: string;
+  filterAgent: string;
+  filterTag: string;
+  sortKey: SortKey;
+  onFilterUnreadChange: (v: boolean) => void;
+  onFilterStarredChange: (v: boolean) => void;
+  onFilterChannelChange: (v: string) => void;
+  onFilterAgentChange: (v: string) => void;
+  onFilterTagChange: (v: string) => void;
+  onSortKeyChange: (v: SortKey) => void;
   onSelectSession: (id: number) => void;
   onTabChange: (tab: TabKey) => void;
   onSearchChange: (q: string) => void;
@@ -35,28 +52,111 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: '중요', label: '\u2B50중요' },
 ];
 
+const SORT_OPTIONS: { key: SortKey; label: string }[] = [
+  { key: 'last_message_at_desc', label: '최신 메시지순' },
+  { key: 'last_message_at_asc', label: '오래된 메시지순' },
+  { key: 'created_at_desc', label: '생성일 최신순' },
+];
+
+const selectSx = {
+  color: '#94a3b8', fontSize: '0.7rem', height: 28,
+  '& .MuiSelect-select': { py: 0.3, px: 1 },
+  '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.1)' },
+  '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.2)' },
+  '& .MuiSvgIcon-root': { color: '#64748b', fontSize: 16 },
+};
+
+const menuItemSx = { fontSize: '0.72rem' };
+
 export default function SessionList({
   sessions, loading, activeSessionId, activeTab, sessionSearch,
-  starred, unreadSessions, onSelectSession, onTabChange, onSearchChange, onToggleStar, sentinelRef,
+  starred, unreadSessions,
+  filterUnread, filterStarred, filterChannel, filterAgent, filterTag, sortKey,
+  onFilterUnreadChange, onFilterStarredChange, onFilterChannelChange, onFilterAgentChange, onFilterTagChange, onSortKeyChange,
+  onSelectSession, onTabChange, onSearchChange, onToggleStar, sentinelRef,
 }: SessionListProps) {
-  // 필터
-  const filteredSessions = sessions.filter(s => {
-    if (activeTab === '신규' && s.status !== 'open') return false;
-    if (activeTab === '진행중' && s.status !== 'escalated') return false;
-    if (activeTab === '완료' && s.status !== 'closed') return false;
-    if (activeTab === '중요' && !starred.has(s.id)) return false;
-    if (sessionSearch) {
-      const q = sessionSearch.toLowerCase();
-      return (
-        (s.customer_name || '').toLowerCase().includes(q) ||
-        s.user_chat_id.toLowerCase().includes(q) ||
-        (s.last_message_text || '').toLowerCase().includes(q)
-      );
-    }
-    return true;
-  });
+
+  // 드롭다운 옵션을 sessions에서 동적 추출
+  const channelOptions = useMemo(() =>
+    [...new Set(sessions.map(s => s.channel_type))].sort(),
+    [sessions]
+  );
+
+  const agentOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    sessions.forEach(s => {
+      if (s.assigned_agent) map.set(s.assigned_agent, s.assigned_agent_name || s.assigned_agent);
+    });
+    return [...map.entries()]; // [id, name][]
+  }, [sessions]);
+
+  const tagOptions = useMemo(() =>
+    [...new Set(sessions.flatMap(s => s.tags || []))].sort(),
+    [sessions]
+  );
+
+  // 활성 필터 개수
+  const activeFilterCount = [filterUnread, filterStarred, !!filterChannel, !!filterAgent, !!filterTag].filter(Boolean).length;
+
+  const resetFilters = () => {
+    onFilterUnreadChange(false);
+    onFilterStarredChange(false);
+    onFilterChannelChange('');
+    onFilterAgentChange('');
+    onFilterTagChange('');
+  };
+
+  // 필터 + 정렬
+  const filteredSessions = useMemo(() => {
+    let result = sessions.filter(s => {
+      // 탭 필터
+      if (activeTab === '신규' && s.status !== 'open') return false;
+      if (activeTab === '진행중' && s.status !== 'escalated') return false;
+      if (activeTab === '완료' && s.status !== 'closed') return false;
+      if (activeTab === '중요' && !starred.has(s.id)) return false;
+      // 토글 필터
+      if (filterUnread && !unreadSessions.has(s.id)) return false;
+      if (filterStarred && !starred.has(s.id)) return false;
+      // 드롭다운 필터
+      if (filterChannel && s.channel_type !== filterChannel) return false;
+      if (filterAgent && s.assigned_agent !== filterAgent) return false;
+      if (filterTag && !(s.tags || []).includes(filterTag)) return false;
+      // 검색
+      if (sessionSearch) {
+        const q = sessionSearch.toLowerCase();
+        return (
+          (s.customer_name || '').toLowerCase().includes(q) ||
+          s.user_chat_id.toLowerCase().includes(q) ||
+          (s.last_message_text || '').toLowerCase().includes(q)
+        );
+      }
+      return true;
+    });
+
+    // 정렬
+    result.sort((a, b) => {
+      if (sortKey === 'last_message_at_desc') {
+        return (b.last_message_at || b.created_at).localeCompare(a.last_message_at || a.created_at);
+      }
+      if (sortKey === 'last_message_at_asc') {
+        return (a.last_message_at || a.created_at).localeCompare(b.last_message_at || b.created_at);
+      }
+      // created_at_desc
+      return b.created_at.localeCompare(a.created_at);
+    });
+
+    return result;
+  }, [sessions, activeTab, starred, unreadSessions, filterUnread, filterStarred, filterChannel, filterAgent, filterTag, sessionSearch, sortKey]);
 
   const cardBorder = '1px solid rgba(255,255,255,0.08)';
+
+  const toggleChipSx = (active: boolean) => ({
+    cursor: 'pointer', fontSize: '0.68rem', height: 26,
+    fontWeight: active ? 700 : 400,
+    bgcolor: active ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.04)',
+    color: active ? '#f87171' : '#94a3b8',
+    border: active ? '1px solid rgba(239,68,68,0.4)' : '1px solid rgba(255,255,255,0.08)',
+  });
 
   return (
     <Box sx={{ width: 340, borderRight: cardBorder, display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
@@ -80,6 +180,111 @@ export default function SessionList({
           ))}
         </Stack>
       </Box>
+
+      {/* 필터바 1줄: 토글 + 정렬 */}
+      <Box sx={{ px: 1, pb: 0.5 }}>
+        <Stack direction="row" spacing={0.5} alignItems="center">
+          <Chip
+            icon={<DotIcon sx={{ fontSize: 10, color: filterUnread ? '#ef4444' : '#64748b' }} />}
+            label="안읽은"
+            size="small"
+            onClick={() => onFilterUnreadChange(!filterUnread)}
+            sx={toggleChipSx(filterUnread)}
+          />
+          <Chip
+            icon={<StarIcon sx={{ fontSize: 12, color: filterStarred ? '#f59e0b' : '#64748b' }} />}
+            label="즐겨찾기"
+            size="small"
+            onClick={() => onFilterStarredChange(!filterStarred)}
+            sx={{
+              ...toggleChipSx(filterStarred),
+              bgcolor: filterStarred ? 'rgba(245,158,11,0.15)' : 'rgba(255,255,255,0.04)',
+              color: filterStarred ? '#fbbf24' : '#94a3b8',
+              border: filterStarred ? '1px solid rgba(245,158,11,0.4)' : '1px solid rgba(255,255,255,0.08)',
+            }}
+          />
+          <Box sx={{ flex: 1 }} />
+          <FormControl size="small" sx={{ minWidth: 110 }}>
+            <Select
+              value={sortKey}
+              onChange={(e) => onSortKeyChange(e.target.value as SortKey)}
+              sx={selectSx}
+            >
+              {SORT_OPTIONS.map(o => (
+                <MenuItem key={o.key} value={o.key} sx={menuItemSx}>{o.label}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Stack>
+      </Box>
+
+      {/* 필터바 2줄: 드롭다운 3개 */}
+      <Box sx={{ px: 1, pb: 0.5 }}>
+        <Stack direction="row" spacing={0.5}>
+          <FormControl size="small" sx={{ flex: 1 }}>
+            <Select
+              value={filterChannel}
+              onChange={(e) => onFilterChannelChange(e.target.value)}
+              displayEmpty
+              sx={selectSx}
+            >
+              <MenuItem value="" sx={menuItemSx}>서비스 전체</MenuItem>
+              {channelOptions.map(ch => (
+                <MenuItem key={ch} value={ch} sx={menuItemSx}>{channelLabel(ch)}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <FormControl size="small" sx={{ flex: 1 }}>
+            <Select
+              value={filterAgent}
+              onChange={(e) => onFilterAgentChange(e.target.value)}
+              displayEmpty
+              sx={selectSx}
+            >
+              <MenuItem value="" sx={menuItemSx}>상담원 전체</MenuItem>
+              {agentOptions.map(([id, name]) => (
+                <MenuItem key={id} value={id} sx={menuItemSx}>{name}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <FormControl size="small" sx={{ flex: 1 }}>
+            <Select
+              value={filterTag}
+              onChange={(e) => onFilterTagChange(e.target.value)}
+              displayEmpty
+              sx={selectSx}
+            >
+              <MenuItem value="" sx={menuItemSx}>태그 전체</MenuItem>
+              {tagOptions.map(tag => (
+                <MenuItem key={tag} value={tag} sx={menuItemSx}>{tag}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Stack>
+      </Box>
+
+      {/* 활성 필터 표시 */}
+      {activeFilterCount > 0 && (
+        <Box sx={{ px: 1, pb: 0.5 }}>
+          <Stack direction="row" alignItems="center" spacing={0.5}>
+            <Typography variant="caption" sx={{ color: '#60a5fa', fontSize: '0.68rem' }}>
+              필터 {activeFilterCount}개 적용 중
+            </Typography>
+            <Chip
+              label="초기화"
+              size="small"
+              icon={<CloseIcon sx={{ fontSize: 12 }} />}
+              onClick={resetFilters}
+              sx={{
+                cursor: 'pointer', fontSize: '0.62rem', height: 20,
+                color: '#94a3b8', bgcolor: 'rgba(255,255,255,0.06)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                '& .MuiChip-icon': { color: '#94a3b8' },
+              }}
+            />
+          </Stack>
+        </Box>
+      )}
 
       {/* 검색 */}
       <Box sx={{ px: 1, pb: 1 }}>

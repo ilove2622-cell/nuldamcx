@@ -165,10 +165,20 @@ async function handleMessageCreated(payload: any, refers: any) {
       console.log(`⏩ 중복 메시지 무시: ${message.id}`);
       return;
     }
-    await supabase.from('chat_sessions').update({
+    const sessionUpdate: Record<string, any> = {
       last_message_at: new Date().toISOString(),
       last_message_text: text.slice(0, 100),
-    }).eq('id', session.id);
+    };
+    // manager 메시지 시 상담원 정보 저장
+    if (personType === 'manager') {
+      const agentId = message.personId || null;
+      const agentName = refers.manager?.profile?.name || refers.manager?.name || null;
+      if (agentId) {
+        sessionUpdate.assigned_agent = agentId;
+        sessionUpdate.assigned_agent_name = agentName;
+      }
+    }
+    await supabase.from('chat_sessions').update(sessionUpdate).eq('id', session.id);
     console.log(`💬 ${sender} 메시지 기록 [${userChatId}]: ${text.slice(0, 80)}`);
     return;
   }
