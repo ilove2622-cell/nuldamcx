@@ -94,6 +94,15 @@ export interface CustomerTag {
   created_at: string;
 }
 
+export interface SessionTag {
+  id: number;
+  session_id: number;
+  label: string;
+  category: string;
+  color: string;
+  created_at: string;
+}
+
 export interface SessionNote {
   id: number;
   session_id: number;

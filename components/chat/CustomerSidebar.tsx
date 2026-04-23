@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Box, Typography, Stack, IconButton, TextField, Chip, Collapse, Tooltip,
+  Popover, InputAdornment,
 } from '@mui/material';
 import {
   ChevronLeft as ChevronLeftIcon,
@@ -17,9 +18,11 @@ import {
   Videocam as VideocamIcon,
   AttachFile as AttachFileIcon,
   OpenInNew as OpenInNewIcon,
+  Search as SearchIcon,
+  Circle as CircleIcon,
 } from '@mui/icons-material';
 import { parseMessageBlocks } from '@/lib/chat-helpers';
-import type { Session, Message, CustomerProfile, CustomerTag, SessionNote, FileAttachment } from '@/types/chat';
+import type { Session, Message, CustomerProfile, CustomerTag, SessionTag, SessionNote, FileAttachment } from '@/types/chat';
 
 interface Props {
   session: Session;
@@ -92,24 +95,155 @@ function InlineField({ label, value, onSave }: { label: string; value: string | 
   );
 }
 
-// ─── 태그 색상 프리셋 ───
-const TAG_COLORS: Record<string, string> = {
-  'VIP': '#f59e0b',
-  '주의': '#ef4444',
-  '단골': '#10b981',
-  '신규': '#3b82f6',
-  '일반': '#3b82f6',
-};
+// ─── 색상 팔레트 ───
+const COLOR_PALETTE = [
+  '#3b82f6', '#8b5cf6', '#ec4899', '#ef4444', '#f59e0b',
+  '#10b981', '#14b8a6', '#06b6d4', '#6366f1', '#64748b',
+];
+
+// ─── 색상 피커 ───
+function ColorPicker({ color, onChange }: { color: string; onChange: (c: string) => void }) {
+  const [anchor, setAnchor] = useState<HTMLElement | null>(null);
+  return (
+    <>
+      <IconButton size="small" onClick={e => setAnchor(e.currentTarget)} sx={{ p: 0.2 }}>
+        <CircleIcon sx={{ fontSize: 14, color }} />
+      </IconButton>
+      <Popover
+        open={!!anchor} anchorEl={anchor} onClose={() => setAnchor(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+        slotProps={{ paper: { sx: { bgcolor: '#1e293b', border: cardBorder, borderRadius: 1, p: 0.8 } } }}
+      >
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, width: 130 }}>
+          {COLOR_PALETTE.map(c => (
+            <IconButton
+              key={c} size="small"
+              onClick={() => { onChange(c); setAnchor(null); }}
+              sx={{ p: 0.3, border: c === color ? '2px solid #fff' : '2px solid transparent', borderRadius: '50%' }}
+            >
+              <CircleIcon sx={{ fontSize: 16, color: c }} />
+            </IconButton>
+          ))}
+        </Box>
+      </Popover>
+    </>
+  );
+}
+
+type TagSuggestion = { label: string; category: string; color: string; count: number };
+
+// ─── 자동완성 태그 입력 ───
+function TagInput({ placeholder, suggestionsType, onAdd }: {
+  placeholder: string;
+  suggestionsType: 'customer' | 'session';
+  onAdd: (label: string, category: string, color: string) => void;
+}) {
+  const [input, setInput] = useState('');
+  const [color, setColor] = useState('#3b82f6');
+  const [suggestions, setSuggestions] = useState<TagSuggestion[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const fetchSuggestions = (q: string) => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/chat/tags?type=${suggestionsType}&q=${encodeURIComponent(q)}`);
+        const data = await res.json();
+        setSuggestions(data.suggestions || []);
+      } catch { setSuggestions([]); }
+    }, 200);
+  };
+
+  const handleChange = (v: string) => {
+    setInput(v);
+    if (v.trim().length > 0) {
+      fetchSuggestions(v.trim());
+      setShowSuggestions(true);
+    } else {
+      setShowSuggestions(false);
+    }
+  };
+
+  const handleSelect = (s: TagSuggestion) => {
+    onAdd(s.label, s.category, s.color);
+    setInput('');
+    setShowSuggestions(false);
+  };
+
+  const handleSubmit = () => {
+    if (!input.trim()) return;
+    const parts = input.trim().split(':');
+    const category = parts.length > 1 ? parts[0] : '일반';
+    const label = parts.length > 1 ? parts.slice(1).join(':') : input.trim();
+    onAdd(label, category, color);
+    setInput('');
+    setShowSuggestions(false);
+  };
+
+  return (
+    <Box sx={{ position: 'relative' }}>
+      <Stack direction="row" spacing={0.5} alignItems="center">
+        <ColorPicker color={color} onChange={setColor} />
+        <TextField
+          size="small" variant="outlined" fullWidth
+          placeholder={placeholder}
+          value={input}
+          onChange={e => handleChange(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleSubmit(); } if (e.key === 'Escape') setShowSuggestions(false); }}
+          onFocus={() => { if (input.trim()) setShowSuggestions(true); }}
+          onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+          sx={{
+            '& .MuiOutlinedInput-root': {
+              bgcolor: 'rgba(255,255,255,0.04)',
+              '& fieldset': { borderColor: 'rgba(255,255,255,0.08)' },
+              '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.15)' },
+              '&.Mui-focused fieldset': { borderColor: '#3b82f6' },
+            },
+            '& .MuiInputBase-input': { color: '#e2e8f0', fontSize: '0.72rem', py: 0.6, px: 1 },
+          }}
+        />
+      </Stack>
+      {showSuggestions && suggestions.length > 0 && (
+        <Box sx={{
+          position: 'absolute', top: '100%', left: 20, right: 0, zIndex: 10, mt: 0.3,
+          bgcolor: '#1e293b', border: cardBorder, borderRadius: 1, maxHeight: 160, overflowY: 'auto',
+        }}>
+          {suggestions.map((s, i) => (
+            <Box
+              key={i}
+              onMouseDown={() => handleSelect(s)}
+              sx={{
+                px: 1, py: 0.5, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 0.5,
+                '&:hover': { bgcolor: 'rgba(255,255,255,0.05)' },
+              }}
+            >
+              <CircleIcon sx={{ fontSize: 10, color: s.color }} />
+              <Typography variant="caption" sx={{ color: '#e2e8f0', fontSize: '0.7rem', flex: 1 }}>
+                {s.category !== '일반' ? `${s.category}: ${s.label}` : s.label}
+              </Typography>
+              <Typography variant="caption" sx={{ color: '#475569', fontSize: '0.6rem' }}>{s.count}건</Typography>
+            </Box>
+          ))}
+        </Box>
+      )}
+    </Box>
+  );
+}
 
 export default function CustomerSidebar({ session, messages, open, onToggle, onImageClick, onScrollToMessage, onShowDesk }: Props) {
   const [profile, setProfile] = useState<CustomerProfile | null>(null);
   const [tags, setTags] = useState<CustomerTag[]>([]);
+  const [sessionTags, setSessionTags] = useState<SessionTag[]>([]);
   const [sessionHistory, setSessionHistory] = useState<any[]>([]);
   const [notes, setNotes] = useState<SessionNote[]>([]);
   const [loading, setLoading] = useState(false);
 
+  // 태그 검색
+  const [customerTagSearch, setCustomerTagSearch] = useState('');
+  const [sessionTagSearch, setSessionTagSearch] = useState('');
+
   // 입력 상태
-  const [tagInput, setTagInput] = useState('');
   const [noteInput, setNoteInput] = useState('');
 
   const customerId = session.customer_id;
@@ -119,14 +253,16 @@ export default function CustomerSidebar({ session, messages, open, onToggle, onI
     if (!customerId) return;
     setLoading(true);
     try {
-      const [custRes, notesRes] = await Promise.all([
+      const [custRes, notesRes, sTagsRes] = await Promise.all([
         fetch(`/api/chat/customer?customerId=${encodeURIComponent(customerId)}`).then(r => r.json()),
         fetch(`/api/chat/notes?sessionId=${session.id}`).then(r => r.json()),
+        fetch(`/api/chat/session-tags?sessionId=${session.id}`).then(r => r.json()),
       ]);
       setProfile(custRes.profile || null);
       setTags(custRes.tags || []);
       setSessionHistory(custRes.sessionHistory || []);
       setNotes(notesRes.notes || []);
+      setSessionTags(sTagsRes.tags || []);
     } catch (e) {
       console.error('사이드바 데이터 로드 실패:', e);
     }
@@ -155,31 +291,61 @@ export default function CustomerSidebar({ session, messages, open, onToggle, onI
     }
   };
 
-  // ─── 태그 추가 ───
-  const handleAddTag = async () => {
-    if (!customerId || !tagInput.trim()) return;
-    const label = tagInput.trim();
-    setTagInput('');
-    // 카테고리:라벨 형식 지원
-    const parts = label.split(':');
-    const category = parts.length > 1 ? parts[0] : '일반';
-    const tagLabel = parts.length > 1 ? parts.slice(1).join(':') : label;
-    const color = TAG_COLORS[category] || '#3b82f6';
+  // ─── 고객 태그 추가 ───
+  const handleAddTag = async (label: string, category: string, color: string) => {
+    if (!customerId || !label) return;
 
-    const optimistic: CustomerTag = { id: Date.now(), customer_id: customerId, label: tagLabel, category, color, created_at: new Date().toISOString() };
+    const optimistic: CustomerTag = { id: Date.now(), customer_id: customerId, label, category, color, created_at: new Date().toISOString() };
     setTags(prev => [optimistic, ...prev]);
 
     try {
       const res = await fetch('/api/chat/customer/tags', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ customerId, label: tagLabel, category, color }),
+        body: JSON.stringify({ customerId, label, category, color }),
       });
       if (!res.ok) throw new Error();
       const { tag } = await res.json();
       setTags(prev => prev.map(t => t.id === optimistic.id ? tag : t));
     } catch {
       setTags(prev => prev.filter(t => t.id !== optimistic.id));
+    }
+  };
+
+  // ─── 상담 태그 추가 ───
+  const handleAddSessionTag = async (label: string, category: string, color: string) => {
+    if (!label) return;
+
+    const optimistic: SessionTag = { id: Date.now(), session_id: session.id, label, category, color, created_at: new Date().toISOString() };
+    setSessionTags(prev => [optimistic, ...prev]);
+
+    try {
+      const res = await fetch('/api/chat/session-tags', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: session.id, label, category, color }),
+      });
+      if (!res.ok) throw new Error();
+      const { tag } = await res.json();
+      setSessionTags(prev => prev.map(t => t.id === optimistic.id ? tag : t));
+    } catch {
+      setSessionTags(prev => prev.filter(t => t.id !== optimistic.id));
+    }
+  };
+
+  // ─── 상담 태그 삭제 ───
+  const handleDeleteSessionTag = async (tagId: number) => {
+    const prev = sessionTags;
+    setSessionTags(t => t.filter(x => x.id !== tagId));
+    try {
+      const res = await fetch('/api/chat/session-tags', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tagId }),
+      });
+      if (!res.ok) throw new Error();
+    } catch {
+      setSessionTags(prev);
     }
   };
 
@@ -313,46 +479,50 @@ export default function CustomerSidebar({ session, messages, open, onToggle, onI
       </Section>
 
       {/* 고객 태그 */}
-      <Section title="고객 태그">
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 0.8 }}>
-          {tags.map(tag => (
-            <Chip
-              key={tag.id}
-              label={tag.category !== '일반' ? `${tag.category}: ${tag.label}` : tag.label}
-              size="small"
-              onDelete={() => handleDeleteTag(tag.id)}
-              deleteIcon={<CloseIcon sx={{ fontSize: '12px !important' }} />}
-              sx={{
-                bgcolor: `${tag.color}22`,
-                color: tag.color,
-                borderColor: `${tag.color}44`,
-                border: 1,
-                fontSize: '0.68rem',
-                height: 22,
-                '& .MuiChip-deleteIcon': { color: `${tag.color}88`, fontSize: 12 },
-              }}
-            />
-          ))}
-          {tags.length === 0 && <Typography variant="caption" sx={{ color: '#475569', fontSize: '0.68rem' }}>태그 없음</Typography>}
-        </Box>
-        <TextField
-          size="small"
-          variant="outlined"
-          placeholder="카테고리:태그 입력 후 Enter"
-          value={tagInput}
-          onChange={e => setTagInput(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddTag(); } }}
-          fullWidth
-          sx={{
-            '& .MuiOutlinedInput-root': {
-              bgcolor: 'rgba(255,255,255,0.04)',
-              '& fieldset': { borderColor: 'rgba(255,255,255,0.08)' },
-              '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.15)' },
-              '&.Mui-focused fieldset': { borderColor: '#3b82f6' },
-            },
-            '& .MuiInputBase-input': { color: '#e2e8f0', fontSize: '0.72rem', py: 0.6, px: 1 },
-          }}
-        />
+      <Section title={`고객 태그${tags.length > 0 ? ` (${tags.length})` : ''}`}>
+        {tags.length > 3 && (
+          <TextField
+            size="small" variant="outlined" fullWidth placeholder="태그 검색..."
+            value={customerTagSearch} onChange={e => setCustomerTagSearch(e.target.value)}
+            slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchIcon sx={{ fontSize: 14, color: '#475569' }} /></InputAdornment> } }}
+            sx={{ mb: 0.8, '& .MuiOutlinedInput-root': { bgcolor: 'rgba(255,255,255,0.04)', height: 28, '& fieldset': { borderColor: 'rgba(255,255,255,0.06)' } }, '& .MuiInputBase-input': { color: '#e2e8f0', fontSize: '0.68rem', py: 0.3, px: 0.5 } }}
+          />
+        )}
+        {(() => {
+          const filtered = customerTagSearch
+            ? tags.filter(t => t.label.toLowerCase().includes(customerTagSearch.toLowerCase()) || t.category.toLowerCase().includes(customerTagSearch.toLowerCase()))
+            : tags;
+          // 카테고리별 그룹
+          const groups = new Map<string, CustomerTag[]>();
+          for (const t of filtered) {
+            const g = groups.get(t.category) || [];
+            g.push(t);
+            groups.set(t.category, g);
+          }
+          return (
+            <Box sx={{ mb: 0.8 }}>
+              {[...groups.entries()].map(([cat, catTags]) => (
+                <Box key={cat} sx={{ mb: 0.5 }}>
+                  {cat !== '일반' && <Typography variant="caption" sx={{ color: '#475569', fontSize: '0.6rem', display: 'block', mb: 0.2 }}>{cat}</Typography>}
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.4 }}>
+                    {catTags.map(tag => (
+                      <Chip
+                        key={tag.id}
+                        label={tag.label}
+                        size="small"
+                        onDelete={() => handleDeleteTag(tag.id)}
+                        deleteIcon={<CloseIcon sx={{ fontSize: '11px !important' }} />}
+                        sx={{ bgcolor: `${tag.color}22`, color: tag.color, borderColor: `${tag.color}44`, border: 1, fontSize: '0.66rem', height: 21, '& .MuiChip-deleteIcon': { color: `${tag.color}88`, fontSize: 11 } }}
+                      />
+                    ))}
+                  </Box>
+                </Box>
+              ))}
+              {filtered.length === 0 && <Typography variant="caption" sx={{ color: '#475569', fontSize: '0.68rem' }}>{customerTagSearch ? '검색 결과 없음' : '태그 없음'}</Typography>}
+            </Box>
+          );
+        })()}
+        <TagInput placeholder="카테고리:태그 입력 (자동완성)" suggestionsType="customer" onAdd={handleAddTag} />
       </Section>
 
       {/* 내부 메모 */}
@@ -390,20 +560,49 @@ export default function CustomerSidebar({ session, messages, open, onToggle, onI
       </Section>
 
       {/* 상담 태그 */}
-      <Section title="상담 태그" defaultOpen={false}>
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-          {(session.tags || []).map((tag, i) => (
-            <Chip
-              key={i}
-              label={tag}
-              size="small"
-              sx={{ bgcolor: 'rgba(59,130,246,0.15)', color: '#60a5fa', fontSize: '0.68rem', height: 22 }}
-            />
-          ))}
-          {(!session.tags || session.tags.length === 0) && (
-            <Typography variant="caption" sx={{ color: '#475569', fontSize: '0.68rem' }}>태그 없음</Typography>
-          )}
-        </Box>
+      <Section title={`상담 태그${sessionTags.length > 0 ? ` (${sessionTags.length})` : ''}`} defaultOpen={false}>
+        {sessionTags.length > 3 && (
+          <TextField
+            size="small" variant="outlined" fullWidth placeholder="태그 검색..."
+            value={sessionTagSearch} onChange={e => setSessionTagSearch(e.target.value)}
+            slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchIcon sx={{ fontSize: 14, color: '#475569' }} /></InputAdornment> } }}
+            sx={{ mb: 0.8, '& .MuiOutlinedInput-root': { bgcolor: 'rgba(255,255,255,0.04)', height: 28, '& fieldset': { borderColor: 'rgba(255,255,255,0.06)' } }, '& .MuiInputBase-input': { color: '#e2e8f0', fontSize: '0.68rem', py: 0.3, px: 0.5 } }}
+          />
+        )}
+        {(() => {
+          const filtered = sessionTagSearch
+            ? sessionTags.filter(t => t.label.toLowerCase().includes(sessionTagSearch.toLowerCase()) || t.category.toLowerCase().includes(sessionTagSearch.toLowerCase()))
+            : sessionTags;
+          const groups = new Map<string, SessionTag[]>();
+          for (const t of filtered) {
+            const g = groups.get(t.category) || [];
+            g.push(t);
+            groups.set(t.category, g);
+          }
+          return (
+            <Box sx={{ mb: 0.8 }}>
+              {[...groups.entries()].map(([cat, catTags]) => (
+                <Box key={cat} sx={{ mb: 0.5 }}>
+                  {cat !== '일반' && <Typography variant="caption" sx={{ color: '#475569', fontSize: '0.6rem', display: 'block', mb: 0.2 }}>{cat}</Typography>}
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.4 }}>
+                    {catTags.map(tag => (
+                      <Chip
+                        key={tag.id}
+                        label={tag.label}
+                        size="small"
+                        onDelete={() => handleDeleteSessionTag(tag.id)}
+                        deleteIcon={<CloseIcon sx={{ fontSize: '11px !important' }} />}
+                        sx={{ bgcolor: `${tag.color}22`, color: tag.color, borderColor: `${tag.color}44`, border: 1, fontSize: '0.66rem', height: 21, '& .MuiChip-deleteIcon': { color: `${tag.color}88`, fontSize: 11 } }}
+                      />
+                    ))}
+                  </Box>
+                </Box>
+              ))}
+              {filtered.length === 0 && <Typography variant="caption" sx={{ color: '#475569', fontSize: '0.68rem' }}>{sessionTagSearch ? '검색 결과 없음' : '태그 없음'}</Typography>}
+            </Box>
+          );
+        })()}
+        <TagInput placeholder="카테고리:태그 입력 (자동완성)" suggestionsType="session" onAdd={handleAddSessionTag} />
       </Section>
 
       {/* 상담 이력 */}
