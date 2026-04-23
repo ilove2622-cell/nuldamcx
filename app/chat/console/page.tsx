@@ -485,15 +485,15 @@ function ChatConsolePage() {
         {/* KPI 스트립 */}
         <Stack direction="row" spacing={2} sx={{ ml: 3 }}>
           {[
-            { label: '오늘 세션', value: kpi.totalSessions, icon: <ChatIcon sx={{ fontSize: 14 }} />, color: '#3b82f6' },
-            { label: 'AI 응답', value: kpi.totalAI, icon: <SmartToyIcon sx={{ fontSize: 14 }} />, color: '#8b5cf6' },
-            { label: '에스컬레이션', value: kpi.totalEsc, icon: <WarningIcon sx={{ fontSize: 14 }} />, color: '#ef4444' },
-            { label: '평균 신뢰도', value: `${(kpi.avgConf * 100).toFixed(0)}%`, icon: <SpeedIcon sx={{ fontSize: 14 }} />, color: kpi.avgConf >= 0.8 ? '#10b981' : kpi.avgConf >= 0.5 ? '#f59e0b' : '#ef4444' },
+            { label: '오늘 세션', value: kpi.totalSessions, icon: <ChatIcon sx={{ fontSize: 18 }} />, color: '#3b82f6' },
+            { label: 'AI 응답', value: kpi.totalAI, icon: <SmartToyIcon sx={{ fontSize: 18 }} />, color: '#8b5cf6' },
+            { label: '에스컬레이션', value: kpi.totalEsc, icon: <WarningIcon sx={{ fontSize: 18 }} />, color: '#ef4444' },
+            { label: '평균 신뢰도', value: `${(kpi.avgConf * 100).toFixed(0)}%`, icon: <SpeedIcon sx={{ fontSize: 18 }} />, color: kpi.avgConf >= 0.8 ? '#10b981' : kpi.avgConf >= 0.5 ? '#f59e0b' : '#ef4444' },
           ].map(k => (
-            <Stack key={k.label} direction="row" alignItems="center" spacing={0.5} sx={{ color: '#64748b', fontSize: '0.75rem' }}>
+            <Stack key={k.label} direction="row" alignItems="center" spacing={0.5}>
               <Box sx={{ color: k.color }}>{k.icon}</Box>
-              <Typography variant="caption" sx={{ color: '#64748b' }}>{k.label}</Typography>
-              <Typography variant="caption" sx={{ color: k.color, fontWeight: 700 }}>{k.value}</Typography>
+              <Typography sx={{ color: '#94a3b8', fontSize: '0.85rem' }}>{k.label}</Typography>
+              <Typography sx={{ color: k.color, fontWeight: 700, fontSize: '0.95rem' }}>{k.value}</Typography>
             </Stack>
           ))}
         </Stack>
