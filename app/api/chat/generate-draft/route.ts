@@ -89,15 +89,14 @@ export async function POST(req: NextRequest) {
               ? result.trackingNumber
               : '송장 미등록';
 
-          // 택배사 실시간 배송조회
+          // 택배사 실시간 배송조회 (tracker.delivery API)
           let deliveryStatus = '';
           let deliverySteps = '';
           if (result.trackingNumber) {
             try {
-              const courierLower = (result.courier || '').toLowerCase();
-              const carrier = courierLower.includes('cj') || courierLower.includes('대한통운') ? 'cj' : 'lotte';
               const trackNum = result.trackingNumber.replace(/[-\s]/g, '');
-              const trackRes = await fetch(`https://nuldamcx.vercel.app/api/tracking?carrier=${carrier}&num=${trackNum}`);
+              const courierParam = encodeURIComponent(result.courier || '');
+              const trackRes = await fetch(`https://nuldamcx.vercel.app/api/tracking?courierName=${courierParam}&num=${trackNum}`);
               if (trackRes.ok) {
                 const trackData = await trackRes.json();
                 deliveryStatus = trackData.currentStatus || '';
