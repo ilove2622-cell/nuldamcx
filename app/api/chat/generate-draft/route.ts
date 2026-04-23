@@ -91,7 +91,7 @@ export async function POST(req: NextRequest) {
           if (result.trackingNumber) {
             try {
               const trackNum = result.trackingNumber.replace(/[-\s]/g, '');
-              const trackRes = await fetch(`https://nuldamcx.vercel.app/api/tracking?num=${trackNum}`);
+              const trackRes = await fetch(`https://nuldamcx-delta.vercel.app/api/tracking?num=${trackNum}`);
               if (trackRes.ok) {
                 const trackData = await trackRes.json();
                 deliveryStatus = trackData.currentStatus || '';

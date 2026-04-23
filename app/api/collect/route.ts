@@ -13,7 +13,7 @@ export async function POST(req: Request) {
     let domain = `${requestUrl.protocol}//${requestUrl.host}`;
 
     if (domain.includes('localhost')) {
-      domain = 'https://nuldamcx.vercel.app'; // 본인 도메인 확인
+      domain = 'https://nuldamcx-delta.vercel.app'; // 본인 도메인 확인
     }
 
     // [전체 수집]용 XML 요청 주소 연결
@@ -120,7 +120,7 @@ export async function POST(req: Request) {
     let detailCount = 0;
     const reqUrl2 = new URL(req.url);
     let detailDomain = `${reqUrl2.protocol}//${reqUrl2.host}`;
-    if (detailDomain.includes('localhost')) detailDomain = 'https://nuldamcx.vercel.app';
+    if (detailDomain.includes('localhost')) detailDomain = 'https://nuldamcx-delta.vercel.app';
 
     for (const orderNum of orderNumbers) {
       try {

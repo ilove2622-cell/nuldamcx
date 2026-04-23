@@ -22,7 +22,7 @@ export async function POST(req: Request) {
     console.log(`[사방넷 주문 조회] 주문번호: ${orderId}`);
 
     // 1. 우리가 만든 XML 생성 API의 주소 만들기 (Vercel 도메인 사용)
-    const domain = 'https://nuldamcx.vercel.app'; // 본인 도메인 확인!
+    const domain = 'https://nuldamcx-delta.vercel.app'; // 본인 도메인 확인!
     const xmlUrl = `${domain}/api/sabangnet-req-order?orderId=${orderId}&ext=.xml`;
     const encodedXmlUrl = encodeURIComponent(xmlUrl);
     

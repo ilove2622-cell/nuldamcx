@@ -32,7 +32,7 @@ export async function POST(req: Request) {
     // 사방넷 호출 (기존 sabangnet-req-order 엔드포인트 재사용)
     const requestUrl = new URL(req.url);
     let domain = `${requestUrl.protocol}//${requestUrl.host}`;
-    if (domain.includes('localhost')) domain = 'https://nuldamcx.vercel.app';
+    if (domain.includes('localhost')) domain = 'https://nuldamcx-delta.vercel.app';
 
     const xmlUrl = `${domain}/api/sabangnet-req-order?orderId=${orderNumber}&ext=.xml`;
     const sabangnetApiUrl = `https://sbadmin15.sabangnet.co.kr/RTL_API/xml_order_info.html?xml_url=${encodeURIComponent(xmlUrl)}`;

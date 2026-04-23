@@ -57,7 +57,7 @@ function formatTrackingNumber(raw: string | undefined): string {
 // domain 기본값: Vercel 배포 도메인
 export async function lookupOrderBySabangnet(
   orderId: string,
-  domain: string = 'https://nuldamcx.vercel.app'
+  domain: string = 'https://nuldamcx-delta.vercel.app'
 ): Promise<OrderLookupResult> {
   if (!orderId) return { found: false, orderNumber: orderId };
 
@@ -186,7 +186,7 @@ async function fetchFromSabangnet(
 /** 검색 기준별 사방넷 조회 (전화번호는 숫자만/하이픈 두 포맷 모두 시도) */
 export async function lookupOrder(
   params: OrderSearchParams,
-  domain: string = 'https://nuldamcx.vercel.app'
+  domain: string = 'https://nuldamcx-delta.vercel.app'
 ): Promise<OrderLookupResult> {
   if (!params.value) return { found: false, orderNumber: params.value };
 

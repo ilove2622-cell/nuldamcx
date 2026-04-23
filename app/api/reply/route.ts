@@ -31,7 +31,7 @@ export async function POST(req: Request) {
     const requestUrl = new URL(req.url);
     let domain = `${requestUrl.protocol}//${requestUrl.host}`;
     if (domain.includes('localhost')) {
-      domain = 'https://nuldamcx.vercel.app'; // Vercel에 배포된 실제 주소
+      domain = 'https://nuldamcx-delta.vercel.app'; // Vercel에 배포된 실제 주소
     }
 
     // 4. 사방넷에 전송할 XML 주소 생성
