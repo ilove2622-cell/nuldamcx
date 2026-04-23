@@ -13,6 +13,8 @@ import {
   HeadsetMic as HeadsetMicIcon,
   TimerOff as TimerOffIcon,
 } from '@mui/icons-material';
+import HandoffScheduleGrid, { defaultHandoffConfig } from '@/components/settings/HandoffScheduleGrid';
+import type { HandoffConfig } from '@/components/settings/HandoffScheduleGrid';
 
 // ─── 타입 ───
 interface DaySchedule {
@@ -209,6 +211,7 @@ export default function SettingsPage() {
   const [humanSchedule, setHumanSchedule] = useState<ScheduleConfig>(defaultSchedule());
   const [autoCloseEnabled, setAutoCloseEnabled] = useState(false);
   const [autoCloseHours, setAutoCloseHours] = useState(360); // 15일 = 360시간
+  const [handoffConfig, setHandoffConfig] = useState<HandoffConfig>(defaultHandoffConfig());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -225,6 +228,7 @@ export default function SettingsPage() {
           setAutoCloseEnabled(data.auto_close.enabled ?? false);
           setAutoCloseHours(data.auto_close.hours ?? 360);
         }
+        if (data.handoff_schedule) setHandoffConfig(data.handoff_schedule);
       } catch (e) {
         console.error('설정 로드 실패:', e);
       }
@@ -244,6 +248,7 @@ export default function SettingsPage() {
           ai_schedule: aiSchedule,
           human_schedule: humanSchedule,
           auto_close: { enabled: autoCloseEnabled, hours: autoCloseHours },
+          handoff_schedule: handoffConfig,
         }),
       });
       if (!res.ok) throw new Error(await res.text());
@@ -260,7 +265,7 @@ export default function SettingsPage() {
       <Container maxWidth="md" sx={{ py: 4 }}>
         <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 3 }}>
           <ScheduleIcon sx={{ color: '#3b82f6', fontSize: 28 }} />
-          <Typography variant="h5" fontWeight={700}>상담 시간 설정</Typography>
+          <Typography variant="h5" fontWeight={700}>상담 설정</Typography>
         </Stack>
 
         {loading ? (
@@ -282,6 +287,9 @@ export default function SettingsPage() {
               config={humanSchedule}
               onChange={setHumanSchedule}
             />
+
+            {/* AI → 휴먼 핸드오프 스케줄 */}
+            <HandoffScheduleGrid config={handoffConfig} onChange={setHandoffConfig} />
 
             {/* 상담 자동 종료 */}
             <Box sx={{ border: cardBorder, borderRadius: 2, bgcolor: 'rgba(255,255,255,0.02)', p: 2 }}>
