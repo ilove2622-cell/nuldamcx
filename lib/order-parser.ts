@@ -106,3 +106,98 @@ export function pickPrimaryOrder(text: string): ParsedOrder | null {
   const priority = { high: 0, medium: 1, low: 2 };
   return orders.sort((a, b) => priority[a.confidence] - priority[b.confidence])[0];
 }
+
+// ─── 다중 검색 기준 매칭 ───
+
+export type SearchCriteria =
+  | { type: 'order_id'; value: string; mall: Mall; confidence: string }
+  | { type: 'tracking_no'; value: string }
+  | { type: 'receiver_tel'; value: string }
+  | { type: 'orderer_tel'; value: string }
+  | { type: 'phone'; value: string }; // 수취인/주문자 구분 불가 시
+
+// 전화번호 패턴: 010-XXXX-XXXX, 01012345678, 010 1234 5678
+const PHONE_REGEX = /\b01[016789][-\s]?\d{3,4}[-\s]?\d{4}\b/g;
+
+// 송장번호 키워드
+const TRACKING_KEYWORDS = ['송장', '운송장', '택배번호', '배송번호', '송장번호', '운송장번호'];
+
+// 수취인/주문자 구분 키워드
+const RECEIVER_KEYWORDS = ['받는분', '수취인', '수령인', '받는사람'];
+const ORDERER_KEYWORDS = ['주문자', '본인', '주문한사람'];
+
+/** 키워드가 value 앞 30자 이내에 존재하는지 체크 */
+function hasNearbyKeyword(text: string, value: string, keywords: string[]): boolean {
+  const idx = text.indexOf(value);
+  if (idx < 0) return false;
+  const before = text.slice(Math.max(0, idx - 30), idx);
+  return keywords.some(kw => before.includes(kw));
+}
+
+/** 메시지에서 검색 기준 후보를 모두 추출 */
+export function parseSearchCriteria(text: string): SearchCriteria[] {
+  if (!text) return [];
+
+  const results: SearchCriteria[] = [];
+
+  // 1. 기존 주문번호 파서
+  const orders = parseOrderNumbers(text);
+  for (const o of orders) {
+    // 송장번호 키워드가 근처에 있으면 tracking_no로 분류 (12~14자리)
+    if (o.orderNumber.length >= 12 && o.orderNumber.length <= 14 &&
+        hasNearbyKeyword(text, o.orderNumber, TRACKING_KEYWORDS)) {
+      results.push({ type: 'tracking_no', value: o.orderNumber });
+    } else {
+      results.push({ type: 'order_id', value: o.orderNumber, mall: o.mall, confidence: o.confidence });
+    }
+  }
+
+  // 2. 전화번호 감지
+  const phoneMatches = text.matchAll(PHONE_REGEX);
+  for (const m of phoneMatches) {
+    const raw = m[0];
+    const digits = raw.replace(/[-\s]/g, '');
+
+    // 이미 주문번호로 잡힌 숫자열과 겹치면 스킵
+    if (orders.some(o => o.orderNumber === digits || o.orderNumber.includes(digits))) continue;
+
+    if (hasNearbyKeyword(text, raw, RECEIVER_KEYWORDS)) {
+      results.push({ type: 'receiver_tel', value: digits });
+    } else if (hasNearbyKeyword(text, raw, ORDERER_KEYWORDS)) {
+      results.push({ type: 'orderer_tel', value: digits });
+    } else {
+      results.push({ type: 'phone', value: digits });
+    }
+  }
+
+  // 3. 키워드 단독 송장번호 (주문번호로 이미 잡혔지만 tracking 키워드 매칭 안 된 경우 보완)
+  // 텍스트에 송장 키워드가 있고, 12~14자리 숫자가 있으면 tracking_no 추가
+  if (TRACKING_KEYWORDS.some(kw => text.includes(kw))) {
+    const trackingMatches = text.matchAll(/\b(\d{12,14})\b/g);
+    for (const m of trackingMatches) {
+      const val = m[1];
+      if (!results.some(r => r.value === val)) {
+        results.push({ type: 'tracking_no', value: val });
+      }
+    }
+  }
+
+  return results;
+}
+
+/** 가장 우선순위 높은 검색 기준 1건 반환 */
+export function pickPrimarySearch(text: string): SearchCriteria | null {
+  const criteria = parseSearchCriteria(text);
+  if (criteria.length === 0) return null;
+
+  // 우선순위: order_id > tracking_no > receiver_tel > orderer_tel > phone
+  const priority: Record<string, number> = {
+    order_id: 0,
+    tracking_no: 1,
+    receiver_tel: 2,
+    orderer_tel: 3,
+    phone: 4,
+  };
+
+  return criteria.sort((a, b) => priority[a.type] - priority[b.type])[0];
+}

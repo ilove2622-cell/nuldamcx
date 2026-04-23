@@ -113,6 +113,118 @@ export async function lookupOrderBySabangnet(
   }
 }
 
+// ─── 다중 검색 기준 조회 ───
+
+export interface OrderSearchParams {
+  type: 'order_id' | 'tracking_no' | 'receiver_tel' | 'orderer_tel';
+  value: string;
+}
+
+/** 숫자만 전화번호 → 010-XXXX-XXXX 하이픈 포맷 변환 */
+function formatPhoneWithHyphens(digits: string): string {
+  // 010XXXXXXXX (11자리) → 010-XXXX-XXXX
+  if (digits.length === 11) {
+    return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
+  }
+  // 010XXXXXXX (10자리) → 010-XXX-XXXX
+  if (digits.length === 10) {
+    return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
+  }
+  return digits;
+}
+
+/** 단일 값으로 사방넷 조회 실행 */
+async function fetchFromSabangnet(
+  type: string,
+  value: string,
+  domain: string
+): Promise<OrderLookupResult> {
+  const xmlUrl = `${domain}/api/sabangnet-req-order?searchType=${type}&value=${encodeURIComponent(value)}&ext=.xml`;
+  const sabangnetUrl = `https://sbadmin15.sabangnet.co.kr/RTL_API/xml_order_info.html?xml_url=${encodeURIComponent(xmlUrl)}`;
+
+  const res = await fetch(sabangnetUrl, { method: 'GET' });
+  if (!res.ok) {
+    console.error(`[사방넷 조회 실패] HTTP ${res.status}`);
+    return { found: false, orderNumber: value };
+  }
+
+  const xmlText = await res.text();
+  const parser = new XMLParser({ ignoreAttributes: true, isArray: (name) => name === 'DATA' });
+  const parsed = parser.parse(xmlText);
+
+  const totalCount = Number(parsed?.SABANG_ORDER_LIST?.HEADER?.TOTAL_COUNT) || 0;
+  const dataList = parsed?.SABANG_ORDER_LIST?.DATA;
+
+  if (totalCount === 0 || !dataList || dataList.length === 0) {
+    return { found: false, orderNumber: value };
+  }
+
+  const items = dataList.map((d: any) => d.ITEM || d);
+  const head = items[0];
+  const mainItem = items.find((i: any) => !i.GIFT_NAME || !String(i.GIFT_NAME).trim()) || head;
+
+  const productName = mainItem.P_PRODUCT_NAME || mainItem.PRODUCT_NAME || '';
+  const optionName = mainItem.SKU_VALUE || '';
+  const orderNumber = head.ORDER_ID || value;
+
+  return {
+    found: true,
+    orderNumber: String(orderNumber),
+    productName: String(productName).trim(),
+    optionName: String(optionName).trim(),
+    status: normalizeStatus(head.ORDER_STATUS || head.DELV_STATUS) || inferDeliveryStatus(head.INVOICE_NO),
+    courier: String(head.DELIVERY_METHOD || head.DELIVERY_COMPANY || '').trim(),
+    trackingNumber: formatTrackingNumber(head.INVOICE_NO),
+    receiverName: String(head.RECEIVE_NAME || '').trim(),
+    receiverAddr: String(head.RECEIVE_ADDR || '').trim(),
+    orderDate: String(head.ORDER_DATE || '').trim(),
+    shipDate: String(head.SHIP_DATE || head.SHIP_HOPE_DATE || '').trim(),
+    itemCount: dataList.length,
+  };
+}
+
+/** 검색 기준별 사방넷 조회 (전화번호는 숫자만/하이픈 두 포맷 모두 시도) */
+export async function lookupOrder(
+  params: OrderSearchParams,
+  domain: string = 'https://nuldamcx.vercel.app'
+): Promise<OrderLookupResult> {
+  if (!params.value) return { found: false, orderNumber: params.value };
+
+  const isPhone = params.type === 'receiver_tel' || params.type === 'orderer_tel';
+
+  if (!isPhone) {
+    // 전화번호 아닌 경우 그대로 조회
+    try {
+      return await fetchFromSabangnet(params.type, params.value, domain);
+    } catch (err: any) {
+      console.error('[사방넷 조회 에러]', err.message);
+      return { found: false, orderNumber: params.value };
+    }
+  }
+
+  // 전화번호: 숫자만(01012345678) → 하이픈(010-1234-5678) 순으로 시도
+  const digits = params.value.replace(/[-\s]/g, '');
+  const hyphenated = formatPhoneWithHyphens(digits);
+
+  try {
+    // 1차: 숫자만
+    const result1 = await fetchFromSabangnet(params.type, digits, domain);
+    if (result1.found) return result1;
+
+    // 2차: 하이픈 포맷 (숫자만과 다를 때만)
+    if (hyphenated !== digits) {
+      console.log(`📞 숫자만 검색 결과 없음, 하이픈 포맷으로 재시도: ${hyphenated}`);
+      const result2 = await fetchFromSabangnet(params.type, hyphenated, domain);
+      if (result2.found) return result2;
+    }
+
+    return { found: false, orderNumber: digits };
+  } catch (err: any) {
+    console.error('[사방넷 조회 에러]', err.message);
+    return { found: false, orderNumber: digits };
+  }
+}
+
 // 자동응답 메시지 포맷팅
 export function formatOrderReply(result: OrderLookupResult): string {
   if (!result.found) {

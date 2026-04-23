@@ -1,11 +1,29 @@
 import { NextResponse } from 'next/server';
 
+/** 검색 타입별 XML 파라미터 생성 */
+function buildSearchParam(searchType: string, value: string): string {
+  switch (searchType) {
+    case 'tracking_no':
+      return `<INVOICE_NO>${value}</INVOICE_NO>`;
+    case 'receiver_tel':
+      return `<RECEIVE_TEL>${value}</RECEIVE_TEL>`;
+    case 'orderer_tel':
+      return `<USER_TEL>${value}</USER_TEL>`;
+    case 'order_id':
+    default:
+      return `<ORDER_ID>${value}</ORDER_ID>`;
+  }
+}
+
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
-  const orderId = searchParams.get('orderId');
 
-  if (!orderId) {
-    return new Response('Missing orderId', { status: 400 });
+  // 새 파라미터: searchType + value (하위호환: orderId도 지원)
+  const searchType = searchParams.get('searchType') || 'order_id';
+  const value = searchParams.get('value') || searchParams.get('orderId');
+
+  if (!value) {
+    return new Response('Missing value or orderId', { status: 400 });
   }
 
   // 오늘 날짜 및 3달 전 날짜 구하기 (검색 범위)
@@ -56,7 +74,7 @@ export async function GET(req: Request) {
             <ORD_ST_DATE>${formatDate(threeMonthsAgo)}</ORD_ST_DATE>
             <ORD_ED_DATE>${formatDate(today)}</ORD_ED_DATE>
             <ORD_FIELD>${ordField}</ORD_FIELD>
-            <ORDER_ID>${orderId}</ORDER_ID>
+            ${buildSearchParam(searchType, value)}
             <LANG>UTF-8</LANG>
         </ITEM>
     </DATA>

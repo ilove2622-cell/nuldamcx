@@ -6,8 +6,10 @@ import {
   getUserChat,
   getSignedFileUrl,
 } from '@/lib/channeltalk-client';
-import { pickPrimaryOrder } from '@/lib/order-parser';
-import { lookupOrderBySabangnet, formatOrderReply } from '@/lib/sabangnet-order-lookup';
+import { pickPrimaryOrder, pickPrimarySearch } from '@/lib/order-parser';
+import type { SearchCriteria } from '@/lib/order-parser';
+import { lookupOrderBySabangnet, lookupOrder, formatOrderReply } from '@/lib/sabangnet-order-lookup';
+import type { OrderSearchParams } from '@/lib/sabangnet-order-lookup';
 import { generate } from '@/lib/llm-router';
 import {
   escalate,
@@ -236,13 +238,28 @@ async function handleMessageCreated(payload: any, refers: any) {
     new Date(new Date(m.created_at).getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10) === todayKST
   );
 
-  // Step 1: 주문번호 감지 → 사방넷 조회 (결과를 LLM 컨텍스트로 전달)
+  // Step 1: 검색 기준 감지 → 사방넷 조회 (주문번호/송장번호/전화번호)
   let orderContext = '';
-  const order = pickPrimaryOrder(fullCustomerText);
-  if (order) {
-    console.log(`🔍 주문번호 감지: ${order.orderNumber} (${order.mall})`);
+  const search = pickPrimarySearch(fullCustomerText);
+  if (search) {
+    console.log(`🔍 검색 기준 감지: ${search.type} = ${search.value}`);
     try {
-      const result = await lookupOrderBySabangnet(order.orderNumber);
+      let result;
+
+      if (search.type === 'order_id') {
+        // 기존 주문번호 조회 (하위호환)
+        result = await lookupOrderBySabangnet(search.value);
+      } else if (search.type === 'phone') {
+        // 수취인/주문자 구분 불가 → receiver_tel 먼저, 없으면 orderer_tel 폴백
+        result = await lookupOrder({ type: 'receiver_tel', value: search.value });
+        if (!result.found) {
+          result = await lookupOrder({ type: 'orderer_tel', value: search.value });
+        }
+      } else {
+        // tracking_no, receiver_tel, orderer_tel
+        result = await lookupOrder({ type: search.type, value: search.value });
+      }
+
       if (result.found) {
         const product = result.productName + (result.optionName ? ` (${result.optionName})` : '');
         const tracking = result.courier && result.trackingNumber
@@ -250,10 +267,15 @@ async function handleMessageCreated(payload: any, refers: any) {
           : result.trackingNumber
             ? `송장번호: ${result.trackingNumber}`
             : '송장 미등록';
-        // 오늘 KST 날짜
         const todayStr = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10).replace(/-/g, '');
+        const searchLabel = search.type === 'order_id' ? '주문번호'
+          : search.type === 'tracking_no' ? '송장번호'
+          : search.type === 'receiver_tel' ? '수취인 전화번호'
+          : search.type === 'orderer_tel' ? '주문자 전화번호'
+          : '전화번호';
         orderContext = [
           `[사방넷 주문조회 결과]`,
+          `검색기준: ${searchLabel} ${search.value}`,
           `주문번호: ${result.orderNumber}`,
           `수신자: ${result.receiverName || '미확인'}`,
           `배송지: ${result.receiverAddr || '미확인'}`,
@@ -262,15 +284,15 @@ async function handleMessageCreated(payload: any, refers: any) {
           result.orderDate ? `주문일: ${result.orderDate}` : '',
           result.shipDate ? `출고일: ${result.shipDate}` : '',
           `배송정보: ${tracking}`,
-          result.itemCount && result.itemCount > 1 ? `총 ${result.itemCount}건 주문` : '',
+          result.itemCount && result.itemCount > 1 ? `총 ${result.itemCount}건 주문 (최근 주문 기준 표시)` : '',
           `오늘 날짜: ${todayStr}`,
         ].filter(Boolean).join('\n');
       } else {
-        orderContext = `[사방넷 주문조회 결과]\n주문번호 ${order.orderNumber}: 조회 결과 없음 (번호 확인 필요)`;
+        orderContext = `[사방넷 주문조회 결과]\n${search.type === 'order_id' ? '주문번호' : search.type} ${search.value}: 조회 결과 없음 (번호 확인 필요)`;
       }
     } catch (err) {
       console.warn('사방넷 조회 실패:', err);
-      orderContext = `[사방넷 주문조회 결과]\n주문번호 ${order.orderNumber}: 조회 실패 (시스템 오류)`;
+      orderContext = `[사방넷 주문조회 결과]\n${search.value}: 조회 실패 (시스템 오류)`;
     }
   }
 
