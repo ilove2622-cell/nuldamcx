@@ -15,11 +15,11 @@ import NavigateNextIcon from '@mui/icons-material/NavigateNext';
 
 const NAV_ITEMS = [
   { path: '/', label: '홈', icon: <HomeIcon fontSize="small" /> },
-  { path: '/ocr', label: 'OCR', icon: <DocumentScannerIcon fontSize="small" /> },
-  { path: '/voc', label: 'VOC', icon: <BiotechIcon fontSize="small" /> },
   { path: '/chat/console', label: '채팅상담', icon: <HeadsetMicIcon fontSize="small" /> },
   { path: '/analytics', label: '분석', icon: <TrendingUpIcon fontSize="small" /> },
   { path: '/status', label: '문의현황', icon: <BarChartIcon fontSize="small" /> },
+  { path: '/voc', label: 'VOC', icon: <BiotechIcon fontSize="small" /> },
+  { path: '/ocr', label: 'OCR', icon: <DocumentScannerIcon fontSize="small" /> },
   { path: '/settings', label: '설정', icon: <SettingsIcon fontSize="small" /> },
 ];
 
