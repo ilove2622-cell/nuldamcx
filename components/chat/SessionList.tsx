@@ -3,7 +3,7 @@
 import React, { useMemo } from 'react';
 import {
   Box, Typography, Stack, Chip, IconButton, TextField, InputAdornment, Badge,
-  Select, MenuItem, FormControl,
+  Select, MenuItem, FormControl, CircularProgress,
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -12,7 +12,7 @@ import {
   FiberManualRecord as DotIcon,
   Close as CloseIcon,
 } from '@mui/icons-material';
-import type { Session, TabKey, SortKey } from '@/types/chat';
+import type { Session, TabKey, SortKey, SessionTag, CustomerTag } from '@/types/chat';
 import { channelLabel, channelColor, statusLabel, statusColor, formatTime } from '@/lib/chat-helpers';
 import { highlightText } from '@/lib/highlight';
 import SessionSkeleton from './SessionSkeleton';
@@ -85,10 +85,14 @@ export default function SessionList({
     return [...map.entries()]; // [id, name][]
   }, [sessions]);
 
-  const tagOptions = useMemo(() =>
-    [...new Set(sessions.flatMap(s => s.tags || []))].sort(),
-    [sessions]
-  );
+  const tagOptions = useMemo(() => {
+    const map = new Map<string, { label: string; color: string; type: string }>();
+    sessions.forEach(s => {
+      (s.session_tags_data || []).forEach(t => map.set(`s:${t.label}`, { label: t.label, color: t.color, type: 'session' }));
+      (s.customer_tags_data || []).forEach(t => map.set(`c:${t.label}`, { label: t.label, color: t.color, type: 'customer' }));
+    });
+    return [...map.entries()].sort((a, b) => a[1].label.localeCompare(b[1].label));
+  }, [sessions]);
 
   // 활성 필터 개수
   const activeFilterCount = [filterUnread, filterStarred, !!filterChannel, !!filterAgent, !!filterTag].filter(Boolean).length;
@@ -115,7 +119,13 @@ export default function SessionList({
       // 드롭다운 필터
       if (filterChannel && s.channel_type !== filterChannel) return false;
       if (filterAgent && s.assigned_agent !== filterAgent) return false;
-      if (filterTag && !(s.tags || []).includes(filterTag)) return false;
+      if (filterTag) {
+        const allTagLabels = [
+          ...(s.session_tags_data || []).map(t => `s:${t.label}`),
+          ...(s.customer_tags_data || []).map(t => `c:${t.label}`),
+        ];
+        if (!allTagLabels.includes(filterTag)) return false;
+      }
       // 검색
       if (sessionSearch) {
         const q = sessionSearch.toLowerCase();
@@ -263,8 +273,14 @@ export default function SessionList({
               sx={selectSx}
             >
               <MenuItem value="" sx={menuItemSx}>태그 전체</MenuItem>
-              {tagOptions.map(tag => (
-                <MenuItem key={tag} value={tag} sx={menuItemSx}>{tag}</MenuItem>
+              {tagOptions.map(([key, info]) => (
+                <MenuItem key={key} value={key} sx={menuItemSx}>
+                  <Box component="span" sx={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', bgcolor: info.color, mr: 0.8, verticalAlign: 'middle' }} />
+                  {info.label}
+                  <Box component="span" sx={{ color: '#64748b', fontSize: '0.6rem', ml: 0.5 }}>
+                    {info.type === 'session' ? '상담' : '고객'}
+                  </Box>
+                </MenuItem>
               ))}
             </Select>
           </FormControl>
@@ -378,6 +394,20 @@ export default function SessionList({
                     : session.last_message_text
                   }
                 </Typography>
+              )}
+              {((session.session_tags_data && session.session_tags_data.length > 0) || (session.customer_tags_data && session.customer_tags_data.length > 0)) && (
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.3, mt: 0.4, pl: 3.5 }}>
+                  {(session.session_tags_data || []).map(tag => (
+                    <Chip key={`s-${tag.id}`} label={tag.label} size="small"
+                      sx={{ height: 16, fontSize: '0.58rem', bgcolor: `${tag.color}22`, color: tag.color, border: `1px solid ${tag.color}44` }}
+                    />
+                  ))}
+                  {(session.customer_tags_data || []).map(tag => (
+                    <Chip key={`c-${tag.id}`} label={tag.label} size="small"
+                      sx={{ height: 16, fontSize: '0.58rem', bgcolor: `${tag.color}22`, color: tag.color, border: `1px solid ${tag.color}44`, borderStyle: 'dashed' }}
+                    />
+                  ))}
+                </Box>
               )}
             </Box>
           ))

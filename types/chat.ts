@@ -17,6 +17,8 @@ export interface Session {
   assigned_agent_name?: string | null;
   tags?: string[] | null;
   snoozed_until?: string | null;
+  session_tags_data?: SessionTag[];
+  customer_tags_data?: CustomerTag[];
 }
 
 export interface Message {

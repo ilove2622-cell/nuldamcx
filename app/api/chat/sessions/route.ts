@@ -60,13 +60,46 @@ export async function GET(req: NextRequest) {
     ? (results[results.length - 1]?.last_message_at || results[results.length - 1]?.created_at)
     : null;
 
-  // 기존 호환성: cursor 파라미터 ���으면 배열 직접 반환
+  // 세션 태그 + 고객 태그 일괄 조회
+  const sessionIds = results.map((s: any) => s.id);
+  const customerIds = [...new Set(results.map((s: any) => s.customer_id).filter(Boolean))] as string[];
+
+  const [stRes, ctRes] = await Promise.all([
+    sessionIds.length > 0
+      ? supabase.from('session_tags').select('*').in('session_id', sessionIds)
+      : Promise.resolve({ data: [] as any[] }),
+    customerIds.length > 0
+      ? supabase.from('customer_tags').select('*').in('customer_id', customerIds)
+      : Promise.resolve({ data: [] as any[] }),
+  ]);
+
+  const sessionTagsMap = new Map<number, any[]>();
+  for (const t of (stRes.data || [])) {
+    const arr = sessionTagsMap.get(t.session_id) || [];
+    arr.push(t);
+    sessionTagsMap.set(t.session_id, arr);
+  }
+
+  const customerTagsMap = new Map<string, any[]>();
+  for (const t of (ctRes.data || [])) {
+    const arr = customerTagsMap.get(t.customer_id) || [];
+    arr.push(t);
+    customerTagsMap.set(t.customer_id, arr);
+  }
+
+  const enriched = results.map((s: any) => ({
+    ...s,
+    session_tags_data: sessionTagsMap.get(s.id) || [],
+    customer_tags_data: s.customer_id ? (customerTagsMap.get(s.customer_id) || []) : [],
+  }));
+
+  // 기존 호환성: cursor 파라미터 없으면 배열 직접 반환
   if (!sp.has('cursor') && !sp.has('limit')) {
-    return NextResponse.json(results);
+    return NextResponse.json(enriched);
   }
 
   return NextResponse.json({
-    data: results,
+    data: enriched,
     nextCursor,
     hasMore,
   });
