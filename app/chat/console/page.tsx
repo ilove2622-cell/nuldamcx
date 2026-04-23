@@ -419,14 +419,14 @@ function ChatConsolePage() {
   };
 
   // ─── AI 초안 생성 ───
-  const handleGenerateDraft = async () => {
+  const handleGenerateDraft = async (extraContext?: string) => {
     if (!activeSession) return;
     setGenerating(true);
     try {
       const res = await fetch('/api/chat/generate-draft', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId: activeSession.id }),
+        body: JSON.stringify({ sessionId: activeSession.id, ...(extraContext ? { extraContext } : {}) }),
       });
       if (!res.ok) {
         const data = await res.json();

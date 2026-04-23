@@ -155,6 +155,23 @@ async function handleMessageCreated(payload: any, refers: any) {
   if (personType !== 'user') {
     const session = await getOrCreateSession(userChatId, refers, message);
     const sender = personType === 'bot' ? 'bot' : 'agent';
+
+    // 콘솔에서 발송한 봇 메시지가 webhook으로 돌아온 경우 중복 방지
+    if (sender === 'bot') {
+      const { data: recent } = await supabase
+        .from('chat_messages')
+        .select('id')
+        .eq('session_id', session.id)
+        .eq('sender', 'bot')
+        .eq('text', text)
+        .gte('created_at', new Date(Date.now() - 30_000).toISOString())
+        .limit(1);
+      if (recent && recent.length > 0) {
+        console.log(`⏩ 콘솔 발송 봇 메시지 중복 무시: ${message.id}`);
+        return;
+      }
+    }
+
     // 중복 웹훅 방지: message_id가 같으면 무시
     const { error: dupErr } = await supabase.from('chat_messages').insert({
       session_id: session.id,

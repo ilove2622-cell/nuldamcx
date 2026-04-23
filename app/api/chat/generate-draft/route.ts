@@ -16,7 +16,7 @@ const supabase = createClient(
  */
 export async function POST(req: NextRequest) {
   try {
-    const { sessionId } = await req.json();
+    const { sessionId, extraContext } = await req.json();
     if (!sessionId) {
       return NextResponse.json({ error: 'sessionId 필요' }, { status: 400 });
     }
@@ -113,6 +113,9 @@ export async function POST(req: NextRequest) {
     if (recentHistory) contextParts.push(`[대화 이력]\n${recentHistory}`);
     if (orderContext) contextParts.push(orderContext);
     if (hasRepliedToday) contextParts.push('[오늘 이미 답변한 적 있음 — 인삿말 생략]');
+    if (extraContext && typeof extraContext === 'string' && extraContext.trim()) {
+      contextParts.push(`[상담원 참고 메모]\n${extraContext.trim()}`);
+    }
 
     // LLM 호출
     const llm = await generate(fullCustomerText, contextParts.join('\n\n'));

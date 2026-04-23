@@ -1,12 +1,13 @@
 'use client';
 
-import React from 'react';
-import { Box, Typography, Stack, Chip, Button, CircularProgress } from '@mui/material';
+import React, { useState } from 'react';
+import { Box, Typography, Stack, Chip, Button, CircularProgress, TextField, Collapse } from '@mui/material';
 import {
   Send as SendIcon,
   Edit as EditIcon,
   SmartToy as SmartToyIcon,
   AutoAwesome as AutoAwesomeIcon,
+  NoteAdd as NoteAddIcon,
 } from '@mui/icons-material';
 import type { AIResponse } from '@/types/chat';
 import { confidenceColor } from '@/lib/chat-helpers';
@@ -19,11 +20,51 @@ interface DraftPanelProps {
   onSelectDraft: (idx: number) => void;
   onSend: (draft: AIResponse) => void;
   onCopyToEditor: (text: string) => void;
-  onGenerate?: () => void;
+  onGenerate?: (extraContext?: string) => void;
 }
 
 export default function DraftPanel({ aiResponses, selectedDraftIdx, sending, generating, onSelectDraft, onSend, onCopyToEditor, onGenerate }: DraftPanelProps) {
+  const [showContextInput, setShowContextInput] = useState(false);
+  const [extraContext, setExtraContext] = useState('');
   const pendingDrafts = aiResponses.filter(a => !a.sent_at && a.mode?.trim() === 'dryrun');
+
+  const handleGenerate = () => {
+    onGenerate?.(extraContext.trim() || undefined);
+    setExtraContext('');
+    setShowContextInput(false);
+  };
+
+  const contextInput = onGenerate && (
+    <Box sx={{ mt: 1 }}>
+      <Button
+        size="small" variant="text"
+        startIcon={<NoteAddIcon />}
+        onClick={() => setShowContextInput(!showContextInput)}
+        sx={{ color: '#64748b', textTransform: 'none', fontSize: '0.75rem', mb: 0.5 }}
+      >
+        {showContextInput ? '참고 내용 접기' : '참고 내용 추가'}
+      </Button>
+      <Collapse in={showContextInput}>
+        <TextField
+          multiline minRows={2} maxRows={4}
+          placeholder="AI에게 전달할 추가 참고 내용을 입력하세요 (예: 이 건은 이미 환불 처리됨, 교환 불가 상품 등)"
+          value={extraContext}
+          onChange={e => setExtraContext(e.target.value)}
+          fullWidth size="small"
+          sx={{
+            mb: 1,
+            '& .MuiOutlinedInput-root': {
+              bgcolor: 'rgba(255,255,255,0.04)', color: '#cbd5e1', fontSize: '0.8rem',
+              '& fieldset': { borderColor: 'rgba(139,92,246,0.3)' },
+              '&:hover fieldset': { borderColor: 'rgba(139,92,246,0.5)' },
+              '&.Mui-focused fieldset': { borderColor: '#8b5cf6' },
+            },
+            '& .MuiInputBase-input::placeholder': { color: '#475569', opacity: 1 },
+          }}
+        />
+      </Collapse>
+    </Box>
+  );
 
   if (pendingDrafts.length === 0) {
     return (
@@ -37,13 +78,14 @@ export default function DraftPanel({ aiResponses, selectedDraftIdx, sending, gen
               size="small" variant="outlined"
               startIcon={generating ? <CircularProgress size={14} /> : <AutoAwesomeIcon />}
               disabled={generating}
-              onClick={onGenerate}
+              onClick={handleGenerate}
               sx={{ color: '#8b5cf6', borderColor: '#8b5cf6', textTransform: 'none', '&:hover': { bgcolor: 'rgba(139,92,246,0.1)' } }}
             >
               {generating ? 'AI 생성 중...' : 'AI 초안 생성'}
             </Button>
           )}
         </Stack>
+        {contextInput}
       </Box>
     );
   }
@@ -129,13 +171,14 @@ export default function DraftPanel({ aiResponses, selectedDraftIdx, sending, gen
             size="small" variant="outlined"
             startIcon={generating ? <CircularProgress size={14} /> : <AutoAwesomeIcon />}
             disabled={generating}
-            onClick={onGenerate}
+            onClick={handleGenerate}
             sx={{ color: '#8b5cf6', borderColor: '#8b5cf6', textTransform: 'none', '&:hover': { bgcolor: 'rgba(139,92,246,0.1)' } }}
           >
             {generating ? '생성 중...' : '새 초안'}
           </Button>
         )}
       </Stack>
+      {contextInput}
     </Box>
   );
 }
