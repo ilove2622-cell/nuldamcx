@@ -17,6 +17,7 @@ import {
   hasEscalationKeyword,
 } from '@/lib/escalation';
 import { emojifyText } from '@/lib/emoji-utils';
+import { checkBusinessHours, getNextBusinessDayISO } from '@/lib/business-hours';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -314,7 +315,9 @@ async function handleMessageCreated(payload: any, refers: any) {
 
   // Step 2: 키워드 기반 무조건 에스컬레이션 체크
   if (hasEscalationKeyword(fullCustomerText)) {
-    await recordAndEscalate(session.id, msgRow?.id, userChatId, fullCustomerText, '키워드 감지 (환불/교환/취소/클레임 등)', undefined, MODE);
+    const bh = checkBusinessHours();
+    await recordAndEscalate(session.id, msgRow?.id, userChatId, fullCustomerText, '키워드 감지 (환불/교환/취소/클레임 등)', undefined, MODE, !bh.isOpen);
+    if (MODE === 'live') await sendEscalationGuide(userChatId, bh);
     return;
   }
 
@@ -335,23 +338,29 @@ async function handleMessageCreated(payload: any, refers: any) {
 
     // 무조건 에스컬레이션 카테고리
     if (shouldForceEscalate(llm.category)) {
-      await recordAndEscalate(session.id, msgRow?.id, userChatId, fullCustomerText, `카테고리: ${llm.category}`, llm, MODE);
+      const bh = checkBusinessHours();
+      await recordAndEscalate(session.id, msgRow?.id, userChatId, fullCustomerText, `카테고리: ${llm.category}`, llm, MODE, !bh.isOpen);
+      if (MODE === 'live') await sendEscalationGuide(userChatId, bh);
       return;
     }
 
     // LLM이 에스컬레이션 판단
     if (llm.escalate) {
-      await recordAndEscalate(session.id, msgRow?.id, userChatId, fullCustomerText, llm.reason, llm, MODE);
+      const bh = checkBusinessHours();
+      await recordAndEscalate(session.id, msgRow?.id, userChatId, fullCustomerText, llm.reason, llm, MODE, !bh.isOpen);
+      if (MODE === 'live') await sendEscalationGuide(userChatId, bh);
       return;
     }
 
     // 신뢰도 체크
     if (llm.confidence < CONFIDENCE_THRESHOLD) {
+      const bh = checkBusinessHours();
       await recordAndEscalate(
         session.id, msgRow?.id, userChatId, fullCustomerText,
         `신뢰도 부족 (${llm.confidence.toFixed(2)} < ${CONFIDENCE_THRESHOLD})`,
-        llm, MODE
+        llm, MODE, !bh.isOpen
       );
+      if (MODE === 'live') await sendEscalationGuide(userChatId, bh);
       return;
     }
 
@@ -366,7 +375,9 @@ async function handleMessageCreated(payload: any, refers: any) {
     }, MODE);
   } catch (err: any) {
     console.error('LLM 호출 실패:', err);
-    await recordAndEscalate(session.id, msgRow?.id, userChatId, fullCustomerText, `LLM 오류: ${err.message}`, undefined, MODE);
+    const bh = checkBusinessHours();
+    await recordAndEscalate(session.id, msgRow?.id, userChatId, fullCustomerText, `LLM 오류: ${err.message}`, undefined, MODE, !bh.isOpen);
+    if (MODE === 'live') await sendEscalationGuide(userChatId, bh);
   }
 }
 
@@ -607,7 +618,8 @@ async function recordAndEscalate(
   customerText: string,
   reason: string,
   llm?: { model: string; answer: string; confidence: number; category: string; reason: string },
-  MODE: string = 'dryrun'
+  MODE: string = 'dryrun',
+  offHours: boolean = false
 ) {
   // 이전 미발송 초안 삭제 (최신 초안으로 교체)
   await supabase
@@ -640,17 +652,55 @@ async function recordAndEscalate(
     category: llm?.category || '기타',
   });
 
-  // 실제 에스컬레이션 (드라이런이어도 기록은 함, 채널톡 API 호출만 분기)
+  // 실제 에스컬레이션
   if (MODE === 'live') {
-    await escalate(userChatId, reason, llm?.category);
-    console.log(`🚨 에스컬레이션 (live): [${userChatId}] ${reason}`);
+    if (offHours) {
+      // 상담시간 외: escalate() 호출 스킵 (봇 유지), snoozed 상태로 전환
+      console.log(`🌙 에스컬레이션 보류 (상담시간 외): [${userChatId}] ${reason}`);
+    } else {
+      // 상담시간 내: 기존대로 봇 해제 + 상담원 배정
+      await escalate(userChatId, reason, llm?.category);
+      console.log(`🚨 에스컬레이션 (live): [${userChatId}] ${reason}`);
+    }
   } else {
     console.log(`📝 에스컬레이션 (dryrun): [${userChatId}] ${reason}`);
   }
 
   // 세션 상태 업데이트
-  await supabase
-    .from('chat_sessions')
-    .update({ status: 'escalated' })
-    .eq('id', sessionId);
+  if (offHours && MODE === 'live') {
+    await supabase
+      .from('chat_sessions')
+      .update({
+        status: 'snoozed',
+        snoozed_until: getNextBusinessDayISO(),
+      })
+      .eq('id', sessionId);
+  } else {
+    await supabase
+      .from('chat_sessions')
+      .update({ status: 'escalated' })
+      .eq('id', sessionId);
+  }
+}
+
+/** 에스컬레이션 시 고객에게 안내 메시지 발송 */
+async function sendEscalationGuide(
+  userChatId: string,
+  bh: { isOpen: boolean; nextOpenDesc: string }
+) {
+  try {
+    if (bh.isOpen) {
+      await sendMessage(
+        userChatId,
+        '해당 문의는 담당 상담원이 직접 확인해드려야 하는 사항입니다.\n상담원에게 연결해드리겠습니다. 잠시만 기다려주세요 😊'
+      );
+    } else {
+      await sendMessage(
+        userChatId,
+        `해당 문의는 담당 상담원이 직접 확인해드려야 하는 사항입니다.\n\n현재는 상담 가능 시간이 아니에요.\n널담 상담 시간: 평일 10:00 ~ 17:00 (주말·공휴일 휴무)\n\n${bh.nextOpenDesc}에 상담원이 확인 후 답변드리겠습니다.\n접수된 내용은 저장되어 있으니 안심하세요! 😊`
+      );
+    }
+  } catch (err) {
+    console.warn('에스컬레이션 안내 메시지 발송 실패:', err);
+  }
 }
