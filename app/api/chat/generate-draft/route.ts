@@ -83,23 +83,19 @@ export async function POST(req: NextRequest) {
 
         if (result.found) {
           const product = result.productName + (result.optionName ? ` (${result.optionName})` : '');
-          const trackingDisplay = result.courier && result.trackingNumber
-            ? `${result.courier} ${result.trackingNumber}`
-            : result.trackingNumber
-              ? result.trackingNumber
-              : '송장 미등록';
 
           // 택배사 실시간 배송조회 (tracker.delivery API)
           let deliveryStatus = '';
           let deliverySteps = '';
+          let realCarrier = result.courier || '';
           if (result.trackingNumber) {
             try {
               const trackNum = result.trackingNumber.replace(/[-\s]/g, '');
-              const courierParam = encodeURIComponent(result.courier || '');
-              const trackRes = await fetch(`https://nuldamcx.vercel.app/api/tracking?courierName=${courierParam}&num=${trackNum}`);
+              const trackRes = await fetch(`https://nuldamcx.vercel.app/api/tracking?num=${trackNum}`);
               if (trackRes.ok) {
                 const trackData = await trackRes.json();
                 deliveryStatus = trackData.currentStatus || '';
+                realCarrier = trackData.carrier || realCarrier;
                 if (trackData.steps && trackData.steps.length > 0) {
                   const recent = trackData.steps.slice(-3);
                   deliverySteps = recent.map((s: any) => `${s.date} ${s.location} - ${s.detail || s.step}`).join('\n');
@@ -107,6 +103,12 @@ export async function POST(req: NextRequest) {
               }
             } catch { /* 조회 실패해도 무시 */ }
           }
+
+          const trackingDisplay = realCarrier && result.trackingNumber
+            ? `${realCarrier} ${result.trackingNumber}`
+            : result.trackingNumber
+              ? result.trackingNumber
+              : '송장 미등록';
 
           const todayStr = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10).replace(/-/g, '');
           orderContext = [
