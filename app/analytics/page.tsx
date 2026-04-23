@@ -108,7 +108,7 @@ export default function AnalyticsPage() {
         <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
           <Typography variant="h5" fontWeight={700}>
             <TrendingUpIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
-            종합 분석
+            채팅 상담 분석
           </Typography>
           <Select
             size="small"
