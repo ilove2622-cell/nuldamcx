@@ -243,7 +243,7 @@ export default function AnalyticsPage() {
         {/* ─── 게시판 문의 분석 ─── */}
         {board && (
           <>
-            <Typography variant="h6" fontWeight={700} sx={{ mb: 2, mt: 1 }}>
+            <Typography variant="h5" fontWeight={700} sx={{ mb: 2, mt: 1 }}>
               <InboxIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
               게시판 문의 분석
             </Typography>
