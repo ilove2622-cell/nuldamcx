@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { pickPrimarySearch } from '@/lib/order-parser';
 import { lookupOrderBySabangnet, lookupOrder } from '@/lib/sabangnet-order-lookup';
 import { generate } from '@/lib/llm-router';
+import { lookupTracking } from '@/lib/tracking-lookup';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -84,22 +85,18 @@ export async function POST(req: NextRequest) {
         if (result.found) {
           const product = result.productName + (result.optionName ? ` (${result.optionName})` : '');
 
-          // 택배사 실시간 배송조회 (tracker.delivery API)
+          // 택배사 실시간 배송조회 (직접 함수 호출)
           let deliveryStatus = '';
           let deliverySteps = '';
           let realCarrier = result.courier || '';
           if (result.trackingNumber) {
             try {
-              const trackNum = result.trackingNumber.replace(/[-\s]/g, '');
-              const trackRes = await fetch(`https://nuldamcx-delta.vercel.app/api/tracking?num=${trackNum}`);
-              if (trackRes.ok) {
-                const trackData = await trackRes.json();
-                deliveryStatus = trackData.currentStatus || '';
-                realCarrier = trackData.carrier || realCarrier;
-                if (trackData.steps && trackData.steps.length > 0) {
-                  const recent = trackData.steps.slice(-3);
-                  deliverySteps = recent.map((s: any) => `${s.date} ${s.location} - ${s.detail || s.step}`).join('\n');
-                }
+              const trackData = await lookupTracking(result.trackingNumber, result.courier);
+              deliveryStatus = trackData.currentStatus || '';
+              realCarrier = trackData.carrier || realCarrier;
+              if (trackData.steps && trackData.steps.length > 0) {
+                const recent = trackData.steps.slice(-3);
+                deliverySteps = recent.map((s: any) => `${s.date} ${s.location} - ${s.detail || s.step}`).join('\n');
               }
             } catch { /* 조회 실패해도 무시 */ }
           }
