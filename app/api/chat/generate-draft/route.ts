@@ -63,9 +63,10 @@ export async function POST(req: NextRequest) {
       new Date(new Date(m.created_at).getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10) === todayKST
     );
 
-    // 사방넷 주문조회
+    // 사방넷 주문조회 (고객 메시지 + 참고 메모에서 주문번호 추출)
     let orderContext = '';
-    const search = pickPrimarySearch(fullCustomerText);
+    const searchText = extraContext ? `${fullCustomerText}\n${extraContext}` : fullCustomerText;
+    const search = pickPrimarySearch(searchText);
     if (search) {
       try {
         let result;
