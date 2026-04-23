@@ -110,9 +110,73 @@ export async function POST(req: Request) {
       }
     }
 
+    // 신규 건 주문 상세 자동 조회 (주문번호가 있는 건만, 중복 제거)
+    const orderNumbers = [...new Set(
+      newItems
+        .map((item: any) => item.order_number)
+        .filter((n: string) => n && n !== '-')
+    )];
+
+    let detailCount = 0;
+    const reqUrl2 = new URL(req.url);
+    let detailDomain = `${reqUrl2.protocol}//${reqUrl2.host}`;
+    if (detailDomain.includes('localhost')) detailDomain = 'https://nuldamcx.vercel.app';
+
+    for (const orderNum of orderNumbers) {
+      try {
+        const xmlUrl = `${detailDomain}/api/sabangnet-req-order?orderId=${orderNum}&ext=.xml`;
+        const sabangnetApiUrl = `https://sbadmin15.sabangnet.co.kr/RTL_API/xml_order_info.html?xml_url=${encodeURIComponent(xmlUrl)}`;
+        const detailRes = await fetch(sabangnetApiUrl, { method: 'GET' });
+        if (!detailRes.ok) continue;
+
+        const detailXml = await detailRes.text();
+        const detailParser = new XMLParser({ ignoreAttributes: true, isArray: (name) => name === 'DATA' });
+        const detailJson = detailParser.parse(detailXml);
+        const detailList = detailJson?.SABANG_ORDER_LIST?.DATA;
+        if (!detailList || detailList.length === 0) continue;
+
+        const head = detailList[0].ITEM || detailList[0];
+        const orderItems = detailList.map((d: any) => {
+          const it = d.ITEM || d;
+          const isGift = !!(it.GIFT_NAME && String(it.GIFT_NAME).trim());
+          return {
+            productId: it.PRODUCT_ID ? String(it.PRODUCT_ID) : '',
+            mallProductId: it.MALL_PRODUCT_ID ? String(it.MALL_PRODUCT_ID) : '',
+            productName: it.PRODUCT_NAME ? String(it.PRODUCT_NAME) : '',
+            skuAlias: it.SKU_ALIAS_NO ? String(it.SKU_ALIAS_NO) : '',
+            sku: it.SKU_NO ? String(it.SKU_NO) : '',
+            option: it.SKU_VALUE ? String(it.SKU_VALUE) : '',
+            unitName: it.P_PRODUCT_NAME ? String(it.P_PRODUCT_NAME) : (it.PRODUCT_NAME ? String(it.PRODUCT_NAME) : ''),
+            barcode: it.BARCODE ? String(it.BARCODE) : '',
+            qty: Number(it.SALE_CNT) || 1,
+            gift: isGift,
+            giftName: isGift ? String(it.GIFT_NAME) : '',
+          };
+        });
+
+        await supabase
+          .from('inquiries')
+          .update({
+            orderer_name: head.USER_NAME || '',
+            receiver_name: head.RECEIVE_NAME || '',
+            receiver_tel: head.RECEIVE_TEL || head.USER_TEL || '',
+            shipping_address: head.RECEIVE_ZIPCODE ? `(${head.RECEIVE_ZIPCODE}) ${head.RECEIVE_ADDR}` : (head.RECEIVE_ADDR || ''),
+            tracking_number: head.INVOICE_NO || '',
+            order_items: orderItems,
+          })
+          .eq('order_number', orderNum);
+
+        detailCount++;
+      } catch (e: any) {
+        console.warn(`[전체 수집] 주문 상세 조회 실패 (${orderNum}):`, e.message);
+      }
+    }
+
+    console.log(`[전체 수집] 주문 상세 자동 조회: ${detailCount}/${orderNumbers.length}건`);
+
     return NextResponse.json({
       status: 'success',
-      message: `전체 수집 완료! 신규 추가: ${insertedCount}건`,
+      message: `전체 수집 완료! 신규 추가: ${insertedCount}건, 상세 조회: ${detailCount}건`,
       count: insertedCount,
     });
 
