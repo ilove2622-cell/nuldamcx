@@ -147,17 +147,17 @@ export default function AnalyticsPage() {
 
         {/* 채널별 세션 수 (인라인) */}
         <Stack direction="row" spacing={2} mb={3} alignItems="center">
-          <Typography variant="caption" sx={{ color: '#64748b' }}>채널별</Typography>
+          <Typography sx={{ color: '#64748b', fontSize: '0.9rem' }}>채널별</Typography>
           {channels.map(ch => (
             <Chip
               key={ch.name}
               label={`${channelLabel(ch.name)} ${ch.count}`}
-              size="small"
+              size="medium"
               sx={{
                 bgcolor: `${ch.name === 'appKakao' ? '#fee500' : ch.name === 'appNaverTalk' ? '#03c75a' : '#3b82f6'}18`,
                 color: ch.name === 'appKakao' ? '#fee500' : ch.name === 'appNaverTalk' ? '#03c75a' : '#3b82f6',
                 fontWeight: 700,
-                fontSize: '0.8rem',
+                fontSize: '0.95rem',
               }}
             />
           ))}
