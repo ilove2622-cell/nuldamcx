@@ -6,6 +6,7 @@ import {
   Send as SendIcon,
   Edit as EditIcon,
   SmartToy as SmartToyIcon,
+  AutoAwesome as AutoAwesomeIcon,
 } from '@mui/icons-material';
 import type { AIResponse } from '@/types/chat';
 import { confidenceColor } from '@/lib/chat-helpers';
@@ -14,20 +15,35 @@ interface DraftPanelProps {
   aiResponses: AIResponse[];
   selectedDraftIdx: number;
   sending: boolean;
+  generating?: boolean;
   onSelectDraft: (idx: number) => void;
   onSend: (draft: AIResponse) => void;
   onCopyToEditor: (text: string) => void;
+  onGenerate?: () => void;
 }
 
-export default function DraftPanel({ aiResponses, selectedDraftIdx, sending, onSelectDraft, onSend, onCopyToEditor }: DraftPanelProps) {
+export default function DraftPanel({ aiResponses, selectedDraftIdx, sending, generating, onSelectDraft, onSend, onCopyToEditor, onGenerate }: DraftPanelProps) {
   const pendingDrafts = aiResponses.filter(a => !a.sent_at && a.mode?.trim() === 'dryrun');
 
   if (pendingDrafts.length === 0) {
     return (
       <Box sx={{ p: 2 }}>
-        <Typography variant="caption" sx={{ color: '#475569' }}>
-          {aiResponses.length > 0 ? '모든 AI 초안이 발송되었습니다' : '대기 중인 AI 초안이 없습니다'}
-        </Typography>
+        <Stack direction="row" spacing={2} alignItems="center">
+          <Typography variant="caption" sx={{ color: '#475569' }}>
+            {aiResponses.length > 0 ? '모든 AI 초안이 발송되었습니다' : '대기 중인 AI 초안이 없습니다'}
+          </Typography>
+          {onGenerate && (
+            <Button
+              size="small" variant="outlined"
+              startIcon={generating ? <CircularProgress size={14} /> : <AutoAwesomeIcon />}
+              disabled={generating}
+              onClick={onGenerate}
+              sx={{ color: '#8b5cf6', borderColor: '#8b5cf6', textTransform: 'none', '&:hover': { bgcolor: 'rgba(139,92,246,0.1)' } }}
+            >
+              {generating ? 'AI 생성 중...' : 'AI 초안 생성'}
+            </Button>
+          )}
+        </Stack>
       </Box>
     );
   }
@@ -108,6 +124,17 @@ export default function DraftPanel({ aiResponses, selectedDraftIdx, sending, onS
         >
           초안 복사
         </Button>
+        {onGenerate && (
+          <Button
+            size="small" variant="outlined"
+            startIcon={generating ? <CircularProgress size={14} /> : <AutoAwesomeIcon />}
+            disabled={generating}
+            onClick={onGenerate}
+            sx={{ color: '#8b5cf6', borderColor: '#8b5cf6', textTransform: 'none', '&:hover': { bgcolor: 'rgba(139,92,246,0.1)' } }}
+          >
+            {generating ? '생성 중...' : '새 초안'}
+          </Button>
+        )}
       </Stack>
     </Box>
   );

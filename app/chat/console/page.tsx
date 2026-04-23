@@ -82,6 +82,7 @@ function ChatConsolePage() {
   const [freeText, setFreeText] = useState('');
   const [selectedDraftIdx, setSelectedDraftIdx] = useState(0);
   const [sending, setSending] = useState(false);
+  const [generating, setGenerating] = useState(false);
   const [escalating, setEscalating] = useState(false);
   const [escalateReason, setEscalateReason] = useState('');
 
@@ -417,6 +418,30 @@ function ChatConsolePage() {
     }
   };
 
+  // ─── AI 초안 생성 ───
+  const handleGenerateDraft = async () => {
+    if (!activeSession) return;
+    setGenerating(true);
+    try {
+      const res = await fetch('/api/chat/generate-draft', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: activeSession.id }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || '생성 실패');
+      }
+      showToast('AI 초안이 생성되었습니다', 'success');
+      await fetchChat(activeSession.id);
+      setSelectedDraftIdx(0);
+    } catch (err) {
+      showToast(`AI 초안 생성 실패: ${err}`, 'error');
+    } finally {
+      setGenerating(false);
+    }
+  };
+
   // ─── 별표 토글 ───
   const handleToggleStar = (e: React.MouseEvent, sessionId: number) => {
     e.stopPropagation();
@@ -719,9 +744,11 @@ function ChatConsolePage() {
                   aiResponses={aiResponses}
                   selectedDraftIdx={selectedDraftIdx}
                   sending={sending}
+                  generating={generating}
                   onSelectDraft={setSelectedDraftIdx}
                   onSend={handleSend}
                   onCopyToEditor={setFreeText}
+                  onGenerate={handleGenerateDraft}
                 />
                 <MessageInput
                   freeText={freeText}
