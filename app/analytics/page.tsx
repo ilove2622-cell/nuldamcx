@@ -12,6 +12,7 @@ import {
   Chat as ChatIcon,
   Send as SendIcon,
   TrendingUp as TrendingUpIcon,
+  HeadsetMic as HeadsetMicIcon,
   Inbox as InboxIcon,
   HourglassEmpty as HourglassIcon,
   CheckCircle as CheckCircleIcon,
@@ -107,7 +108,7 @@ export default function AnalyticsPage() {
       <Container maxWidth="xl">
         <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
           <Typography variant="h5" fontWeight={700}>
-            <TrendingUpIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
+            <HeadsetMicIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
             채팅 상담 분석
           </Typography>
           <Select
