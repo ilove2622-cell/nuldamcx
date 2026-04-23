@@ -1,4 +1,6 @@
 import crypto from 'crypto';
+import { fetchWithRetry } from './fetch-with-retry';
+import { channeltalkLimiter } from './rate-limiter';
 
 const BASE_URL = 'https://api.channel.io/open/v5';
 const ACCESS_KEY = process.env.CHANNELTALK_ACCESS_KEY || '';
@@ -6,7 +8,7 @@ const ACCESS_SECRET = process.env.CHANNELTALK_ACCESS_SECRET || '';
 const CHANNEL_ID = process.env.CHANNELTALK_CHANNEL_ID || '';
 const WEBHOOK_TOKEN = process.env.CHANNELTALK_WEBHOOK_TOKEN || '';
 
-function authHeaders() {
+function authHeaders(): Record<string, string> {
   return {
     'Content-Type': 'application/json',
     'X-Access-Key': ACCESS_KEY,
@@ -14,9 +16,15 @@ function authHeaders() {
   };
 }
 
+/** Rate-limited fetch with retry for ChannelTalk API */
+async function ctFetch(url: string, options: RequestInit = {}): Promise<Response> {
+  await channeltalkLimiter.acquire();
+  return fetchWithRetry(url, { ...options, timeout: 10_000, maxRetries: 3 });
+}
+
 /** 유저챗에 봇 메시지 발송 */
 export async function sendMessage(userChatId: string, text: string) {
-  const res = await fetch(`${BASE_URL}/user-chats/${userChatId}/messages`, {
+  const res = await ctFetch(`${BASE_URL}/user-chats/${userChatId}/messages`, {
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify({
@@ -32,7 +40,7 @@ export async function sendMessage(userChatId: string, text: string) {
 
 /** 봇 배정 (자동응답 모드) */
 export async function assignToBot(userChatId: string) {
-  const res = await fetch(`${BASE_URL}/user-chats/${userChatId}/assign-to-bot`, {
+  const res = await ctFetch(`${BASE_URL}/user-chats/${userChatId}/assign-to-bot`, {
     method: 'POST',
     headers: authHeaders(),
   });
@@ -45,7 +53,7 @@ export async function assignToBot(userChatId: string) {
 
 /** 봇 배정 해제 (상담사에게 넘기기) */
 export async function unassignFromBot(userChatId: string) {
-  const res = await fetch(`${BASE_URL}/user-chats/${userChatId}/unassign-from-bot`, {
+  const res = await ctFetch(`${BASE_URL}/user-chats/${userChatId}/unassign-from-bot`, {
     method: 'POST',
     headers: authHeaders(),
   });
@@ -58,7 +66,7 @@ export async function unassignFromBot(userChatId: string) {
 
 /** 유저챗에 태그 추가 */
 export async function addTag(userChatId: string, tag: string) {
-  const res = await fetch(`${BASE_URL}/user-chats/${userChatId}/tags`, {
+  const res = await ctFetch(`${BASE_URL}/user-chats/${userChatId}/tags`, {
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify({ tag }),
@@ -71,7 +79,7 @@ export async function addTag(userChatId: string, tag: string) {
 
 /** 내부 메모(노트) 추가 */
 export async function addNote(userChatId: string, text: string) {
-  const res = await fetch(`${BASE_URL}/user-chats/${userChatId}/messages`, {
+  const res = await ctFetch(`${BASE_URL}/user-chats/${userChatId}/messages`, {
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify({
@@ -87,7 +95,7 @@ export async function addNote(userChatId: string, text: string) {
 
 /** 유저챗 정보 조회 (채널 유형 등) */
 export async function getUserChat(userChatId: string): Promise<any> {
-  const res = await fetch(`${BASE_URL}/user-chats/${userChatId}`, {
+  const res = await ctFetch(`${BASE_URL}/user-chats/${userChatId}`, {
     method: 'GET',
     headers: authHeaders(),
   });
@@ -99,7 +107,7 @@ export async function getUserChat(userChatId: string): Promise<any> {
 /** 채널톡 private 파일의 signed download URL 발급 (15분 유효) */
 export async function getSignedFileUrl(userChatId: string, fileKey: string): Promise<string | null> {
   try {
-    const res = await fetch(
+    const res = await ctFetch(
       `${BASE_URL}/user-chats/${userChatId}/messages/file?key=${encodeURIComponent(fileKey)}`,
       { method: 'GET', headers: authHeaders() },
     );

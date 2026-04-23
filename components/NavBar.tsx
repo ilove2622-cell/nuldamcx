@@ -2,28 +2,51 @@
 
 import { usePathname, useRouter } from 'next/navigation';
 import {
-  Box, Container, Typography, Stack, Button
+  Box, Container, Typography, Stack, Button, Breadcrumbs
 } from '@mui/material';
 import DocumentScannerIcon from '@mui/icons-material/DocumentScanner';
 import BiotechIcon from '@mui/icons-material/Biotech';
 import HeadsetMicIcon from '@mui/icons-material/HeadsetMic';
 import BarChartIcon from '@mui/icons-material/BarChart';
 import HomeIcon from '@mui/icons-material/Home';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import NavigateNextIcon from '@mui/icons-material/NavigateNext';
 
 const NAV_ITEMS = [
   { path: '/', label: '홈', icon: <HomeIcon fontSize="small" /> },
   { path: '/ocr', label: 'OCR', icon: <DocumentScannerIcon fontSize="small" /> },
   { path: '/voc', label: 'VOC', icon: <BiotechIcon fontSize="small" /> },
   { path: '/chat', label: '채팅상담', icon: <HeadsetMicIcon fontSize="small" /> },
+  { path: '/analytics', label: '분석', icon: <TrendingUpIcon fontSize="small" /> },
   { path: '/status', label: '문의현황', icon: <BarChartIcon fontSize="small" /> },
 ];
+
+// 경로 → 라벨 매핑
+const BREADCRUMB_MAP: Record<string, string> = {
+  '/': '홈',
+  '/chat': '채팅상담',
+  '/chat/console': '실시간 콘솔',
+  '/analytics': '분석',
+  '/ocr': 'OCR',
+  '/voc': 'VOC',
+  '/status': '문의현황',
+};
 
 export default function NavBar() {
   const router = useRouter();
   const pathname = usePathname();
 
-  // 로그인 페이지에서는 네비게이션 숨김
   if (pathname === '/login') return null;
+
+  // Breadcrumbs 생성
+  const pathParts = pathname.split('/').filter(Boolean);
+  const crumbs: Array<{ label: string; path: string }> = [];
+  let accumulated = '';
+  for (const part of pathParts) {
+    accumulated += `/${part}`;
+    const label = BREADCRUMB_MAP[accumulated];
+    if (label) crumbs.push({ label, path: accumulated });
+  }
 
   return (
     <Box
@@ -38,13 +61,37 @@ export default function NavBar() {
       }}
     >
       <Container maxWidth="xl" sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 1.5, px: { xs: 1.5, sm: 3, lg: 4 }, gap: 1 }}>
-        <Box
-          onClick={() => router.push('/')}
-          sx={{ display: 'flex', alignItems: 'baseline', gap: 1, minWidth: 0, flexShrink: 1, cursor: 'pointer' }}
-        >
-          <Typography sx={{ fontWeight: 800, letterSpacing: '-1px', fontSize: { xs: '1.1rem', md: '1.5rem' }, whiteSpace: 'nowrap' }}>
-            <span style={{ color: '#3b82f6' }}>N</span>uldam <span style={{ color: '#94a3b8', fontWeight: 300 }}>CX</span>
-          </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0, flexShrink: 1 }}>
+          <Box
+            onClick={() => router.push('/')}
+            sx={{ display: 'flex', alignItems: 'baseline', gap: 1, cursor: 'pointer' }}
+          >
+            <Typography sx={{ fontWeight: 800, letterSpacing: '-1px', fontSize: { xs: '1.1rem', md: '1.5rem' }, whiteSpace: 'nowrap' }}>
+              <span style={{ color: '#3b82f6' }}>N</span>uldam <span style={{ color: '#94a3b8', fontWeight: 300 }}>CX</span>
+            </Typography>
+          </Box>
+          {crumbs.length > 0 && (
+            <Breadcrumbs
+              separator={<NavigateNextIcon sx={{ fontSize: 14, color: '#475569' }} />}
+              sx={{ ml: 2, display: { xs: 'none', md: 'flex' } }}
+            >
+              {crumbs.map((crumb, i) => (
+                <Typography
+                  key={crumb.path}
+                  variant="caption"
+                  onClick={i < crumbs.length - 1 ? () => router.push(crumb.path) : undefined}
+                  sx={{
+                    color: i === crumbs.length - 1 ? '#94a3b8' : '#64748b',
+                    cursor: i < crumbs.length - 1 ? 'pointer' : 'default',
+                    fontWeight: i === crumbs.length - 1 ? 600 : 400,
+                    '&:hover': i < crumbs.length - 1 ? { color: '#cbd5e1' } : {},
+                  }}
+                >
+                  {crumb.label}
+                </Typography>
+              ))}
+            </Breadcrumbs>
+          )}
           <Typography variant="caption" sx={{ color: '#64748b', ml: 1, letterSpacing: '1px', display: { xs: 'none', lg: 'inline' } }}>
             INTEGRATED WORKSPACE
           </Typography>

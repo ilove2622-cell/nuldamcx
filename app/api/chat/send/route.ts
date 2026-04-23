@@ -10,17 +10,31 @@ const supabase = createClient(
 /**
  * POST /api/chat/send
  * AI 초안을 채널톡으로 실제 발송
- * body: { userChatId, text, aiResponseId? }
+ * body: { userChatId, text, aiResponseId?, idempotencyKey? }
  */
 export async function POST(req: NextRequest) {
   try {
-    const { userChatId, text, aiResponseId } = await req.json();
+    const { userChatId, text, aiResponseId, idempotencyKey } = await req.json();
 
     if (!userChatId || !text) {
       return NextResponse.json(
         { error: 'userChatId와 text는 필수입니다' },
         { status: 400 }
       );
+    }
+
+    // 멱등성 체크: 동일 키가 이미 있으면 중복 요청
+    if (idempotencyKey) {
+      const { data: existing } = await supabase
+        .from('chat_messages')
+        .select('id')
+        .eq('idempotency_key', idempotencyKey)
+        .maybeSingle();
+
+      if (existing) {
+        console.log(`⏩ 중복 발송 무시 (idempotency_key: ${idempotencyKey})`);
+        return NextResponse.json({ ok: true, deduplicated: true });
+      }
     }
 
     // 1. 채널톡 메시지 발송
@@ -46,6 +60,7 @@ export async function POST(req: NextRequest) {
         session_id: session.id,
         sender: 'bot',
         text,
+        ...(idempotencyKey ? { idempotency_key: idempotencyKey } : {}),
       });
       await supabase.from('chat_sessions').update({
         last_message_at: new Date().toISOString(),

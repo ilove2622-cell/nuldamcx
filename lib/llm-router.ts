@@ -14,6 +14,8 @@ const API_KEYS = [
   process.env.GEMINI_API_KEY_5,
 ].filter(Boolean) as string[];
 
+const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || '';
+
 export type Category =
   | '주문조회' | '배송' | '환불' | '교환' | '취소'
   | '클레임' | '상품문의' | '기타';
@@ -71,85 +73,81 @@ answer 작성 규칙:
 - 대화 이력이 제공되면 이전 맥락을 이어서 자연스럽게 답변`;
 
 /**
- * Gemini 기반 LLM 라우터 — 멀티키 폴백 + RAG(match_scripts)
+ * Gemini 기반 LLM 라우터 — 멀티키 폴백 + RAG(match_scripts) + Claude 폴백
  */
 export async function generate(
   customerMessage: string,
   context?: string
 ): Promise<LLMResult> {
-  if (API_KEYS.length === 0) {
-    throw new Error('GEMINI_API_KEY가 설정되지 않았습니다.');
+  if (API_KEYS.length === 0 && !ANTHROPIC_API_KEY) {
+    throw new Error('GEMINI_API_KEY 또는 ANTHROPIC_API_KEY가 설정되지 않았습니다.');
   }
 
-  let lastError: any = null;
+  // RAG: 참고 스크립트 + 과거 상담 사례 조회 (별도 Gemini 키 소진과 독립)
+  let referenceText = '일치하는 안내 스크립트가 없습니다. 일반적인 CS 기준으로 친절하게 답변해주세요.';
+  let conversationRef = '';
+  let queryEmbedding: number[] | null = null;
 
-  for (let i = 0; i < API_KEYS.length; i++) {
-    const genAI = new GoogleGenerativeAI(API_KEYS[i]);
-
+  // embedding은 첫 번째 사용 가능한 키로 시도
+  for (const key of API_KEYS) {
     try {
-      // 1. Embedding → RAG
+      const genAI = new GoogleGenerativeAI(key);
       const embeddingModel = genAI.getGenerativeModel({ model: 'gemini-embedding-001' });
       const embeddingResult = await embeddingModel.embedContent(customerMessage);
-      const queryEmbedding = embeddingResult.embedding.values.slice(0, 768);
+      queryEmbedding = embeddingResult.embedding.values.slice(0, 768);
+      break;
+    } catch (err: any) {
+      const msg = (err.message || '').toLowerCase();
+      if (msg.includes('429') || msg.includes('quota') || msg.includes('exceeded')) continue;
+      break; // 다른 에러는 중단
+    }
+  }
 
-      const { data: matchedScripts } = await supabase.rpc('match_scripts', {
+  if (queryEmbedding) {
+    const [{ data: matchedScripts }, { data: matchedConvos }] = await Promise.all([
+      supabase.rpc('match_scripts', {
         query_embedding: queryEmbedding,
         match_threshold: 0.3,
         match_count: 2,
-      });
-
-      let referenceText = '';
-      if (matchedScripts && matchedScripts.length > 0) {
-        referenceText = matchedScripts
-          .map((s: any, idx: number) => `[참고 스크립트 ${idx + 1}: ${s.title}]\n${s.content}`)
-          .join('\n\n');
-      } else {
-        referenceText = '일치하는 안내 스크립트가 없습니다. 일반적인 CS 기준으로 친절하게 답변해주세요.';
-      }
-
-      // 1-b. 과거 상담 사례 RAG (동일 embedding 재사용)
-      let conversationRef = '';
-      const { data: matchedConvos } = await supabase.rpc('match_conversations', {
+      }),
+      supabase.rpc('match_conversations', {
         query_embedding: queryEmbedding,
         match_threshold: 0.4,
         match_count: 2,
-      });
-      if (matchedConvos && matchedConvos.length > 0) {
-        conversationRef = matchedConvos
-          .map((c: any, idx: number) =>
-            `[과거 유사 상담 ${idx + 1}]\n고객: ${c.customer_text}\n상담사: ${c.manager_response}`
-          )
-          .join('\n\n');
-      }
+      }),
+    ]);
 
-      // 2. Generate
-      const model = genAI.getGenerativeModel({
-        model: 'gemini-2.5-flash',
-        systemInstruction: SYSTEM_PROMPT,
-      });
+    if (matchedScripts && matchedScripts.length > 0) {
+      referenceText = matchedScripts
+        .map((s: any, idx: number) => `[참고 스크립트 ${idx + 1}: ${s.title}]\n${s.content}`)
+        .join('\n\n');
+    }
 
-      const prompt = [
-        '[참고 스크립트]',
-        referenceText,
-        conversationRef ? `\n[과거 유사 상담 사례]\n${conversationRef}` : '',
-        context ? `\n[추가 맥락]\n${context}` : '',
-        `\n[고객 메시지]\n${customerMessage}`,
-      ].join('\n');
+    // Phase 4.3: RAG 중복 제거 — manager 응답만 참고 (bot 응답 제외)
+    const filteredConvos = (matchedConvos || []).filter((c: any) => !c.source || c.source === 'manager');
+    if (filteredConvos.length > 0) {
+      conversationRef = filteredConvos
+        .map((c: any, idx: number) =>
+          `[과거 유사 상담 ${idx + 1}]\n고객: ${c.customer_text}\n상담사: ${c.manager_response}`
+        )
+        .join('\n\n');
+    }
+  }
 
-      const aiResult = await model.generateContent(prompt);
-      const raw = aiResult.response.text();
+  const prompt = [
+    '[참고 스크립트]',
+    referenceText,
+    conversationRef ? `\n[과거 유사 상담 사례]\n${conversationRef}` : '',
+    context ? `\n[추가 맥락]\n${context}` : '',
+    `\n[고객 메시지]\n${customerMessage}`,
+  ].join('\n');
 
-      // 3. Parse JSON
-      const parsed = parseJSON(raw);
-
-      return {
-        answer: parsed.answer || '',
-        confidence: Math.min(1, Math.max(0, Number(parsed.confidence) || 0)),
-        category: parsed.category || '기타',
-        escalate: Boolean(parsed.escalate),
-        reason: parsed.reason || '',
-        model: 'gemini-2.5-flash',
-      };
+  // Gemini 시도
+  let lastError: any = null;
+  for (let i = 0; i < API_KEYS.length; i++) {
+    try {
+      const result = await callGemini(API_KEYS[i], prompt);
+      return result;
     } catch (err: any) {
       lastError = err;
       const msg = (err.message || '').toLowerCase();
@@ -161,7 +159,97 @@ export async function generate(
     }
   }
 
-  throw new Error(`모든 Gemini API 키 한도 초과. 마지막 에러: ${lastError?.message}`);
+  // Phase 4.2: Claude 폴백
+  if (ANTHROPIC_API_KEY) {
+    console.log('🔄 Gemini 키 소진 → Claude 폴백');
+    try {
+      return await callClaude(prompt);
+    } catch (err: any) {
+      console.error('Claude 폴백 실패:', err.message);
+      throw err;
+    }
+  }
+
+  throw new Error(`모든 LLM API 키 한도 초과. 마지막 에러: ${lastError?.message}`);
+}
+
+async function callGemini(apiKey: string, prompt: string): Promise<LLMResult> {
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const model = genAI.getGenerativeModel({
+    model: 'gemini-2.5-flash',
+    systemInstruction: SYSTEM_PROMPT,
+  });
+
+  // 30초 타임아웃
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 30_000);
+
+  try {
+    const aiResult = await model.generateContent({
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    });
+    clearTimeout(timer);
+    const raw = aiResult.response.text();
+    const parsed = parseJSON(raw);
+
+    return {
+      answer: parsed.answer || '',
+      confidence: Math.min(1, Math.max(0, Number(parsed.confidence) || 0)),
+      category: parsed.category || '기타',
+      escalate: Boolean(parsed.escalate),
+      reason: parsed.reason || '',
+      model: 'gemini-2.5-flash',
+    };
+  } catch (err) {
+    clearTimeout(timer);
+    throw err;
+  }
+}
+
+async function callClaude(prompt: string): Promise<LLMResult> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 30_000);
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1024,
+        system: SYSTEM_PROMPT,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timer);
+
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(`Claude API error (${res.status}): ${body}`);
+    }
+
+    const data = await res.json();
+    const raw = data.content?.[0]?.text || '';
+    const parsed = parseJSON(raw);
+
+    return {
+      answer: parsed.answer || '',
+      confidence: Math.min(1, Math.max(0, Number(parsed.confidence) || 0)),
+      category: parsed.category || '기타',
+      escalate: Boolean(parsed.escalate),
+      reason: parsed.reason || '',
+      model: 'claude-sonnet-4-20250514',
+    };
+  } catch (err) {
+    clearTimeout(timer);
+    throw err;
+  }
 }
 
 function parseJSON(raw: string): any {

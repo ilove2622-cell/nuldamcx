@@ -34,6 +34,8 @@ interface Session {
   opened_at: string;
   closed_at: string | null;
   created_at: string;
+  last_message_at?: string | null;
+  last_message_text?: string | null;
 }
 
 interface Message {
@@ -122,10 +124,19 @@ export default function ChatDashboardPage() {
       const newAiResponses = extraRes.aiResponses || [];
       const newEscalations = extraRes.escalations || [];
 
-      // 데이터가 변경된 경우에만 상태 업데이트 (불필요한 리렌더링 방지)
-      setSessions(prev => JSON.stringify(prev) === JSON.stringify(newSessions) ? prev : newSessions);
-      setAiResponses(prev => JSON.stringify(prev) === JSON.stringify(newAiResponses) ? prev : newAiResponses);
-      setEscalations(prev => JSON.stringify(prev) === JSON.stringify(newEscalations) ? prev : newEscalations);
+      // 경량 비교: count + 마지막 항목 ID로 변경 감지 (JSON.stringify 대체)
+      setSessions(prev => {
+        if (prev.length === newSessions.length && prev[0]?.id === newSessions[0]?.id && prev[prev.length - 1]?.last_message_at === newSessions[newSessions.length - 1]?.last_message_at) return prev;
+        return newSessions;
+      });
+      setAiResponses(prev => {
+        if (prev.length === newAiResponses.length && prev[prev.length - 1]?.id === newAiResponses[newAiResponses.length - 1]?.id) return prev;
+        return newAiResponses;
+      });
+      setEscalations(prev => {
+        if (prev.length === newEscalations.length && prev[prev.length - 1]?.id === newEscalations[newEscalations.length - 1]?.id) return prev;
+        return newEscalations;
+      });
     } catch (e) {
       console.error('데이터 로드 실패:', e);
     }

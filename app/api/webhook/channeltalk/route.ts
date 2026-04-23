@@ -21,8 +21,40 @@ const supabase = createClient(
 );
 
 const CHANNEL_ID = process.env.CHANNELTALK_CHANNEL_ID || '';
-const MODE = (process.env.AUTO_REPLY_MODE || 'dryrun').trim(); // dryrun | live
-const CONFIDENCE_THRESHOLD = Number(process.env.AUTO_REPLY_CONFIDENCE_THRESHOLD) || 0.8;
+
+// 설정 캐시 (60초 TTL)
+let settingsCache: { mode: string; threshold: number; ts: number } | null = null;
+const SETTINGS_TTL = 60_000;
+
+async function getSettings(): Promise<{ mode: string; threshold: number }> {
+  if (settingsCache && Date.now() - settingsCache.ts < SETTINGS_TTL) {
+    return settingsCache;
+  }
+  try {
+    const { data: modeRow } = await supabase
+      .from('app_settings')
+      .select('value')
+      .eq('key', 'auto_reply_mode')
+      .single();
+    const { data: threshRow } = await supabase
+      .from('app_settings')
+      .select('value')
+      .eq('key', 'confidence_threshold')
+      .single();
+    const mode = modeRow?.value ? String(modeRow.value).replace(/"/g, '') : (process.env.AUTO_REPLY_MODE || 'dryrun').trim();
+    const threshold = threshRow?.value ? Number(threshRow.value) : (Number(process.env.AUTO_REPLY_CONFIDENCE_THRESHOLD) || 0.8);
+    settingsCache = { mode, threshold, ts: Date.now() };
+    return settingsCache;
+  } catch {
+    // DB 조회 실패 시 env fallback
+    const fallback = {
+      mode: (process.env.AUTO_REPLY_MODE || 'dryrun').trim(),
+      threshold: Number(process.env.AUTO_REPLY_CONFIDENCE_THRESHOLD) || 0.8,
+    };
+    settingsCache = { ...fallback, ts: Date.now() };
+    return fallback;
+  }
+}
 
 /** 채널톡 웹훅 핸들러 */
 export async function POST(req: NextRequest) {
@@ -119,12 +151,17 @@ async function handleMessageCreated(payload: any, refers: any) {
   if (personType !== 'user') {
     const session = await getOrCreateSession(userChatId, refers, message);
     const sender = personType === 'bot' ? 'bot' : 'agent';
-    await supabase.from('chat_messages').insert({
+    // 중복 웹훅 방지: message_id가 같으면 무시
+    const { error: dupErr } = await supabase.from('chat_messages').insert({
       session_id: session.id,
       sender,
       message_id: message.id,
       text,
     });
+    if (dupErr && dupErr.code === '23505') {
+      console.log(`⏩ 중복 메시지 무시: ${message.id}`);
+      return;
+    }
     await supabase.from('chat_sessions').update({
       last_message_at: new Date().toISOString(),
       last_message_text: text.slice(0, 100),
@@ -138,7 +175,7 @@ async function handleMessageCreated(payload: any, refers: any) {
   // 세션 조회/생성 (push 이벤트에서는 entity에서 정보 추출)
   const session = await getOrCreateSession(userChatId, refers, message);
 
-  // 고객 메시지 DB 기록
+  // 고객 메시지 DB 기록 (중복 웹훅 방지)
   const { data: msgRow, error: msgErr } = await supabase
     .from('chat_messages')
     .insert({
@@ -150,7 +187,13 @@ async function handleMessageCreated(payload: any, refers: any) {
     .select('id')
     .single();
 
-  if (msgErr) console.error(`❌ 메시지 저장 실패:`, msgErr.message);
+  if (msgErr) {
+    if (msgErr.code === '23505') {
+      console.log(`⏩ 중복 고객 메시지 무시: ${message.id}`);
+      return;
+    }
+    console.error(`❌ 메시지 저장 실패:`, msgErr.message);
+  }
 
   // 세션에 마지막 메시지 정보 업데이트
   await supabase.from('chat_sessions').update({
@@ -231,9 +274,14 @@ async function handleMessageCreated(payload: any, refers: any) {
     }
   }
 
+  // 동적 설정 로드
+  const settings = await getSettings();
+  const MODE = settings.mode;
+  const CONFIDENCE_THRESHOLD = settings.threshold;
+
   // Step 2: 키워드 기반 무조건 에스컬레이션 체크
   if (hasEscalationKeyword(fullCustomerText)) {
-    await recordAndEscalate(session.id, msgRow?.id, userChatId, fullCustomerText, '키워드 감지 (환불/교환/취소/클레임 등)');
+    await recordAndEscalate(session.id, msgRow?.id, userChatId, fullCustomerText, '키워드 감지 (환불/교환/취소/클레임 등)', undefined, MODE);
     return;
   }
 
@@ -254,13 +302,13 @@ async function handleMessageCreated(payload: any, refers: any) {
 
     // 무조건 에스컬레이션 카테고리
     if (shouldForceEscalate(llm.category)) {
-      await recordAndEscalate(session.id, msgRow?.id, userChatId, fullCustomerText, `카테고리: ${llm.category}`, llm);
+      await recordAndEscalate(session.id, msgRow?.id, userChatId, fullCustomerText, `카테고리: ${llm.category}`, llm, MODE);
       return;
     }
 
     // LLM이 에스컬레이션 판단
     if (llm.escalate) {
-      await recordAndEscalate(session.id, msgRow?.id, userChatId, fullCustomerText, llm.reason, llm);
+      await recordAndEscalate(session.id, msgRow?.id, userChatId, fullCustomerText, llm.reason, llm, MODE);
       return;
     }
 
@@ -269,7 +317,7 @@ async function handleMessageCreated(payload: any, refers: any) {
       await recordAndEscalate(
         session.id, msgRow?.id, userChatId, fullCustomerText,
         `신뢰도 부족 (${llm.confidence.toFixed(2)} < ${CONFIDENCE_THRESHOLD})`,
-        llm
+        llm, MODE
       );
       return;
     }
@@ -282,10 +330,10 @@ async function handleMessageCreated(payload: any, refers: any) {
       category: llm.category,
       escalate: false,
       reason: llm.reason,
-    });
+    }, MODE);
   } catch (err: any) {
     console.error('LLM 호출 실패:', err);
-    await recordAndEscalate(session.id, msgRow?.id, userChatId, fullCustomerText, `LLM 오류: ${err.message}`);
+    await recordAndEscalate(session.id, msgRow?.id, userChatId, fullCustomerText, `LLM 오류: ${err.message}`, undefined, MODE);
   }
 }
 
@@ -430,29 +478,7 @@ function getOriginalFileUrl(file: any): string | null {
 }
 
 async function getOrCreateSession(userChatId: string, refers: any, message?: any) {
-  const { data: existing, error: findErr } = await supabase
-    .from('chat_sessions')
-    .select('id, channel_type')
-    .eq('user_chat_id', userChatId)
-    .single();
-
-  if (existing) {
-    // 기존 세션의 channel_type이 부정확하면 API로 갱신
-    if (!['appKakao', 'appNaverTalk', 'native'].includes(existing.channel_type)) {
-      try {
-        const chatInfo = await getUserChat(userChatId);
-        const rawType = chatInfo?.source?.appMessenger?.mediumType || chatInfo?.source?.medium?.mediumType;
-        const normalized = normalizeChannelType(rawType);
-        if (normalized !== existing.channel_type) {
-          await supabase.from('chat_sessions').update({ channel_type: normalized }).eq('id', existing.id);
-        }
-      } catch { /* ignore */ }
-    }
-    return existing;
-  }
-  if (findErr) console.log(`세션 조회 결과: ${findErr.message} (정상 — 새 세션 생성)`);
-
-  // push 이벤트에서는 refers가 비어있으므로, 채널톡 API로 채팅 정보 조회
+  // 채널 유형과 고객 정보 확인
   let channelType = 'native';
   let customerName = refers.user?.profile?.name || null;
   try {
@@ -462,7 +488,8 @@ async function getOrCreateSession(userChatId: string, refers: any, message?: any
     if (!customerName && chatInfo?.name) customerName = chatInfo.name;
   } catch { /* ignore */ }
 
-  const insertData = {
+  // upsert로 경합 조건 방지
+  const upsertData = {
     user_chat_id: userChatId,
     channel_type: channelType,
     customer_id: refers.user?.id || message?.personId || null,
@@ -470,21 +497,26 @@ async function getOrCreateSession(userChatId: string, refers: any, message?: any
     status: 'open',
     opened_at: new Date().toISOString(),
   };
-  console.log(`📝 세션 생성 시도:`, JSON.stringify(insertData));
 
-  const { data: created, error: insertErr } = await supabase
+  const { data: upserted, error: upsertErr } = await supabase
     .from('chat_sessions')
-    .insert(insertData)
-    .select('id')
+    .upsert(upsertData, { onConflict: 'user_chat_id', ignoreDuplicates: false })
+    .select('id, channel_type')
     .single();
 
-  if (insertErr) {
-    console.error(`❌ 세션 생성 실패:`, insertErr.message, insertErr.details, insertErr.hint);
-    throw new Error(`세션 생성 실패: ${insertErr.message}`);
+  if (upsertErr) {
+    // upsert 실패 시 기존 세션 조회 시도
+    const { data: existing } = await supabase
+      .from('chat_sessions')
+      .select('id, channel_type')
+      .eq('user_chat_id', userChatId)
+      .single();
+    if (existing) return existing;
+    console.error(`❌ 세션 생성 실패:`, upsertErr.message);
+    throw new Error(`세션 생성 실패: ${upsertErr.message}`);
   }
 
-  console.log(`✅ 세션 생성 완료: id=${created!.id}`);
-  return created!;
+  return upserted!;
 }
 
 interface AIResponseMeta {
@@ -501,7 +533,8 @@ async function recordAndSend(
   messageId: number | undefined,
   userChatId: string,
   answer: string,
-  meta: AIResponseMeta
+  meta: AIResponseMeta,
+  MODE: string = 'dryrun'
 ) {
   // 이전 미발송 초안 삭제 (최신 초안으로 교체)
   await supabase
@@ -540,7 +573,8 @@ async function recordAndEscalate(
   userChatId: string,
   customerText: string,
   reason: string,
-  llm?: { model: string; answer: string; confidence: number; category: string; reason: string }
+  llm?: { model: string; answer: string; confidence: number; category: string; reason: string },
+  MODE: string = 'dryrun'
 ) {
   // 이전 미발송 초안 삭제 (최신 초안으로 교체)
   await supabase

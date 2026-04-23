@@ -6,21 +6,48 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-/** GET /api/chat/messages?sessionId=1 — 메시지 + AI 응답 + 에스컬레이션 조회 */
+/**
+ * GET /api/chat/messages?sessionId=1 — 메시지 + AI 응답 조회
+ * 커서: ?sessionId=1&before=<id>&limit=100
+ */
 export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;
   const sessionId = sp.get('sessionId');
   const days = Number(sp.get('days') || '1');
+  const before = sp.get('before'); // 메시지 ID 커서
+  const limit = Math.min(Number(sp.get('limit') || '100'), 200);
 
   // 세션별 상세 조회
   if (sessionId) {
+    let msgQ = supabase
+      .from('chat_messages')
+      .select('*')
+      .eq('session_id', sessionId)
+      .order('created_at', { ascending: true })
+      .limit(limit);
+
+    if (before) {
+      msgQ = supabase
+        .from('chat_messages')
+        .select('*')
+        .eq('session_id', sessionId)
+        .lt('id', before)
+        .order('created_at', { ascending: true })
+        .limit(limit);
+    }
+
     const [msgs, ai] = await Promise.all([
-      supabase.from('chat_messages').select('*').eq('session_id', sessionId).order('created_at', { ascending: true }),
+      msgQ,
       supabase.from('ai_responses').select('*').eq('session_id', sessionId).order('created_at', { ascending: true }),
     ]);
+
+    const messages = msgs.data || [];
+    const hasOlder = before ? messages.length === limit : false;
+
     return NextResponse.json({
-      messages: msgs.data || [],
+      messages,
       aiResponses: ai.data || [],
+      ...(before ? { hasOlder } : {}),
     });
   }
 
