@@ -3,29 +3,17 @@ import { NextResponse } from 'next/server';
 // tracker.delivery 오픈 API를 사용하여 실시간 배송 조회
 // 지원 택배사: CJ대한통운, 롯데택배, 한진, 우체국, 로젠, 쿠팡LS 등
 
+// 널담은 CJ대한통운 + 롯데택배만 사용
 const CARRIER_MAP: Record<string, { id: string; name: string }> = {
-  cj:     { id: 'kr.cjlogistics', name: 'CJ대한통운' },
-  lotte:  { id: 'kr.lotte',       name: '롯데택배' },
-  hanjin: { id: 'kr.hanjin',      name: '한진택배' },
-  epost:  { id: 'kr.epost',       name: '우체국택배' },
-  logen:  { id: 'kr.logen',       name: '로젠택배' },
-  coupang:{ id: 'kr.coupangls',   name: '쿠팡로지스틱스' },
-  kdexp:  { id: 'kr.kdexp',       name: '경동택배' },
-  hapdong:{ id: 'kr.hdexp',       name: '합동택배' },
+  cj:    { id: 'kr.cjlogistics', name: 'CJ대한통운' },
+  lotte: { id: 'kr.lotte',       name: '롯데택배' },
 };
 
-// 택배사 이름에서 carrier key 추정
+// 택배사 이름에서 carrier key 추정 (CJ 아니면 롯데)
 function detectCarrier(courierName: string): string {
   const n = courierName.toLowerCase();
-  if (n.includes('cj') || n.includes('대한통운')) return 'cj';
   if (n.includes('롯데')) return 'lotte';
-  if (n.includes('한진')) return 'hanjin';
-  if (n.includes('우체국') || n.includes('우편')) return 'epost';
-  if (n.includes('로젠')) return 'logen';
-  if (n.includes('쿠팡')) return 'coupang';
-  if (n.includes('경동')) return 'kdexp';
-  if (n.includes('합동')) return 'hapdong';
-  return 'cj'; // 기본값
+  return 'cj';
 }
 
 // status.id → 한글 매핑
@@ -88,9 +76,9 @@ export async function GET(req: Request) {
   }
 }
 
-// 주요 택배사를 순차 시도
+// CJ/롯데 순차 시도
 async function tryAllCarriers(trackingNum: string, excludeCarrier: string) {
-  const tryOrder = ['cj', 'lotte', 'hanjin', 'epost', 'logen'];
+  const tryOrder = ['cj', 'lotte'];
   for (const c of tryOrder) {
     if (c === excludeCarrier) continue;
     const info = CARRIER_MAP[c];
