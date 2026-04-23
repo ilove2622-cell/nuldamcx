@@ -13,7 +13,10 @@ import {
   Close as CloseIcon,
   NoteAdd as NoteAddIcon,
   Photo as PhotoIcon,
+  PhotoCamera as PhotoCameraIcon,
+  Videocam as VideocamIcon,
   AttachFile as AttachFileIcon,
+  OpenInNew as OpenInNewIcon,
 } from '@mui/icons-material';
 import { parseMessageBlocks } from '@/lib/chat-helpers';
 import type { Session, Message, CustomerProfile, CustomerTag, SessionNote, FileAttachment } from '@/types/chat';
@@ -23,6 +26,9 @@ interface Props {
   messages: Message[];
   open: boolean;
   onToggle: () => void;
+  onImageClick?: (url: string) => void;
+  onScrollToMessage?: (messageId: number) => void;
+  onShowDesk?: () => void;
 }
 
 const cardBorder = '1px solid rgba(255,255,255,0.08)';
@@ -95,7 +101,7 @@ const TAG_COLORS: Record<string, string> = {
   '일반': '#3b82f6',
 };
 
-export default function CustomerSidebar({ session, messages, open, onToggle }: Props) {
+export default function CustomerSidebar({ session, messages, open, onToggle, onImageClick, onScrollToMessage, onShowDesk }: Props) {
   const [profile, setProfile] = useState<CustomerProfile | null>(null);
   const [tags, setTags] = useState<CustomerTag[]>([]);
   const [sessionHistory, setSessionHistory] = useState<any[]>([]);
@@ -426,27 +432,74 @@ export default function CustomerSidebar({ session, messages, open, onToggle }: P
       </Section>
 
       {/* 첨부파일 */}
-      <Section title="첨부파일" defaultOpen={false}>
-        <Stack direction="row" spacing={1.5}>
-          {photoCount > 0 && (
-            <Stack direction="row" alignItems="center" spacing={0.3}>
-              <PhotoIcon sx={{ fontSize: 14, color: '#64748b' }} />
-              <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.7rem' }}>사진({photoCount})</Typography>
+      <Section title={`첨부파일${attachments.length > 0 ? ` (${attachments.length})` : ''}`} defaultOpen={false}>
+        {attachments.length === 0 ? (
+          <Typography variant="caption" sx={{ color: '#475569', fontSize: '0.68rem' }}>없음</Typography>
+        ) : (
+          <>
+            {/* 이미지 그리드 (직접 URL 있는 것) */}
+            {attachments.filter(a => a.type === 'image' && a.url).length > 0 && (
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 1 }}>
+                {attachments.filter(a => a.type === 'image' && a.url).map((a, i) => (
+                  <Box
+                    key={`img-${i}`}
+                    component="img"
+                    src={a.url}
+                    onClick={() => onImageClick?.(a.url!)}
+                    sx={{
+                      width: 64, height: 64, objectFit: 'cover', borderRadius: 1,
+                      cursor: 'pointer', border: '1px solid rgba(255,255,255,0.1)',
+                      '&:hover': { opacity: 0.8, borderColor: '#3b82f6' },
+                    }}
+                  />
+                ))}
+              </Box>
+            )}
+            {/* 개별 첨부파일 리스트 */}
+            <Stack spacing={0.3}>
+              {attachments.map((a, i) => {
+                if (a.type === 'image' && a.url) return null; // 위 그리드에서 이미 표시
+                const icon = (a.type === 'photo' || a.type === 'image')
+                  ? <PhotoCameraIcon sx={{ fontSize: 14, color: '#60a5fa' }} />
+                  : (a.type === 'video' || a.type === 'video-url')
+                    ? <VideocamIcon sx={{ fontSize: 14, color: '#a78bfa' }} />
+                    : <AttachFileIcon sx={{ fontSize: 14, color: '#94a3b8' }} />;
+                const label = (a.type === 'photo' || a.type === 'image') ? '사진'
+                  : (a.type === 'video' || a.type === 'video-url') ? '동영상'
+                    : a.name || '파일';
+                const handleClick = () => {
+                  if (a.type === 'video-url' && a.url) {
+                    onImageClick?.(a.url);
+                  } else if (a.type === 'photo' || a.type === 'video' || a.type === 'file') {
+                    // 채널톡 파일 → 데스크 패널 열기 + 해당 메시지로 스크롤
+                    onShowDesk?.();
+                    onScrollToMessage?.(a.messageId);
+                  } else {
+                    onScrollToMessage?.(a.messageId);
+                  }
+                };
+                return (
+                  <Box
+                    key={`att-${i}`}
+                    onClick={handleClick}
+                    sx={{
+                      display: 'flex', alignItems: 'center', gap: 0.5, py: 0.4, px: 0.5,
+                      borderRadius: 1, cursor: 'pointer',
+                      '&:hover': { bgcolor: 'rgba(255,255,255,0.05)' },
+                    }}
+                  >
+                    {icon}
+                    <Typography variant="caption" sx={{ color: '#e2e8f0', fontSize: '0.7rem', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {label}{a.name && a.name !== label ? ` — ${a.name}` : ''}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: '#475569', fontSize: '0.6rem' }}>{fmtDateTime(a.createdAt)}</Typography>
+                    <OpenInNewIcon sx={{ fontSize: 11, color: '#475569' }} />
+                  </Box>
+                );
+              }).filter(Boolean)}
             </Stack>
-          )}
-          {videoCount > 0 && (
-            <Stack direction="row" alignItems="center" spacing={0.3}>
-              <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.7rem' }}>동영상({videoCount})</Typography>
-            </Stack>
-          )}
-          {fileCount > 0 && (
-            <Stack direction="row" alignItems="center" spacing={0.3}>
-              <AttachFileIcon sx={{ fontSize: 14, color: '#64748b' }} />
-              <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.7rem' }}>파일({fileCount})</Typography>
-            </Stack>
-          )}
-          {attachments.length === 0 && <Typography variant="caption" sx={{ color: '#475569', fontSize: '0.68rem' }}>없음</Typography>}
-        </Stack>
+          </>
+        )}
       </Section>
     </Box>
   );

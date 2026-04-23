@@ -28,12 +28,13 @@ export default function ChatThread({ messages, loading, chatEndRef, onImageClick
   return (
     <Stack spacing={1}>
       {messages.map((msg) => (
-        <MessageRenderer
-          key={msg.id}
-          message={msg}
-          onImageClick={onImageClick}
-          onShowDesk={onShowDesk}
-        />
+        <Box key={msg.id} data-message-id={msg.id}>
+          <MessageRenderer
+            message={msg}
+            onImageClick={onImageClick}
+            onShowDesk={onShowDesk}
+          />
+        </Box>
       ))}
       <div ref={chatEndRef} />
     </Stack>

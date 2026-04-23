@@ -412,6 +412,18 @@ function ChatConsolePage() {
     }
   };
 
+  // ─── 메시지로 스크롤 ───
+  const handleScrollToMessage = useCallback((messageId: number) => {
+    const el = document.querySelector(`[data-message-id="${messageId}"]`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      // 잠시 하이라이트
+      (el as HTMLElement).style.transition = 'background-color 0.3s';
+      (el as HTMLElement).style.backgroundColor = 'rgba(59,130,246,0.15)';
+      setTimeout(() => { (el as HTMLElement).style.backgroundColor = ''; }, 1500);
+    }
+  }, []);
+
   const cardBorder = '1px solid rgba(255,255,255,0.08)';
 
   return (
@@ -569,6 +581,9 @@ function ChatConsolePage() {
                     messages={messages}
                     open={showCustomerSidebar}
                     onToggle={() => setShowCustomerSidebar(prev => !prev)}
+                    onImageClick={setImageModalUrl}
+                    onScrollToMessage={handleScrollToMessage}
+                    onShowDesk={() => setShowDeskPanel(true)}
                   />
                 )}
               </Box>
