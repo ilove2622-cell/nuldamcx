@@ -136,9 +136,10 @@ export default function DraftPanel({ aiResponses, selectedDraftIdx, sending, gen
       </Stack>
 
       {/* 초안 텍스트 */}
-      <Typography variant="body2" sx={{
+      <Typography variant="body2" data-selectable sx={{
         whiteSpace: 'pre-wrap', bgcolor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
         borderRadius: 1.5, p: 1.5, mb: 1, fontSize: '0.85rem', color: '#cbd5e1', maxHeight: 120, overflowY: 'auto',
+        userSelect: 'text', WebkitUserSelect: 'text',
       }}>
         {draft.answer}
       </Typography>

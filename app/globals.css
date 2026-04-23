@@ -24,10 +24,10 @@ body {
   user-select: none;
 }
 
-/* 입력 필드는 선택 허용 */
-input, textarea, [contenteditable] {
-  -webkit-user-select: auto;
-  user-select: auto;
+/* 입력 필드 + 채팅 메시지는 선택 허용 */
+input, textarea, [contenteditable], [data-selectable], [data-message-id] {
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 /* iOS safe area 대응 */
