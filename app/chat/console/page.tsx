@@ -98,10 +98,10 @@ function ChatConsolePage() {
   // 채널톡 데스크 패널
   const [showDeskPanel, setShowDeskPanel] = useState(false);
 
-  // 고객 정보 사이드바
+  // 고객 정보 사이드바 (항상 열림 기본값)
   const [showCustomerSidebar, setShowCustomerSidebar] = useState(() => {
-    if (typeof window !== 'undefined') return localStorage.getItem('console_customerSidebar') === 'true';
-    return false;
+    if (typeof window !== 'undefined') return localStorage.getItem('console_customerSidebar') !== 'false';
+    return true;
   });
 
   // Realtime 연결 상태
