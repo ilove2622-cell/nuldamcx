@@ -19,6 +19,7 @@ import CustomerSidebar from '@/components/chat/CustomerSidebar';
 
 import {
   Box, Typography, Button, Stack, Chip, IconButton, Dialog,
+  Menu, MenuItem, ListItemIcon, ListItemText, Divider,
 } from '@mui/material';
 import {
   ArrowBack as ArrowBackIcon,
@@ -31,6 +32,9 @@ import {
   Replay as ReplayIcon,
   OpenInNew as OpenInNewIcon,
   Person as PersonIcon,
+  ExpandMore as ExpandMoreIcon,
+  Snooze as SnoozeIcon,
+  PlayArrow as PlayArrowIcon,
 } from '@mui/icons-material';
 
 // ─── 메인 ───
@@ -54,7 +58,9 @@ function ChatConsolePage() {
   const [sessionSearch, setSessionSearch] = useState('');
   const [activeTab, setActiveTab] = useState<TabKey>(() => {
     if (typeof window !== 'undefined') {
-      return (localStorage.getItem('console_activeTab') as TabKey) || '전체';
+      const saved = localStorage.getItem('console_activeTab') as TabKey;
+      const valid: TabKey[] = ['전체', '응대중', '대기중', '종료', '중요'];
+      if (saved && valid.includes(saved)) return saved;
     }
     return '전체';
   });
@@ -261,9 +267,9 @@ function ChatConsolePage() {
         const target = e.target as HTMLElement;
         if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
         const filtered = sessions.filter(s => {
-          if (activeTab === '신규') return s.status === 'open';
-          if (activeTab === '진행중') return s.status === 'escalated';
-          if (activeTab === '완료') return s.status === 'closed';
+          if (activeTab === '응대중') return s.status === 'open' || s.status === 'escalated';
+          if (activeTab === '대기중') return s.status === 'snoozed';
+          if (activeTab === '종료') return s.status === 'closed';
           if (activeTab === '중요') return starred.has(s.id);
           return true;
         });
@@ -397,19 +403,41 @@ function ChatConsolePage() {
   };
 
   // ─── 세션 상태 변경 ───
-  const handleStatusChange = async (sessionId: number, newStatus: string) => {
+  const handleStatusChange = async (sessionId: number, newStatus: string, snoozedUntil?: string) => {
     try {
       const res = await fetch('/api/chat/sessions', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId, status: newStatus }),
+        body: JSON.stringify({ sessionId, status: newStatus, snoozedUntil }),
       });
       if (!res.ok) throw new Error(await res.text());
-      showToast(`상태 변경: ${newStatus}`, 'success');
+      const labels: Record<string, string> = { open: '응대중', snoozed: '대기중', closed: '종료' };
+      showToast(`상태 변경: ${labels[newStatus] || newStatus}`, 'success');
       await fetchSessions();
     } catch (err) {
       showToast(`상태 변경 실패: ${err}`, 'error');
     }
+  };
+
+  // 상태 드롭다운 메뉴
+  const [statusMenuAnchor, setStatusMenuAnchor] = useState<HTMLElement | null>(null);
+  const [snoozeSubmenuAnchor, setSnoozeSubmenuAnchor] = useState<HTMLElement | null>(null);
+
+  const computeSnoozeTime = (option: string) => {
+    const now = new Date();
+    if (option === '4h') {
+      return new Date(now.getTime() + 4 * 3600_000).toISOString();
+    }
+    // 내일 오전 9시
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    if (option === 'tomorrow_am') {
+      tomorrow.setHours(9, 0, 0, 0);
+      return tomorrow.toISOString();
+    }
+    // 내일 오후 2시
+    tomorrow.setHours(14, 0, 0, 0);
+    return tomorrow.toISOString();
   };
 
   // ─── 메시지로 스크롤 ───
@@ -533,15 +561,80 @@ function ChatConsolePage() {
                     <IconButton size="small" onClick={(e) => handleToggleStar(e, activeSession.id)} sx={{ color: starred.has(activeSession.id) ? '#f59e0b' : '#475569' }}>
                       {starred.has(activeSession.id) ? <StarIcon sx={{ fontSize: 20 }} /> : <StarBorderIcon sx={{ fontSize: 20 }} />}
                     </IconButton>
-                    {activeSession.status !== 'closed' ? (
-                      <Button size="small" variant="outlined" startIcon={<CheckCircleIcon />} onClick={() => handleStatusChange(activeSession.id, 'closed')} sx={{ color: '#10b981', borderColor: '#10b981', textTransform: 'none', fontSize: '0.75rem' }}>
-                        완료 처리
-                      </Button>
-                    ) : (
-                      <Button size="small" variant="outlined" startIcon={<ReplayIcon />} onClick={() => handleStatusChange(activeSession.id, 'open')} sx={{ color: '#3b82f6', borderColor: '#3b82f6', textTransform: 'none', fontSize: '0.75rem' }}>
-                        재오픈
-                      </Button>
-                    )}
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      endIcon={<ExpandMoreIcon sx={{ fontSize: 16 }} />}
+                      onClick={(e) => setStatusMenuAnchor(e.currentTarget)}
+                      sx={{
+                        textTransform: 'none', fontSize: '0.72rem',
+                        color: statusColor(activeSession.status),
+                        borderColor: statusColor(activeSession.status),
+                        '&:hover': { bgcolor: `${statusColor(activeSession.status)}15` },
+                      }}
+                    >
+                      {statusLabel(activeSession.status)}
+                    </Button>
+                    <Menu
+                      anchorEl={statusMenuAnchor}
+                      open={!!statusMenuAnchor}
+                      onClose={() => { setStatusMenuAnchor(null); setSnoozeSubmenuAnchor(null); }}
+                      slotProps={{ paper: { sx: { bgcolor: '#1e293b', border: cardBorder, borderRadius: 1.5, minWidth: 160 } } }}
+                    >
+                      <MenuItem
+                        onClick={() => { handleStatusChange(activeSession.id, 'open'); setStatusMenuAnchor(null); }}
+                        selected={activeSession.status === 'open' || activeSession.status === 'escalated'}
+                        sx={{ fontSize: '0.78rem', color: '#e2e8f0', '&.Mui-selected': { bgcolor: 'rgba(59,130,246,0.1)' } }}
+                      >
+                        <ListItemIcon><PlayArrowIcon sx={{ fontSize: 18, color: '#3b82f6' }} /></ListItemIcon>
+                        <ListItemText slotProps={{ primary: { sx: { fontSize: '0.78rem' } } }}>응대중</ListItemText>
+                      </MenuItem>
+                      <MenuItem
+                        onClick={(e) => setSnoozeSubmenuAnchor(e.currentTarget)}
+                        selected={activeSession.status === 'snoozed'}
+                        sx={{ fontSize: '0.78rem', color: '#e2e8f0', '&.Mui-selected': { bgcolor: 'rgba(139,92,246,0.1)' } }}
+                      >
+                        <ListItemIcon><SnoozeIcon sx={{ fontSize: 18, color: '#8b5cf6' }} /></ListItemIcon>
+                        <ListItemText slotProps={{ primary: { sx: { fontSize: '0.78rem' } } }}>대기중</ListItemText>
+                        <ExpandMoreIcon sx={{ fontSize: 14, color: '#64748b', transform: 'rotate(-90deg)', ml: 1 }} />
+                      </MenuItem>
+                      <Divider sx={{ borderColor: 'rgba(255,255,255,0.06)' }} />
+                      <MenuItem
+                        onClick={() => { handleStatusChange(activeSession.id, 'closed'); setStatusMenuAnchor(null); }}
+                        selected={activeSession.status === 'closed'}
+                        sx={{ fontSize: '0.78rem', color: '#e2e8f0', '&.Mui-selected': { bgcolor: 'rgba(16,185,129,0.1)' } }}
+                      >
+                        <ListItemIcon><CheckCircleIcon sx={{ fontSize: 18, color: '#10b981' }} /></ListItemIcon>
+                        <ListItemText slotProps={{ primary: { sx: { fontSize: '0.78rem' } } }}>종료</ListItemText>
+                      </MenuItem>
+                    </Menu>
+                    {/* 스누즈 서브메뉴 */}
+                    <Menu
+                      anchorEl={snoozeSubmenuAnchor}
+                      open={!!snoozeSubmenuAnchor}
+                      onClose={() => setSnoozeSubmenuAnchor(null)}
+                      anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+                      transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+                      slotProps={{ paper: { sx: { bgcolor: '#1e293b', border: cardBorder, borderRadius: 1.5, minWidth: 140 } } }}
+                    >
+                      {[
+                        { key: '4h', label: '4시간 이후' },
+                        { key: 'tomorrow_am', label: '내일 오전' },
+                        { key: 'tomorrow_pm', label: '내일 오후' },
+                      ].map(opt => (
+                        <MenuItem
+                          key={opt.key}
+                          onClick={() => {
+                            handleStatusChange(activeSession.id, 'snoozed', computeSnoozeTime(opt.key));
+                            setSnoozeSubmenuAnchor(null);
+                            setStatusMenuAnchor(null);
+                          }}
+                          sx={{ fontSize: '0.78rem', color: '#e2e8f0' }}
+                        >
+                          {opt.label}
+                        </MenuItem>
+                      ))}
+                    </Menu>
                   </Stack>
                 </Box>
               )}

@@ -16,15 +16,17 @@ export const channelColor = (type: string) => {
 
 // ─── 상태 ───
 export const statusLabel = (status: string) => {
-  if (status === 'open') return '신규';
-  if (status === 'escalated') return '진행중';
-  if (status === 'closed') return '완료';
+  if (status === 'open') return '응대중';
+  if (status === 'escalated') return '응대중';
+  if (status === 'snoozed') return '대기중';
+  if (status === 'closed') return '종료';
   return status;
 };
 
 export const statusColor = (status: string) => {
   if (status === 'open') return '#3b82f6';
-  if (status === 'escalated') return '#ef4444';
+  if (status === 'escalated') return '#f59e0b';
+  if (status === 'snoozed') return '#8b5cf6';
   if (status === 'closed') return '#10b981';
   return '#64748b';
 };

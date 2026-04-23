@@ -16,6 +16,7 @@ export interface Session {
   assigned_agent?: string | null;
   assigned_agent_name?: string | null;
   tags?: string[] | null;
+  snoozed_until?: string | null;
 }
 
 export interface Message {
@@ -53,7 +54,7 @@ export interface Escalation {
   created_at: string;
 }
 
-export type TabKey = '전체' | '신규' | '진행중' | '완료' | '중요';
+export type TabKey = '전체' | '응대중' | '대기중' | '종료' | '중요';
 
 export type SortKey = 'last_message_at_desc' | 'last_message_at_asc' | 'created_at_desc';
 

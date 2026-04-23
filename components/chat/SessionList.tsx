@@ -44,13 +44,8 @@ interface SessionListProps {
   sentinelRef?: React.RefObject<HTMLDivElement | null>;
 }
 
-const TABS: { key: TabKey; label: string }[] = [
-  { key: '전체', label: '전체' },
-  { key: '신규', label: '신규' },
-  { key: '진행중', label: '진행중' },
-  { key: '완료', label: '완료' },
-  { key: '중요', label: '\u2B50중요' },
-];
+// 탭은 동적으로 건수 포함하여 렌더링
+const TAB_KEYS: TabKey[] = ['전체', '응대중', '대기중', '종료', '중요'];
 
 const SORT_OPTIONS: { key: SortKey; label: string }[] = [
   { key: 'last_message_at_desc', label: '최신 메시지순' },
@@ -110,9 +105,9 @@ export default function SessionList({
   const filteredSessions = useMemo(() => {
     let result = sessions.filter(s => {
       // 탭 필터
-      if (activeTab === '신규' && s.status !== 'open') return false;
-      if (activeTab === '진행중' && s.status !== 'escalated') return false;
-      if (activeTab === '완료' && s.status !== 'closed') return false;
+      if (activeTab === '응대중' && s.status !== 'open' && s.status !== 'escalated') return false;
+      if (activeTab === '대기중' && s.status !== 'snoozed') return false;
+      if (activeTab === '종료' && s.status !== 'closed') return false;
       if (activeTab === '중요' && !starred.has(s.id)) return false;
       // 토글 필터
       if (filterUnread && !unreadSessions.has(s.id)) return false;
@@ -148,6 +143,15 @@ export default function SessionList({
     return result;
   }, [sessions, activeTab, starred, unreadSessions, filterUnread, filterStarred, filterChannel, filterAgent, filterTag, sessionSearch, sortKey]);
 
+  // 탭별 건수
+  const tabCounts = useMemo(() => {
+    const active = sessions.filter(s => s.status === 'open' || s.status === 'escalated').length;
+    const snoozed = sessions.filter(s => s.status === 'snoozed').length;
+    const closed = sessions.filter(s => s.status === 'closed').length;
+    const important = sessions.filter(s => starred.has(s.id)).length;
+    return { '전체': sessions.length, '응대중': active, '대기중': snoozed, '종료': closed, '중요': important } as Record<TabKey, number>;
+  }, [sessions, starred]);
+
   const cardBorder = '1px solid rgba(255,255,255,0.08)';
 
   const toggleChipSx = (active: boolean) => ({
@@ -163,21 +167,25 @@ export default function SessionList({
       {/* 탭 */}
       <Box sx={{ px: 1, pt: 1, pb: 0.5 }}>
         <Stack direction="row" spacing={0.5} sx={{ flexWrap: 'wrap' }}>
-          {TABS.map(t => (
-            <Chip
-              key={t.key}
-              label={t.label}
-              size="small"
-              onClick={() => onTabChange(t.key)}
-              sx={{
-                cursor: 'pointer', fontSize: '0.72rem', height: 26,
-                fontWeight: activeTab === t.key ? 700 : 400,
-                bgcolor: activeTab === t.key ? 'rgba(59,130,246,0.2)' : 'rgba(255,255,255,0.04)',
-                color: activeTab === t.key ? '#60a5fa' : '#94a3b8',
-                border: activeTab === t.key ? '1px solid rgba(59,130,246,0.4)' : '1px solid rgba(255,255,255,0.08)',
-              }}
-            />
-          ))}
+          {TAB_KEYS.map(key => {
+            const count = tabCounts[key];
+            const label = key === '중요' ? `\u2B50${key}` : `${key} ${count}`;
+            return (
+              <Chip
+                key={key}
+                label={label}
+                size="small"
+                onClick={() => onTabChange(key)}
+                sx={{
+                  cursor: 'pointer', fontSize: '0.72rem', height: 26,
+                  fontWeight: activeTab === key ? 700 : 400,
+                  bgcolor: activeTab === key ? 'rgba(59,130,246,0.2)' : 'rgba(255,255,255,0.04)',
+                  color: activeTab === key ? '#60a5fa' : '#94a3b8',
+                  border: activeTab === key ? '1px solid rgba(59,130,246,0.4)' : '1px solid rgba(255,255,255,0.08)',
+                }}
+              />
+            );
+          })}
         </Stack>
       </Box>
 

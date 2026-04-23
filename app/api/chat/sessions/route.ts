@@ -75,7 +75,7 @@ export async function GET(req: NextRequest) {
 /** PATCH /api/chat/sessions  — 세션 상태 변경 */
 export async function PATCH(req: NextRequest) {
   try {
-    const { sessionId, status } = await req.json();
+    const { sessionId, status, snoozedUntil } = await req.json();
     if (!sessionId || !status) {
       return NextResponse.json({ error: 'sessionId와 status는 필수' }, { status: 400 });
     }
@@ -83,6 +83,12 @@ export async function PATCH(req: NextRequest) {
     const updateData: Record<string, any> = { status };
     if (status === 'closed') {
       updateData.closed_at = new Date().toISOString();
+      updateData.snoozed_until = null;
+    } else if (status === 'snoozed' && snoozedUntil) {
+      updateData.snoozed_until = snoozedUntil;
+    } else {
+      // open / escalated → 스누즈 해제
+      updateData.snoozed_until = null;
     }
 
     const { error } = await supabase
