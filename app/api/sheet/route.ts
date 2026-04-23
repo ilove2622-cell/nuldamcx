@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
 import { google } from 'googleapis';
+import { getSheetTargetDate } from '@/lib/business-hours';
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    // 💡 프론트에서 보낸 targetDate 추가로 받기
     const { channel, orderNumber, customerName, tel, address, trackingNumber, targetDate } = body;
 
     const auth = new google.auth.GoogleAuth({
@@ -18,20 +18,10 @@ export async function POST(req: Request) {
     const sheets = google.sheets({ version: 'v4', auth });
     const spreadsheetId = '1-xT0UthGXZPCNN6ZtxZz-fYuUnnUblTEnmTz1dFC5jM';
 
-    let tabName = '';
-
-    // 💡 프론트에서 계산한 날짜(YYYY-MM-DD)가 넘어왔다면 우선적으로 사용
-    if (targetDate) {
-      const [yyyy, mm, dd] = targetDate.split('-');
-      tabName = `${mm}${dd}`; // 예: "0408"
-    } else {
-      // 💡 넘어온 게 없다면 서버 기준 오늘 날짜 계산 (기존 유지)
-      const now = new Date();
-      const kst = new Date(now.getTime() + (9 * 60 * 60 * 1000));
-      const mm = String(kst.getUTCMonth() + 1).padStart(2, '0');
-      const dd = String(kst.getUTCDate()).padStart(2, '0');
-      tabName = `${mm}${dd}`; 
-    }
+    // 영업일 기준 대상 날짜 계산 (15:30 이후 → 다음 영업일, 주말/공휴일 → 다음 영업일)
+    const resolvedDate = targetDate || getSheetTargetDate();
+    const [, mm, dd] = resolvedDate.split('-');
+    const tabName = `${mm}${dd}`;
 
     const getRes = await sheets.spreadsheets.values.get({
       spreadsheetId,

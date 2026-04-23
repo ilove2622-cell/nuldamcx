@@ -133,3 +133,28 @@ export function getNextBusinessDayISO(): string {
   const utc = new Date(nextBiz.getTime() - KST_OFFSET);
   return utc.toISOString();
 }
+
+/**
+ * 시트 저장용 대상 날짜 (YYYY-MM-DD)
+ * - 영업일 15:30 이전 → 오늘
+ * - 영업일 15:30 이후 → 다음 영업일
+ * - 비영업일(주말/공휴일) → 다음 영업일
+ */
+export function getSheetTargetDate(): string {
+  const now = nowKST();
+  const hour = now.getUTCHours();
+  const min = now.getUTCMinutes();
+  const afterCutoff = hour > 15 || (hour === 15 && min >= 30);
+
+  let target: Date;
+  if (isBusinessDay(now) && !afterCutoff) {
+    target = now;
+  } else {
+    target = getNextBusinessDay(now);
+  }
+
+  const y = target.getUTCFullYear();
+  const m = String(target.getUTCMonth() + 1).padStart(2, '0');
+  const d = String(target.getUTCDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
