@@ -10,11 +10,17 @@ const CARRIER_MAP: Record<string, { id: string; name: string }> = {
 };
 
 // 택배사 판별: 송장번호 앞자리 우선, 그다음 택배사명
-// 현재 기준: 6으로 시작 → CJ대한통운, 2로 시작 → 롯데택배
+// ⚠️ 2026-04 기준 규칙. 택배사 송장번호 체계 변경 시 아래 매핑 업데이트 필요
+// 현재: 6→CJ대한통운, 2→롯데택배 (향후 변경 가능)
+const PREFIX_CARRIER_MAP: Record<string, string> = {
+  '6': 'cj',
+  '2': 'lotte',
+};
+
 function detectCarrier(courierName: string, trackingNum?: string): string {
   const digits = (trackingNum || '').replace(/[-\s]/g, '');
-  if (digits.startsWith('6')) return 'cj';
-  if (digits.startsWith('2')) return 'lotte';
+  const prefix = digits.charAt(0);
+  if (prefix && PREFIX_CARRIER_MAP[prefix]) return PREFIX_CARRIER_MAP[prefix];
   // 송장번호로 판별 불가 시 택배사명으로
   const n = courierName.toLowerCase();
   if (n.includes('롯데')) return 'lotte';
