@@ -96,10 +96,10 @@ export default function SessionList({
   }, [sessions]);
 
   const tagOptions = useMemo(() => {
-    const map = new Map<string, { label: string; color: string; type: string }>();
+    const map = new Map<string, { label: string; color: string }>();
     sessions.forEach(s => {
-      (s.session_tags_data || []).forEach(t => map.set(`s:${t.label}`, { label: t.label, color: t.color, type: 'session' }));
-      (s.customer_tags_data || []).forEach(t => map.set(`c:${t.label}`, { label: t.label, color: t.color, type: 'customer' }));
+      (s.session_tags_data || []).forEach(t => map.set(t.label, { label: t.label, color: t.color }));
+      (s.customer_tags_data || []).forEach(t => map.set(t.label, { label: t.label, color: t.color }));
     });
     return [...map.entries()].sort((a, b) => a[1].label.localeCompare(b[1].label));
   }, [sessions]);
@@ -129,8 +129,8 @@ export default function SessionList({
       if (filterAgent && s.assigned_agent !== filterAgent) return false;
       if (filterTag) {
         const allTagLabels = [
-          ...(s.session_tags_data || []).map(t => `s:${t.label}`),
-          ...(s.customer_tags_data || []).map(t => `c:${t.label}`),
+          ...(s.session_tags_data || []).map(t => t.label),
+          ...(s.customer_tags_data || []).map(t => t.label),
         ];
         if (!allTagLabels.includes(filterTag)) return false;
       }
@@ -331,9 +331,6 @@ export default function SessionList({
                 <MenuItem key={key} value={key} sx={menuItemSx}>
                   <Box component="span" sx={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', bgcolor: info.color, mr: 0.8, verticalAlign: 'middle' }} />
                   {info.label}
-                  <Box component="span" sx={{ color: '#64748b', fontSize: '0.6rem', ml: 0.5 }}>
-                    {info.type === 'session' ? '상담' : '고객'}
-                  </Box>
                 </MenuItem>
               ))}
             </Select>
@@ -451,14 +448,9 @@ export default function SessionList({
               )}
               {((session.session_tags_data && session.session_tags_data.length > 0) || (session.customer_tags_data && session.customer_tags_data.length > 0)) && (
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.3, mt: 0.4, pl: 3.5 }}>
-                  {(session.session_tags_data || []).map(tag => (
-                    <Chip key={`s-${tag.id}`} label={tag.label} size="small"
+                  {[...(session.session_tags_data || []).map(t => ({ ...t, _key: `s-${t.id}` })), ...(session.customer_tags_data || []).map(t => ({ ...t, _key: `c-${t.id}` }))].map(tag => (
+                    <Chip key={tag._key} label={tag.label} size="small"
                       sx={{ height: 16, fontSize: '0.58rem', bgcolor: `${tag.color}22`, color: tag.color, border: `1px solid ${tag.color}44` }}
-                    />
-                  ))}
-                  {(session.customer_tags_data || []).map(tag => (
-                    <Chip key={`c-${tag.id}`} label={tag.label} size="small"
-                      sx={{ height: 16, fontSize: '0.58rem', bgcolor: `${tag.color}22`, color: tag.color, border: `1px solid ${tag.color}44`, borderStyle: 'dashed' }}
                     />
                   ))}
                 </Box>
