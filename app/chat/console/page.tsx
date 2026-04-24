@@ -38,6 +38,7 @@ import {
   Warning as WarningIcon,
   Speed as SpeedIcon,
   Chat as ChatIcon,
+  DeleteForever as DeleteIcon,
 } from '@mui/icons-material';
 
 // ─── 메인 ───
@@ -502,6 +503,39 @@ function ChatConsolePage() {
   const [statusMenuAnchor, setStatusMenuAnchor] = useState<HTMLElement | null>(null);
   const [snoozeSubmenuAnchor, setSnoozeSubmenuAnchor] = useState<HTMLElement | null>(null);
 
+  // 삭제 확인 다이얼로그
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteConfirmName, setDeleteConfirmName] = useState('');
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDeleteSession = async () => {
+    if (!activeSession) return;
+    const expectedName = activeSession.customer_name || activeSession.user_chat_id;
+    if (deleteConfirmName.trim() !== expectedName.trim()) {
+      showToast('고객 닉네임이 일치하지 않습니다', 'error');
+      return;
+    }
+    setDeleting(true);
+    try {
+      const res = await fetch('/api/chat/sessions', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: activeSession.id }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      showToast('세션이 삭제되었습니다', 'success');
+      setDeleteDialogOpen(false);
+      setDeleteConfirmName('');
+      setActiveSessionId(null);
+      setActiveSession(null);
+      await fetchSessions();
+    } catch (err) {
+      showToast(`삭제 실패: ${err}`, 'error');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const computeSnoozeTime = (option: string) => {
     const now = new Date();
     if (option === '4h') {
@@ -699,6 +733,14 @@ function ChatConsolePage() {
                         <ListItemIcon><CheckCircleIcon sx={{ fontSize: 18, color: '#10b981' }} /></ListItemIcon>
                         <ListItemText slotProps={{ primary: { sx: { fontSize: '0.78rem' } } }}>종료</ListItemText>
                       </MenuItem>
+                      <Divider sx={{ borderColor: 'rgba(255,255,255,0.06)' }} />
+                      <MenuItem
+                        onClick={() => { setStatusMenuAnchor(null); setDeleteDialogOpen(true); setDeleteConfirmName(''); }}
+                        sx={{ fontSize: '0.78rem', color: '#ef4444' }}
+                      >
+                        <ListItemIcon><DeleteIcon sx={{ fontSize: 18, color: '#ef4444' }} /></ListItemIcon>
+                        <ListItemText slotProps={{ primary: { sx: { fontSize: '0.78rem', color: '#ef4444' } } }}>삭제</ListItemText>
+                      </MenuItem>
                     </Menu>
                     {/* 스누즈 서브메뉴 */}
                     <Menu
@@ -802,6 +844,45 @@ function ChatConsolePage() {
           )}
         </Box>
       </Box>
+
+      {/* 삭제 확인 다이얼로그 */}
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+        slotProps={{ paper: { sx: { bgcolor: '#1e293b', border: cardBorder, borderRadius: 2, minWidth: 340, p: 1 } } }}
+      >
+        <Box sx={{ p: 2 }}>
+          <Typography sx={{ color: '#ef4444', fontWeight: 700, mb: 1 }}>세션 삭제</Typography>
+          <Typography variant="body2" sx={{ color: '#94a3b8', mb: 2 }}>
+            이 세션과 관련된 모든 데이터가 삭제됩니다. 확인을 위해 고객 닉네임을 입력하세요:
+          </Typography>
+          <Typography variant="body2" sx={{ color: '#f59e0b', mb: 1, fontWeight: 600 }}>
+            {activeSession?.customer_name || activeSession?.user_chat_id}
+          </Typography>
+          <Box
+            component="input"
+            value={deleteConfirmName}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDeleteConfirmName(e.target.value)}
+            onKeyDown={(e: React.KeyboardEvent) => { if (e.key === 'Enter') handleDeleteSession(); }}
+            placeholder="고객 닉네임 입력"
+            sx={{
+              width: '100%', bgcolor: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)',
+              borderRadius: 1, color: '#f8fafc', fontSize: '0.85rem', p: '8px 12px', mb: 2,
+              outline: 'none', '&:focus': { borderColor: '#ef4444' },
+            }}
+          />
+          <Stack direction="row" spacing={1} justifyContent="flex-end">
+            <Button size="small" onClick={() => setDeleteDialogOpen(false)} sx={{ color: '#94a3b8', textTransform: 'none' }}>취소</Button>
+            <Button
+              size="small" variant="contained" disabled={deleting}
+              onClick={handleDeleteSession}
+              sx={{ bgcolor: '#ef4444', textTransform: 'none', '&:hover': { bgcolor: '#dc2626' } }}
+            >
+              {deleting ? '삭제 중...' : '삭제'}
+            </Button>
+          </Stack>
+        </Box>
+      </Dialog>
 
       {/* 이미지 확대 모달 */}
       <Dialog

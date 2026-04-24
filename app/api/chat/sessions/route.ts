@@ -147,3 +147,32 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
+
+/** DELETE /api/chat/sessions — 세션 삭제 (관련 데이터 포함) */
+export async function DELETE(req: NextRequest) {
+  try {
+    const { sessionId } = await req.json();
+    if (!sessionId) {
+      return NextResponse.json({ error: 'sessionId는 필수' }, { status: 400 });
+    }
+
+    // 관련 데이터 삭제 (순서 중요: FK 참조)
+    await Promise.all([
+      supabase.from('chat_messages').delete().eq('session_id', sessionId),
+      supabase.from('ai_responses').delete().eq('session_id', sessionId),
+      supabase.from('escalations').delete().eq('session_id', sessionId),
+      supabase.from('session_tags').delete().eq('session_id', sessionId),
+      supabase.from('session_notes').delete().eq('session_id', sessionId),
+    ]);
+
+    const { error } = await supabase
+      .from('chat_sessions')
+      .delete()
+      .eq('id', sessionId);
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: true });
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
+}
