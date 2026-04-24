@@ -39,6 +39,8 @@ import {
   Speed as SpeedIcon,
   Chat as ChatIcon,
   DeleteForever as DeleteIcon,
+  Sync as SyncIcon,
+  Timer as TimerIcon,
 } from '@mui/icons-material';
 
 // ─── 메인 ───
@@ -129,6 +131,16 @@ function ChatConsolePage() {
   // Realtime 연결 상태
   const [realtimeState, setRealtimeState] = useState<'connected' | 'connecting' | 'disconnected'>('connecting');
 
+  // 업데이트 모드: realtime / polling
+  const [updateMode, setUpdateMode] = useState<'realtime' | 'polling'>(() => {
+    if (typeof window !== 'undefined') return (localStorage.getItem('console_updateMode') as any) || 'polling';
+    return 'polling';
+  });
+  const [pollingInterval, setPollingInterval] = useState<number>(() => {
+    if (typeof window !== 'undefined') return Number(localStorage.getItem('console_pollingInterval')) || 15;
+    return 15;
+  });
+
   // KPI
   const [kpi, setKpi] = useState({ totalSessions: 0, totalAI: 0, totalEsc: 0, avgConf: 0 });
 
@@ -151,6 +163,14 @@ function ChatConsolePage() {
   useEffect(() => {
     localStorage.setItem('console_customerSidebar', String(showCustomerSidebar));
   }, [showCustomerSidebar]);
+
+  // 업데이트 모드 저장
+  useEffect(() => {
+    localStorage.setItem('console_updateMode', updateMode);
+  }, [updateMode]);
+  useEffect(() => {
+    localStorage.setItem('console_pollingInterval', String(pollingInterval));
+  }, [pollingInterval]);
 
   // ─── 세션 목록 로드 (자동 전체 페이지네이션, 상한 2000) ───
   const fetchSessions = useCallback(async () => {
@@ -266,8 +286,12 @@ function ChatConsolePage() {
     }
   }, [activeSessionId, sessions]);
 
-  // Supabase Realtime (RLS로 실질 미작동, 상태 표시용)
+  // Supabase Realtime (realtime 모드일 때만 구독)
   useEffect(() => {
+    if (updateMode !== 'realtime') {
+      setRealtimeState('disconnected');
+      return;
+    }
     setRealtimeState('connecting');
     const channel = supabase
       .channel('console-realtime')
@@ -293,16 +317,18 @@ function ChatConsolePage() {
 
     return () => { supabase.removeChannel(channel); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [updateMode]);
 
-  // 폴링: 15초 고정 (Realtime과 독립, 리셋되지 않음)
+  // 폴링 (polling 모드일 때만 동작, 간격 조절 가능)
   useEffect(() => {
+    if (updateMode !== 'polling') return;
+    const ms = pollingInterval * 1000;
     const iv = setInterval(() => {
       fetchSessions();
       if (activeSessionId) fetchChat(activeSessionId, true);
-    }, 15000);
+    }, ms);
     return () => clearInterval(iv);
-  }, [fetchSessions, fetchChat, activeSessionId]);
+  }, [fetchSessions, fetchChat, activeSessionId, updateMode, pollingInterval]);
 
   // 스크롤
   const prevMsgCountRef = useRef(0);
@@ -593,6 +619,51 @@ function ChatConsolePage() {
           ))}
         </Stack>
         <Box sx={{ flex: 1 }} />
+        {/* 업데이트 모드 토글 */}
+        <Stack direction="row" alignItems="center" spacing={0.5} sx={{ bgcolor: 'rgba(255,255,255,0.04)', borderRadius: 2, px: 1, py: 0.3, border: '1px solid rgba(255,255,255,0.08)' }}>
+          <Chip
+            icon={<SyncIcon sx={{ fontSize: 14 }} />}
+            label="실시간"
+            size="small"
+            onClick={() => setUpdateMode('realtime')}
+            sx={{
+              fontSize: '0.7rem', height: 24,
+              bgcolor: updateMode === 'realtime' ? 'rgba(16,185,129,0.2)' : 'transparent',
+              color: updateMode === 'realtime' ? '#10b981' : '#64748b',
+              border: updateMode === 'realtime' ? '1px solid rgba(16,185,129,0.4)' : '1px solid transparent',
+              cursor: 'pointer', '& .MuiChip-icon': { color: 'inherit' },
+            }}
+          />
+          <Chip
+            icon={<TimerIcon sx={{ fontSize: 14 }} />}
+            label={`폴링 ${pollingInterval}초`}
+            size="small"
+            onClick={() => setUpdateMode('polling')}
+            sx={{
+              fontSize: '0.7rem', height: 24,
+              bgcolor: updateMode === 'polling' ? 'rgba(59,130,246,0.2)' : 'transparent',
+              color: updateMode === 'polling' ? '#60a5fa' : '#64748b',
+              border: updateMode === 'polling' ? '1px solid rgba(59,130,246,0.4)' : '1px solid transparent',
+              cursor: 'pointer', '& .MuiChip-icon': { color: 'inherit' },
+            }}
+          />
+          {updateMode === 'polling' && (
+            <Box
+              component="select"
+              value={pollingInterval}
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setPollingInterval(Number(e.target.value))}
+              sx={{
+                bgcolor: 'transparent', color: '#94a3b8', border: 'none', fontSize: '0.7rem',
+                outline: 'none', cursor: 'pointer', ml: 0.3,
+                '& option': { bgcolor: '#1e293b', color: '#e2e8f0' },
+              }}
+            >
+              {[5, 10, 15, 30, 60].map(s => (
+                <option key={s} value={s}>{s}초</option>
+              ))}
+            </Box>
+          )}
+        </Stack>
         <IconButton onClick={() => { fetchSessions(); if (activeSessionId) fetchChat(activeSessionId); }} sx={{ color: '#94a3b8' }}>
           <RefreshIcon />
         </IconButton>
