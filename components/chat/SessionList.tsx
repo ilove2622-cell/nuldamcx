@@ -441,7 +441,7 @@ export default function SessionList({
               {session.last_message_text && (
                 <Typography
                   variant="caption"
-                  sx={{ color: '#64748b', mt: 0.3, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.72rem', pl: 3.5 }}
+                  sx={{ color: '#64748b', mt: 0.3, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', textOverflow: 'ellipsis', fontSize: '0.72rem', pl: 3.5, lineHeight: 1.4 }}
                 >
                   {sessionSearch
                     ? highlightText(session.last_message_text, sessionSearch)
