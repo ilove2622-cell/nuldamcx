@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
   const status = sp.get('status');
   const channel = sp.get('channel');
   const cursor = sp.get('cursor');
-  const limit = Math.min(Number(sp.get('limit') || '50'), 100);
+  const limit = Math.min(Number(sp.get('limit') || '50'), 1000);
 
   const since = new Date(Date.now() - days * 86400000).toISOString();
 

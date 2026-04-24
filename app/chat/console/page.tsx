@@ -143,25 +143,11 @@ function ChatConsolePage() {
   // ─── 세션 목록 로드 (자동 전체 페이지네이션, 상한 2000) ───
   const fetchSessions = useCallback(async () => {
     try {
-      const MAX_SESSIONS = 2000;
-      const fetchAll = async (): Promise<Session[]> => {
-        const all: Session[] = [];
-        let cursor: string | null = null;
-        do {
-          const params = new URLSearchParams({ days: '7', limit: '100' });
-          if (cursor) params.set('cursor', cursor);
-          const res = await fetch(`/api/chat/sessions?${params}`).then(r => r.json());
-          const items = res.data || [];
-          all.push(...items);
-          cursor = res.hasMore ? res.nextCursor : null;
-        } while (cursor && all.length < MAX_SESSIONS);
-        return all;
-      };
-      const [allSessions, extraRes] = await Promise.all([
-        fetchAll(),
+      const [res, extraRes] = await Promise.all([
+        fetch('/api/chat/sessions?days=7&limit=1000').then(r => r.json()),
         fetch('/api/chat/messages?days=1').then(r => r.json()),
       ]);
-      const newSessions: Session[] = allSessions;
+      const newSessions: Session[] = res.data || (Array.isArray(res) ? res : []);
       setSessions(prev => {
         if (prev.length === newSessions.length) {
           const same = prev.every((s, i) =>
