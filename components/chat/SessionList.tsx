@@ -438,7 +438,7 @@ export default function SessionList({
               {session.last_message_text && (
                 <Typography
                   variant="caption"
-                  sx={{ color: '#64748b', mt: 0.3, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', textOverflow: 'ellipsis', fontSize: '0.72rem', pl: 3.5, lineHeight: 1.4 }}
+                  sx={{ color: '#64748b', mt: 0.3, overflow: 'hidden', textOverflow: 'ellipsis', fontSize: '0.72rem', pl: 3.5, lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', wordBreak: 'break-all' }}
                 >
                   {sessionSearch
                     ? highlightText(session.last_message_text, sessionSearch)
@@ -446,15 +446,24 @@ export default function SessionList({
                   }
                 </Typography>
               )}
-              {((session.session_tags_data && session.session_tags_data.length > 0) || (session.customer_tags_data && session.customer_tags_data.length > 0)) && (
-                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.3, mt: 0.4, pl: 3.5 }}>
-                  {[...(session.session_tags_data || []).map(t => ({ ...t, _key: `s-${t.id}` })), ...(session.customer_tags_data || []).map(t => ({ ...t, _key: `c-${t.id}` }))].map(tag => (
-                    <Chip key={tag._key} label={tag.label} size="small"
-                      sx={{ height: 16, fontSize: '0.58rem', bgcolor: `${tag.color}22`, color: tag.color, border: `1px solid ${tag.color}44` }}
-                    />
-                  ))}
-                </Box>
-              )}
+              {(() => {
+                const seen = new Set<string>();
+                const allTags = [...(session.session_tags_data || []), ...(session.customer_tags_data || [])].filter(t => {
+                  if (seen.has(t.label)) return false;
+                  seen.add(t.label);
+                  return true;
+                });
+                if (allTags.length === 0) return null;
+                return (
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.3, mt: 0.4, pl: 3.5 }}>
+                    {allTags.map(tag => (
+                      <Chip key={tag.label} label={tag.label} size="small"
+                        sx={{ height: 16, fontSize: '0.58rem', bgcolor: `${tag.color}22`, color: tag.color, border: `1px solid ${tag.color}44` }}
+                      />
+                    ))}
+                  </Box>
+                );
+              })()}
             </Box>
           ))
         )}
