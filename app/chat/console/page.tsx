@@ -266,7 +266,7 @@ function ChatConsolePage() {
     }
   }, [activeSessionId, sessions]);
 
-  // Supabase Realtime + 폴링 fallback
+  // Supabase Realtime (RLS로 실질 미작동, 상태 표시용)
   useEffect(() => {
     setRealtimeState('connecting');
     const channel = supabase
@@ -274,7 +274,6 @@ function ChatConsolePage() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_sessions' }, () => fetchSessions())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_messages' }, (payload) => {
         const msgSessionId = (payload.new as any)?.session_id;
-        // 현재 보고 있는 세션이면 채팅 갱신, 아니면 안읽은 표시
         if (activeSessionId && msgSessionId === activeSessionId) {
           fetchChat(activeSessionId, true);
         } else if (msgSessionId) {
@@ -292,14 +291,18 @@ function ChatConsolePage() {
         else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') setRealtimeState('disconnected');
       });
 
-    // 폴링 간격: 15초 고정 (RLS로 인해 Realtime이 실질적으로 작동하지 않음)
+    return () => { supabase.removeChannel(channel); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 폴링: 15초 고정 (Realtime과 독립, 리셋되지 않음)
+  useEffect(() => {
     const iv = setInterval(() => {
       fetchSessions();
       if (activeSessionId) fetchChat(activeSessionId, true);
     }, 15000);
-
-    return () => { supabase.removeChannel(channel); clearInterval(iv); };
-  }, [fetchSessions, fetchChat, activeSessionId, realtimeState]);
+    return () => clearInterval(iv);
+  }, [fetchSessions, fetchChat, activeSessionId]);
 
   // 스크롤
   const prevMsgCountRef = useRef(0);
