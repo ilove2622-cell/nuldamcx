@@ -140,14 +140,27 @@ function ChatConsolePage() {
     localStorage.setItem('console_customerSidebar', String(showCustomerSidebar));
   }, [showCustomerSidebar]);
 
-  // ─── 세션 목록 로드 ───
+  // ─── 세션 목록 로드 (자동 페이지네이션) ───
   const fetchSessions = useCallback(async () => {
     try {
-      const [data, extraRes] = await Promise.all([
-        fetch('/api/chat/sessions?days=7').then(r => r.json()),
+      const fetchAllSessions = async (): Promise<Session[]> => {
+        const all: Session[] = [];
+        let cursor: string | null = null;
+        do {
+          const params = new URLSearchParams({ days: '7', limit: '100' });
+          if (cursor) params.set('cursor', cursor);
+          const res = await fetch(`/api/chat/sessions?${params}`).then(r => r.json());
+          const items = res.data || [];
+          all.push(...items);
+          cursor = res.hasMore ? res.nextCursor : null;
+        } while (cursor);
+        return all;
+      };
+      const [allSessions, extraRes] = await Promise.all([
+        fetchAllSessions(),
         fetch('/api/chat/messages?days=1').then(r => r.json()),
       ]);
-      const newSessions: Session[] = Array.isArray(data) ? data : [];
+      const newSessions: Session[] = allSessions;
       setSessions(prev => {
         if (prev.length === newSessions.length) {
           const same = prev.every((s, i) =>
