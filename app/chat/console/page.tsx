@@ -88,7 +88,7 @@ function ChatConsolePage() {
 
   // 필터 & 정렬
   const [filterUnread, setFilterUnread] = useState(false);
-  const [filterStarred, setFilterStarred] = useState(false);
+  // filterStarred 제거됨 — "중요" 탭과 중복
   const [filterChannel, setFilterChannel] = useState('');
   const [filterAgent, setFilterAgent] = useState('');
   const [filterTag, setFilterTag] = useState('');
@@ -156,6 +156,23 @@ function ChatConsolePage() {
             s.last_message_at === newSessions[i].last_message_at
           );
           if (same) return prev;
+        }
+        // last_message_at이 바뀐 세션 = 새 메시지 도착 → 안읽은 표시
+        if (prev.length > 0) {
+          const prevMap = new Map(prev.map(s => [s.id, s.last_message_at]));
+          const changed = newSessions.filter(s =>
+            prevMap.has(s.id) && prevMap.get(s.id) !== s.last_message_at
+          ).map(s => s.id);
+          // 새로 생긴 세션도 안읽은 표시
+          const brandNew = newSessions.filter(s => !prevMap.has(s.id)).map(s => s.id);
+          const toMark = [...changed, ...brandNew];
+          if (toMark.length > 0) {
+            setUnreadSessions(p => {
+              const next = new Set(p);
+              toMark.forEach(id => next.add(id));
+              return next;
+            });
+          }
         }
         return newSessions;
       });
@@ -242,9 +259,12 @@ function ChatConsolePage() {
       .channel('console-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_sessions' }, () => fetchSessions())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_messages' }, (payload) => {
-        // 해당 세션만 업데이트
-        if (activeSessionId && (payload.new as any)?.session_id === activeSessionId) {
+        const msgSessionId = (payload.new as any)?.session_id;
+        // 현재 보고 있는 세션이면 채팅 갱신, 아니면 안읽은 표시
+        if (activeSessionId && msgSessionId === activeSessionId) {
           fetchChat(activeSessionId, true);
+        } else if (msgSessionId) {
+          setUnreadSessions(prev => { const next = new Set(prev); next.add(msgSessionId); return next; });
         }
         fetchSessions();
       })
@@ -539,13 +559,11 @@ function ChatConsolePage() {
           starred={starred}
           unreadSessions={unreadSessions}
           filterUnread={filterUnread}
-          filterStarred={filterStarred}
           filterChannel={filterChannel}
           filterAgent={filterAgent}
           filterTag={filterTag}
           sortKey={sortKey}
           onFilterUnreadChange={setFilterUnread}
-          onFilterStarredChange={setFilterStarred}
           onFilterChannelChange={setFilterChannel}
           onFilterAgentChange={setFilterAgent}
           onFilterTagChange={setFilterTag}

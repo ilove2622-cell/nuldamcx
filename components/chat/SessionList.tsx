@@ -26,13 +26,11 @@ interface SessionListProps {
   starred: Set<number>;
   unreadSessions: Set<number>;
   filterUnread: boolean;
-  filterStarred: boolean;
   filterChannel: string;
   filterAgent: string;
   filterTag: string;
   sortKey: SortKey;
   onFilterUnreadChange: (v: boolean) => void;
-  onFilterStarredChange: (v: boolean) => void;
   onFilterChannelChange: (v: string) => void;
   onFilterAgentChange: (v: string) => void;
   onFilterTagChange: (v: string) => void;
@@ -68,8 +66,8 @@ const menuItemSx = { fontSize: '0.72rem' };
 export default function SessionList({
   sessions, loading, activeSessionId, activeTab, sessionSearch,
   starred, unreadSessions,
-  filterUnread, filterStarred, filterChannel, filterAgent, filterTag, sortKey,
-  onFilterUnreadChange, onFilterStarredChange, onFilterChannelChange, onFilterAgentChange, onFilterTagChange, onSortKeyChange,
+  filterUnread, filterChannel, filterAgent, filterTag, sortKey,
+  onFilterUnreadChange, onFilterChannelChange, onFilterAgentChange, onFilterTagChange, onSortKeyChange,
   onSelectSession, onTabChange, onSearchChange, onToggleStar, sentinelRef,
   loadingMore, hasMore,
 }: SessionListProps) {
@@ -98,11 +96,10 @@ export default function SessionList({
   }, [sessions]);
 
   // 활성 필터 개수
-  const activeFilterCount = [filterUnread, filterStarred, !!filterChannel, !!filterAgent, !!filterTag].filter(Boolean).length;
+  const activeFilterCount = [filterUnread, !!filterChannel, !!filterAgent, !!filterTag].filter(Boolean).length;
 
   const resetFilters = () => {
     onFilterUnreadChange(false);
-    onFilterStarredChange(false);
     onFilterChannelChange('');
     onFilterAgentChange('');
     onFilterTagChange('');
@@ -118,7 +115,6 @@ export default function SessionList({
       if (activeTab === '중요' && !starred.has(s.id)) return false;
       // 토글 필터
       if (filterUnread && !unreadSessions.has(s.id)) return false;
-      if (filterStarred && !starred.has(s.id)) return false;
       // 드롭다운 필터
       if (filterChannel && s.channel_type !== filterChannel) return false;
       if (filterAgent && s.assigned_agent !== filterAgent) return false;
@@ -154,7 +150,7 @@ export default function SessionList({
     });
 
     return result;
-  }, [sessions, activeTab, starred, unreadSessions, filterUnread, filterStarred, filterChannel, filterAgent, filterTag, sessionSearch, sortKey]);
+  }, [sessions, activeTab, starred, unreadSessions, filterUnread, filterChannel, filterAgent, filterTag, sessionSearch, sortKey]);
 
   // 탭별 건수
   const tabCounts = useMemo(() => {
@@ -211,18 +207,6 @@ export default function SessionList({
             size="small"
             onClick={() => onFilterUnreadChange(!filterUnread)}
             sx={toggleChipSx(filterUnread)}
-          />
-          <Chip
-            icon={<StarIcon sx={{ fontSize: 12, color: filterStarred ? '#f59e0b' : '#64748b' }} />}
-            label="즐겨찾기"
-            size="small"
-            onClick={() => onFilterStarredChange(!filterStarred)}
-            sx={{
-              ...toggleChipSx(filterStarred),
-              bgcolor: filterStarred ? 'rgba(245,158,11,0.15)' : 'rgba(255,255,255,0.04)',
-              color: filterStarred ? '#fbbf24' : '#94a3b8',
-              border: filterStarred ? '1px solid rgba(245,158,11,0.4)' : '1px solid rgba(255,255,255,0.08)',
-            }}
           />
           <Box sx={{ flex: 1 }} />
           <FormControl size="small" sx={{ minWidth: 110 }}>
