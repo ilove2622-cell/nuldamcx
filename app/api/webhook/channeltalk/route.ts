@@ -140,11 +140,33 @@ async function handleChatCreated(payload: any, refers: any) {
 async function handleMessageCreated(payload: any, refers: any) {
   const message = payload.entity || {};
 
-  // 시스템 로그 메시지 무시 (채팅 오픈/종료 등)
-  if (message.log) return;
-
   const userChatId = message.chatId || message.userChatId;
   if (!userChatId) return;
+
+  // 시스템 로그 메시지 중 상담 종료 패턴 감지
+  if (message.log) {
+    const logText = message.plainText || message.blocks?.map((b: any) => b.value || '').join('') || '';
+    if (/님이 상담을 종료하였습니다/.test(logText)) {
+      const session = await getOrCreateSession(userChatId, refers, message);
+      // 종료 메시지 저장
+      await supabase.from('chat_messages').insert({
+        session_id: session.id,
+        sender: 'system',
+        message_id: message.id,
+        text: logText.trim(),
+      });
+      // 세션 상태 업데이트
+      await supabase.from('chat_sessions').update({
+        status: 'closed',
+        closed_at: new Date().toISOString(),
+        last_message_at: new Date().toISOString(),
+        last_message_text: logText.trim().slice(0, 100),
+        last_message_sender: 'system',
+      }).eq('id', session.id);
+      console.log(`🔒 고객 상담 종료 감지 (log): ${userChatId}`);
+    }
+    return;
+  }
 
   // 텍스트 추출
   const personType = message.personType;
@@ -234,20 +256,6 @@ async function handleMessageCreated(payload: any, refers: any) {
     last_message_sender: 'customer',
   }).eq('id', session.id);
 
-  // 고객이 상담 종료한 경우 감지 ("OOO님이 상담을 종료하였습니다" 패턴)
-  if (/님이 상담을 종료하였습니다/.test(text)) {
-    await supabase.from('chat_sessions').update({
-      status: 'closed',
-      closed_at: new Date().toISOString(),
-      last_message_sender: 'system',
-    }).eq('id', session.id);
-    // sender를 system으로 변경
-    await supabase.from('chat_messages').update({ sender: 'system' })
-      .eq('session_id', session.id)
-      .eq('channeltalk_message_id', message.id);
-    console.log(`🔒 고객 상담 종료 감지: ${userChatId}`);
-    return;
-  }
 
   // ─── 플로우 시작 ───
 
