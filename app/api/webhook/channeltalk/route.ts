@@ -186,6 +186,7 @@ async function handleMessageCreated(payload: any, refers: any) {
     const sessionUpdate: Record<string, any> = {
       last_message_at: new Date().toISOString(),
       last_message_text: text.slice(0, 100),
+      last_message_sender: personType === 'manager' ? 'agent' : 'bot',
     };
     // manager 메시지 시 상담원 정보 저장
     if (personType === 'manager') {
@@ -230,6 +231,7 @@ async function handleMessageCreated(payload: any, refers: any) {
   await supabase.from('chat_sessions').update({
     last_message_at: new Date().toISOString(),
     last_message_text: text.slice(0, 100),
+    last_message_sender: 'customer',
   }).eq('id', session.id);
 
   // ─── 플로우 시작 ───

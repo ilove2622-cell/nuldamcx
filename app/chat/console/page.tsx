@@ -98,6 +98,7 @@ function ChatConsolePage() {
 
   // 필터 & 정렬
   const [filterUnread, setFilterUnread] = useState(false);
+  const [filterUnanswered, setFilterUnanswered] = useState(false);
   // filterStarred 제거됨 — "중요" 탭과 중복
   const [filterChannel, setFilterChannel] = useState('');
   const [filterAgent, setFilterAgent] = useState('');
@@ -571,6 +572,7 @@ function ChatConsolePage() {
           starred={starred}
           unreadSessions={unreadSessions}
           filterUnread={filterUnread}
+          filterUnanswered={filterUnanswered}
           filterChannel={filterChannel}
           filterAgent={filterAgent}
           filterTag={filterTag}
@@ -578,6 +580,7 @@ function ChatConsolePage() {
           dateRange={dateRange}
           onDateRangeChange={setDateRange}
           onFilterUnreadChange={setFilterUnread}
+          onFilterUnansweredChange={setFilterUnanswered}
           onFilterChannelChange={setFilterChannel}
           onFilterAgentChange={setFilterAgent}
           onFilterTagChange={setFilterTag}

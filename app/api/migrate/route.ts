@@ -10,11 +10,7 @@ const supabase = createClient(
 export async function GET() {
   const results: string[] = [];
 
-  // 1. Try adding columns by inserting a test update
-  // Supabase JS doesn't support raw DDL, so we use a workaround:
-  // Just try to update with the new columns - if they don't exist, we'll know
-
-  // Test if column exists
+  // 1. Test if last_message_at column exists
   const { error: testErr } = await supabase
     .from('chat_sessions')
     .select('last_message_at')
@@ -25,39 +21,78 @@ export async function GET() {
     return NextResponse.json({ results, needsManualSQL: true });
   }
 
-  results.push('columns exist');
+  results.push('last_message_at exists');
 
-  // 2. Backfill: for each session without last_message_at, find latest message
+  // 2. Backfill last_message_at
   const { data: sessions } = await supabase
     .from('chat_sessions')
     .select('id')
     .is('last_message_at', null)
     .limit(1000);
 
-  if (!sessions || sessions.length === 0) {
-    results.push('no sessions need backfill');
-    return NextResponse.json({ results });
-  }
+  if (sessions && sessions.length > 0) {
+    let updated = 0;
+    for (const s of sessions) {
+      const { data: lastMsg } = await supabase
+        .from('chat_messages')
+        .select('created_at, text')
+        .eq('session_id', s.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
 
-  let updated = 0;
-  for (const s of sessions) {
-    const { data: lastMsg } = await supabase
-      .from('chat_messages')
-      .select('created_at, text')
-      .eq('session_id', s.id)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single();
-
-    if (lastMsg) {
-      await supabase.from('chat_sessions').update({
-        last_message_at: lastMsg.created_at,
-        last_message_text: (lastMsg.text || '').slice(0, 100),
-      }).eq('id', s.id);
-      updated++;
+      if (lastMsg) {
+        await supabase.from('chat_sessions').update({
+          last_message_at: lastMsg.created_at,
+          last_message_text: (lastMsg.text || '').slice(0, 100),
+        }).eq('id', s.id);
+        updated++;
+      }
     }
+    results.push(`backfilled last_message_at: ${updated}/${sessions.length}`);
+  } else {
+    results.push('last_message_at: no backfill needed');
   }
 
-  results.push(`backfilled ${updated}/${sessions.length} sessions`);
+  // 3. Backfill last_message_sender
+  const { error: senderTestErr } = await supabase
+    .from('chat_sessions')
+    .select('last_message_sender')
+    .limit(1);
+
+  if (senderTestErr && senderTestErr.message.includes('last_message_sender')) {
+    results.push('last_message_sender column does not exist - run SQL: ALTER TABLE chat_sessions ADD COLUMN IF NOT EXISTS last_message_sender TEXT;');
+    return NextResponse.json({ results, needsManualSQL: true });
+  }
+
+  const { data: needsSender } = await supabase
+    .from('chat_sessions')
+    .select('id')
+    .is('last_message_sender', null)
+    .limit(1000);
+
+  if (needsSender && needsSender.length > 0) {
+    let updated = 0;
+    for (const s of needsSender) {
+      const { data: lastMsg } = await supabase
+        .from('chat_messages')
+        .select('sender')
+        .eq('session_id', s.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (lastMsg) {
+        await supabase.from('chat_sessions').update({
+          last_message_sender: lastMsg.sender,
+        }).eq('id', s.id);
+        updated++;
+      }
+    }
+    results.push(`backfilled last_message_sender: ${updated}/${needsSender.length}`);
+  } else {
+    results.push('last_message_sender: no backfill needed');
+  }
+
   return NextResponse.json({ results });
 }

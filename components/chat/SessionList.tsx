@@ -32,6 +32,7 @@ interface SessionListProps {
   starred: Set<number>;
   unreadSessions: Set<number>;
   filterUnread: boolean;
+  filterUnanswered: boolean;
   filterChannel: string;
   filterAgent: string;
   filterTag: string;
@@ -39,6 +40,7 @@ interface SessionListProps {
   dateRange: DateRange;
   onDateRangeChange: (range: DateRange) => void;
   onFilterUnreadChange: (v: boolean) => void;
+  onFilterUnansweredChange: (v: boolean) => void;
   onFilterChannelChange: (v: string) => void;
   onFilterAgentChange: (v: string) => void;
   onFilterTagChange: (v: string) => void;
@@ -74,9 +76,9 @@ const menuItemSx = { fontSize: '0.72rem' };
 export default function SessionList({
   sessions, loading, activeSessionId, activeTab, sessionSearch,
   starred, unreadSessions,
-  filterUnread, filterChannel, filterAgent, filterTag, sortKey,
+  filterUnread, filterUnanswered, filterChannel, filterAgent, filterTag, sortKey,
   dateRange, onDateRangeChange,
-  onFilterUnreadChange, onFilterChannelChange, onFilterAgentChange, onFilterTagChange, onSortKeyChange,
+  onFilterUnreadChange, onFilterUnansweredChange, onFilterChannelChange, onFilterAgentChange, onFilterTagChange, onSortKeyChange,
   onSelectSession, onTabChange, onSearchChange, onToggleStar, sentinelRef,
   loadingMore, hasMore,
 }: SessionListProps) {
@@ -105,10 +107,11 @@ export default function SessionList({
   }, [sessions]);
 
   // 활성 필터 개수
-  const activeFilterCount = [filterUnread, !!filterChannel, !!filterAgent, !!filterTag].filter(Boolean).length;
+  const activeFilterCount = [filterUnread, filterUnanswered, !!filterChannel, !!filterAgent, !!filterTag].filter(Boolean).length;
 
   const resetFilters = () => {
     onFilterUnreadChange(false);
+    onFilterUnansweredChange(false);
     onFilterChannelChange('');
     onFilterAgentChange('');
     onFilterTagChange('');
@@ -124,6 +127,7 @@ export default function SessionList({
       if (activeTab === '중요' && !starred.has(s.id)) return false;
       // 토글 필터
       if (filterUnread && !unreadSessions.has(s.id)) return false;
+      if (filterUnanswered && s.last_message_sender !== 'customer') return false;
       // 드롭다운 필터
       if (filterChannel && s.channel_type !== filterChannel) return false;
       if (filterAgent && s.assigned_agent !== filterAgent) return false;
@@ -159,7 +163,7 @@ export default function SessionList({
     });
 
     return result;
-  }, [sessions, activeTab, starred, unreadSessions, filterUnread, filterChannel, filterAgent, filterTag, sessionSearch, sortKey]);
+  }, [sessions, activeTab, starred, unreadSessions, filterUnread, filterUnanswered, filterChannel, filterAgent, filterTag, sessionSearch, sortKey]);
 
   // 탭별 건수
   const tabCounts = useMemo(() => {
@@ -274,6 +278,19 @@ export default function SessionList({
             size="small"
             onClick={() => onFilterUnreadChange(!filterUnread)}
             sx={toggleChipSx(filterUnread)}
+          />
+          <Chip
+            icon={<DotIcon sx={{ fontSize: 10, color: filterUnanswered ? '#f59e0b' : '#64748b' }} />}
+            label="미답변"
+            size="small"
+            onClick={() => onFilterUnansweredChange(!filterUnanswered)}
+            sx={{
+              cursor: 'pointer', fontSize: '0.68rem', height: 26,
+              fontWeight: filterUnanswered ? 700 : 400,
+              bgcolor: filterUnanswered ? 'rgba(245,158,11,0.15)' : 'rgba(255,255,255,0.04)',
+              color: filterUnanswered ? '#fbbf24' : '#94a3b8',
+              border: filterUnanswered ? '1px solid rgba(245,158,11,0.4)' : '1px solid rgba(255,255,255,0.08)',
+            }}
           />
           <Box sx={{ flex: 1 }} />
           <FormControl size="small" sx={{ minWidth: 110 }}>
