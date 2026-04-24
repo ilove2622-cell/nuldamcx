@@ -478,23 +478,25 @@ export default function CustomerSidebar({ session, messages, open, onToggle, onI
         )}
       </Section>
 
-      {/* 고객 태그 */}
-      <Section title={`고객 태그${tags.length > 0 ? ` (${tags.length})` : ''}`}>
-        {tags.length > 3 && (
+      {/* 태그 (고객+상담 통합) */}
+      <Section title={`태그${(tags.length + sessionTags.length) > 0 ? ` (${tags.length + sessionTags.length})` : ''}`}>
+        {(tags.length + sessionTags.length) > 3 && (
           <TextField
             size="small" variant="outlined" fullWidth placeholder="태그 검색..."
-            value={customerTagSearch} onChange={e => setCustomerTagSearch(e.target.value)}
+            value={customerTagSearch} onChange={e => { setCustomerTagSearch(e.target.value); setSessionTagSearch(e.target.value); }}
             slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchIcon sx={{ fontSize: 14, color: '#475569' }} /></InputAdornment> } }}
             sx={{ mb: 0.8, '& .MuiOutlinedInput-root': { bgcolor: 'rgba(255,255,255,0.04)', height: 28, '& fieldset': { borderColor: 'rgba(255,255,255,0.06)' } }, '& .MuiInputBase-input': { color: '#e2e8f0', fontSize: '0.68rem', py: 0.3, px: 0.5 } }}
           />
         )}
         {(() => {
-          const filtered = customerTagSearch
-            ? tags.filter(t => t.label.toLowerCase().includes(customerTagSearch.toLowerCase()) || t.category.toLowerCase().includes(customerTagSearch.toLowerCase()))
-            : tags;
+          const q = customerTagSearch.toLowerCase();
+          const allTags = [
+            ...tags.map(t => ({ ...t, _src: 'customer' as const })),
+            ...sessionTags.map(t => ({ ...t, _src: 'session' as const, customer_id: '' })),
+          ].filter(t => !q || t.label.toLowerCase().includes(q) || t.category.toLowerCase().includes(q));
           // 카테고리별 그룹
-          const groups = new Map<string, CustomerTag[]>();
-          for (const t of filtered) {
+          const groups = new Map<string, typeof allTags>();
+          for (const t of allTags) {
             const g = groups.get(t.category) || [];
             g.push(t);
             groups.set(t.category, g);
@@ -507,10 +509,10 @@ export default function CustomerSidebar({ session, messages, open, onToggle, onI
                   <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.4 }}>
                     {catTags.map(tag => (
                       <Chip
-                        key={tag.id}
+                        key={`${tag._src}-${tag.id}`}
                         label={tag.label}
                         size="small"
-                        onDelete={() => handleDeleteTag(tag.id)}
+                        onDelete={() => tag._src === 'customer' ? handleDeleteTag(tag.id) : handleDeleteSessionTag(tag.id)}
                         deleteIcon={<CloseIcon sx={{ fontSize: '11px !important' }} />}
                         sx={{ bgcolor: `${tag.color}22`, color: tag.color, borderColor: `${tag.color}44`, border: 1, fontSize: '0.66rem', height: 21, '& .MuiChip-deleteIcon': { color: `${tag.color}88`, fontSize: 11 } }}
                       />
@@ -518,7 +520,7 @@ export default function CustomerSidebar({ session, messages, open, onToggle, onI
                   </Box>
                 </Box>
               ))}
-              {filtered.length === 0 && <Typography variant="caption" sx={{ color: '#475569', fontSize: '0.68rem' }}>{customerTagSearch ? '검색 결과 없음' : '태그 없음'}</Typography>}
+              {allTags.length === 0 && <Typography variant="caption" sx={{ color: '#475569', fontSize: '0.68rem' }}>{q ? '검색 결과 없음' : '태그 없음'}</Typography>}
             </Box>
           );
         })()}
@@ -559,52 +561,6 @@ export default function CustomerSidebar({ session, messages, open, onToggle, onI
         />
       </Section>
 
-      {/* 상담 태그 */}
-      <Section title={`상담 태그${sessionTags.length > 0 ? ` (${sessionTags.length})` : ''}`} defaultOpen={false}>
-        {sessionTags.length > 3 && (
-          <TextField
-            size="small" variant="outlined" fullWidth placeholder="태그 검색..."
-            value={sessionTagSearch} onChange={e => setSessionTagSearch(e.target.value)}
-            slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchIcon sx={{ fontSize: 14, color: '#475569' }} /></InputAdornment> } }}
-            sx={{ mb: 0.8, '& .MuiOutlinedInput-root': { bgcolor: 'rgba(255,255,255,0.04)', height: 28, '& fieldset': { borderColor: 'rgba(255,255,255,0.06)' } }, '& .MuiInputBase-input': { color: '#e2e8f0', fontSize: '0.68rem', py: 0.3, px: 0.5 } }}
-          />
-        )}
-        {(() => {
-          const filtered = sessionTagSearch
-            ? sessionTags.filter(t => t.label.toLowerCase().includes(sessionTagSearch.toLowerCase()) || t.category.toLowerCase().includes(sessionTagSearch.toLowerCase()))
-            : sessionTags;
-          const groups = new Map<string, SessionTag[]>();
-          for (const t of filtered) {
-            const g = groups.get(t.category) || [];
-            g.push(t);
-            groups.set(t.category, g);
-          }
-          return (
-            <Box sx={{ mb: 0.8 }}>
-              {[...groups.entries()].map(([cat, catTags]) => (
-                <Box key={cat} sx={{ mb: 0.5 }}>
-                  {cat !== '일반' && <Typography variant="caption" sx={{ color: '#475569', fontSize: '0.6rem', display: 'block', mb: 0.2 }}>{cat}</Typography>}
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.4 }}>
-                    {catTags.map(tag => (
-                      <Chip
-                        key={tag.id}
-                        label={tag.label}
-                        size="small"
-                        onDelete={() => handleDeleteSessionTag(tag.id)}
-                        deleteIcon={<CloseIcon sx={{ fontSize: '11px !important' }} />}
-                        sx={{ bgcolor: `${tag.color}22`, color: tag.color, borderColor: `${tag.color}44`, border: 1, fontSize: '0.66rem', height: 21, '& .MuiChip-deleteIcon': { color: `${tag.color}88`, fontSize: 11 } }}
-                      />
-                    ))}
-                  </Box>
-                </Box>
-              ))}
-              {filtered.length === 0 && <Typography variant="caption" sx={{ color: '#475569', fontSize: '0.68rem' }}>{sessionTagSearch ? '검색 결과 없음' : '태그 없음'}</Typography>}
-            </Box>
-          );
-        })()}
-        <TagInput placeholder="카테고리:태그 입력 (자동완성)" suggestionsType="session" onAdd={handleAddSessionTag} />
-      </Section>
-
       {/* 상담 이력 */}
       <Section title="상담 이력">
         <Stack spacing={0.3}>
@@ -621,8 +577,8 @@ export default function CustomerSidebar({ session, messages, open, onToggle, onI
                 }}
               />
               <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.65rem' }}>{fmtDate(h.created_at)}</Typography>
-              <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.68rem', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {h.last_message_text ? (h.last_message_text.length > 25 ? h.last_message_text.slice(0, 25) + '…' : h.last_message_text) : '—'}
+              <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.68rem', flex: 1, overflow: 'hidden', lineHeight: 1.4, maxHeight: '2.8em', wordBreak: 'break-all' }}>
+                {h.last_message_text || '—'}
               </Typography>
             </Box>
           ))}
