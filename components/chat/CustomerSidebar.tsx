@@ -237,27 +237,31 @@ function HistoryItem({ h, fmtDate }: { h: any; fmtDate: (iso: string) => string 
   return (
     <Box
       onClick={() => setExpanded(v => !v)}
-      sx={{ display: 'flex', alignItems: h.last_message_text && expanded ? 'flex-start' : 'center', gap: 0.5, py: 0.3, cursor: 'pointer', borderRadius: 0.5, '&:hover': { bgcolor: 'rgba(255,255,255,0.03)' } }}
+      sx={{ py: 0.3, cursor: 'pointer', borderRadius: 0.5, '&:hover': { bgcolor: 'rgba(255,255,255,0.03)' } }}
     >
-      <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.65rem', fontFamily: 'monospace', flexShrink: 0 }}>#{h.id}</Typography>
-      <Chip
-        label={h.status === 'closed' ? '완료' : h.status === 'escalated' ? '전달' : '진행'}
-        size="small"
-        sx={{
-          height: 16, fontSize: '0.6rem', flexShrink: 0,
-          bgcolor: h.status === 'closed' ? 'rgba(16,185,129,0.15)' : h.status === 'escalated' ? 'rgba(239,68,68,0.15)' : 'rgba(59,130,246,0.15)',
-          color: h.status === 'closed' ? '#10b981' : h.status === 'escalated' ? '#ef4444' : '#3b82f6',
-        }}
-      />
-      <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.65rem', flexShrink: 0 }}>{fmtDate(h.created_at)}</Typography>
-      <Typography variant="caption" sx={{
-        color: '#94a3b8', fontSize: '0.68rem', flex: 1,
-        ...(expanded
-          ? { whiteSpace: 'pre-wrap', wordBreak: 'break-all' }
-          : { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }),
-      }}>
-        {h.last_message_text || '—'}
-      </Typography>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+        <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.65rem', fontFamily: 'monospace', flexShrink: 0 }}>#{h.id}</Typography>
+        <Chip
+          label={h.status === 'closed' ? '완료' : h.status === 'escalated' ? '전달' : '진행'}
+          size="small"
+          sx={{
+            height: 16, fontSize: '0.6rem', flexShrink: 0,
+            bgcolor: h.status === 'closed' ? 'rgba(16,185,129,0.15)' : h.status === 'escalated' ? 'rgba(239,68,68,0.15)' : 'rgba(59,130,246,0.15)',
+            color: h.status === 'closed' ? '#10b981' : h.status === 'escalated' ? '#ef4444' : '#3b82f6',
+          }}
+        />
+        <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.65rem', flexShrink: 0 }}>{fmtDate(h.created_at)}</Typography>
+        {!expanded && (
+          <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.68rem', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {h.last_message_text || '—'}
+          </Typography>
+        )}
+      </Box>
+      {expanded && h.last_message_text && (
+        <Typography variant="caption" sx={{ color: '#c8d0db', fontSize: '0.7rem', display: 'block', mt: 0.4, pl: 1, lineHeight: 1.5, whiteSpace: 'pre-wrap', wordBreak: 'break-all', bgcolor: 'rgba(255,255,255,0.02)', borderRadius: 0.5, p: 0.8 }}>
+          {h.last_message_text}
+        </Typography>
+      )}
     </Box>
   );
 }
