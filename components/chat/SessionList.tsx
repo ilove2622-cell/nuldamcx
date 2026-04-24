@@ -127,7 +127,7 @@ export default function SessionList({
       if (activeTab === '중요' && !starred.has(s.id)) return false;
       // 토글 필터
       if (filterUnread && !unreadSessions.has(s.id)) return false;
-      if (filterUnanswered && s.last_message_sender !== 'customer') return false;
+      if (filterUnanswered && (s.last_message_sender !== 'customer' || s.status === 'closed')) return false;
       // 드롭다운 필터
       if (filterChannel && s.channel_type !== filterChannel) return false;
       if (filterAgent && s.assigned_agent !== filterAgent) return false;
