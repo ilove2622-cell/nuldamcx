@@ -8,23 +8,30 @@ const supabase = createClient(
 
 /**
  * GET /api/chat/sessions?days=7&status=open&channel=appKakao
+ * 날짜 범위: ?from=2026-04-01T00:00:00&to=2026-04-24T23:59:59
  * 커서 기반 페이지네이션: ?cursor=<ISO>&limit=50
  */
 export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;
+  const fromParam = sp.get('from');
+  const toParam = sp.get('to');
   const days = Number(sp.get('days') || '7');
   const status = sp.get('status');
   const channel = sp.get('channel');
   const cursor = sp.get('cursor');
   const limit = Math.min(Number(sp.get('limit') || '50'), 1000);
 
-  const since = new Date(Date.now() - days * 86400000).toISOString();
+  // from/to 파라미터 우선, 없으면 days 사용
+  const since = fromParam || new Date(Date.now() - days * 86400000).toISOString();
 
   let q = supabase
     .from('chat_sessions')
     .select('*')
-    .gte('created_at', since)
-    .order('last_message_at', { ascending: false, nullsFirst: false })
+    .gte('created_at', since);
+
+  if (toParam) q = q.lte('created_at', toParam);
+
+  q = q.order('last_message_at', { ascending: false, nullsFirst: false })
     .limit(limit + 1); // +1로 다음 페이지 존재 여부 확인
 
   if (status && status !== '전체') q = q.eq('status', status);
@@ -38,8 +45,11 @@ export async function GET(req: NextRequest) {
     let fallback = supabase
       .from('chat_sessions')
       .select('*')
-      .gte('created_at', since)
-      .order('created_at', { ascending: false })
+      .gte('created_at', since);
+
+    if (toParam) fallback = fallback.lte('created_at', toParam);
+
+    fallback = fallback.order('created_at', { ascending: false })
       .limit(limit + 1);
 
     if (status && status !== '전체') fallback = fallback.eq('status', status);

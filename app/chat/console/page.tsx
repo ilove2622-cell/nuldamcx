@@ -86,6 +86,16 @@ function ChatConsolePage() {
   const [escalating, setEscalating] = useState(false);
   const [escalateReason, setEscalateReason] = useState('');
 
+  // 날짜 범위 필터
+  const [dateRange, setDateRange] = useState<{ from: string; to: string }>(() => {
+    const to = new Date();
+    const from = new Date(to.getTime() - 7 * 86400000);
+    return {
+      from: from.toISOString().slice(0, 10),
+      to: to.toISOString().slice(0, 10),
+    };
+  });
+
   // 필터 & 정렬
   const [filterUnread, setFilterUnread] = useState(false);
   // filterStarred 제거됨 — "중요" 탭과 중복
@@ -143,8 +153,10 @@ function ChatConsolePage() {
   // ─── 세션 목록 로드 (자동 전체 페이지네이션, 상한 2000) ───
   const fetchSessions = useCallback(async () => {
     try {
+      const fromISO = new Date(dateRange.from + 'T00:00:00').toISOString();
+      const toISO = new Date(dateRange.to + 'T23:59:59').toISOString();
       const [res, extraRes] = await Promise.all([
-        fetch('/api/chat/sessions?days=7&limit=1000').then(r => r.json()),
+        fetch(`/api/chat/sessions?from=${encodeURIComponent(fromISO)}&to=${encodeURIComponent(toISO)}&limit=1000`).then(r => r.json()),
         fetch('/api/chat/messages?days=1').then(r => r.json()),
       ]);
       const newSessions: Session[] = res.data || (Array.isArray(res) ? res : []);
@@ -192,7 +204,7 @@ function ChatConsolePage() {
       console.error('세션 로드 실패:', e);
     }
     setSessionsLoading(false);
-  }, []);
+  }, [dateRange]);
 
   // ─── 메시지 & AI 응답 로드 ───
   const fetchChat = useCallback(async (sessionId: number, isPolling = false) => {
@@ -563,6 +575,8 @@ function ChatConsolePage() {
           filterAgent={filterAgent}
           filterTag={filterTag}
           sortKey={sortKey}
+          dateRange={dateRange}
+          onDateRangeChange={setDateRange}
           onFilterUnreadChange={setFilterUnread}
           onFilterChannelChange={setFilterChannel}
           onFilterAgentChange={setFilterAgent}

@@ -11,11 +11,17 @@ import {
   StarBorder as StarBorderIcon,
   FiberManualRecord as DotIcon,
   Close as CloseIcon,
+  CalendarMonth as CalendarIcon,
 } from '@mui/icons-material';
 import type { Session, TabKey, SortKey, SessionTag, CustomerTag } from '@/types/chat';
 import { channelLabel, channelColor, statusLabel, statusColor, formatTime } from '@/lib/chat-helpers';
 import { highlightText } from '@/lib/highlight';
 import SessionSkeleton from './SessionSkeleton';
+
+interface DateRange {
+  from: string; // YYYY-MM-DD
+  to: string;
+}
 
 interface SessionListProps {
   sessions: Session[];
@@ -30,6 +36,8 @@ interface SessionListProps {
   filterAgent: string;
   filterTag: string;
   sortKey: SortKey;
+  dateRange: DateRange;
+  onDateRangeChange: (range: DateRange) => void;
   onFilterUnreadChange: (v: boolean) => void;
   onFilterChannelChange: (v: string) => void;
   onFilterAgentChange: (v: string) => void;
@@ -67,6 +75,7 @@ export default function SessionList({
   sessions, loading, activeSessionId, activeTab, sessionSearch,
   starred, unreadSessions,
   filterUnread, filterChannel, filterAgent, filterTag, sortKey,
+  dateRange, onDateRangeChange,
   onFilterUnreadChange, onFilterChannelChange, onFilterAgentChange, onFilterTagChange, onSortKeyChange,
   onSelectSession, onTabChange, onSearchChange, onToggleStar, sentinelRef,
   loadingMore, hasMore,
@@ -195,6 +204,64 @@ export default function SessionList({
               />
             );
           })}
+        </Stack>
+      </Box>
+
+      {/* 날짜 범위 필터 */}
+      <Box sx={{ px: 1, pb: 0.5 }}>
+        <Stack direction="row" spacing={0.5} alignItems="center" sx={{ flexWrap: 'wrap', gap: 0.3 }}>
+          <CalendarIcon sx={{ fontSize: 14, color: '#64748b' }} />
+          {[
+            { label: '오늘', days: 0 },
+            { label: '3일', days: 3 },
+            { label: '7일', days: 7 },
+            { label: '30일', days: 30 },
+            { label: '전체', days: 365 },
+          ].map(opt => {
+            const today = new Date().toISOString().slice(0, 10);
+            const from = opt.days === 0
+              ? today
+              : new Date(Date.now() - opt.days * 86400000).toISOString().slice(0, 10);
+            const isActive = dateRange.from === from && dateRange.to === today;
+            return (
+              <Chip
+                key={opt.label}
+                label={opt.label}
+                size="small"
+                onClick={() => onDateRangeChange({ from, to: today })}
+                sx={{
+                  cursor: 'pointer', fontSize: '0.65rem', height: 22,
+                  fontWeight: isActive ? 700 : 400,
+                  bgcolor: isActive ? 'rgba(16,185,129,0.15)' : 'rgba(255,255,255,0.04)',
+                  color: isActive ? '#34d399' : '#94a3b8',
+                  border: isActive ? '1px solid rgba(16,185,129,0.4)' : '1px solid rgba(255,255,255,0.08)',
+                }}
+              />
+            );
+          })}
+        </Stack>
+        <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.5 }}>
+          <input
+            type="date"
+            value={dateRange.from}
+            onChange={(e) => onDateRangeChange({ ...dateRange, from: e.target.value })}
+            style={{
+              flex: 1, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
+              borderRadius: 4, color: '#94a3b8', fontSize: '0.7rem', padding: '2px 6px', height: 26,
+              colorScheme: 'dark',
+            }}
+          />
+          <Typography sx={{ color: '#475569', fontSize: '0.7rem' }}>~</Typography>
+          <input
+            type="date"
+            value={dateRange.to}
+            onChange={(e) => onDateRangeChange({ ...dateRange, to: e.target.value })}
+            style={{
+              flex: 1, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
+              borderRadius: 4, color: '#94a3b8', fontSize: '0.7rem', padding: '2px 6px', height: 26,
+              colorScheme: 'dark',
+            }}
+          />
         </Stack>
       </Box>
 
