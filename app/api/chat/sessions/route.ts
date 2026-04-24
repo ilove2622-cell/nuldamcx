@@ -24,12 +24,13 @@ export async function GET(req: NextRequest) {
   // from/to 파라미터 우선, 없으면 days 사용
   const since = fromParam || new Date(Date.now() - days * 86400000).toISOString();
 
+  // last_message_at(마지막 활동) 기준 필터, null이면 created_at으로 fallback
   let q = supabase
     .from('chat_sessions')
     .select('*')
-    .gte('created_at', since);
+    .or(`last_message_at.gte.${since},and(last_message_at.is.null,created_at.gte.${since})`);
 
-  if (toParam) q = q.lte('created_at', toParam);
+  if (toParam) q = q.or(`last_message_at.lte.${toParam},and(last_message_at.is.null,created_at.lte.${toParam})`);
 
   q = q.order('last_message_at', { ascending: false, nullsFirst: false })
     .limit(limit + 1); // +1로 다음 페이지 존재 여부 확인
@@ -48,6 +49,7 @@ export async function GET(req: NextRequest) {
       .gte('created_at', since);
 
     if (toParam) fallback = fallback.lte('created_at', toParam);
+    // fallback은 last_message_at 없으므로 created_at 사용
 
     fallback = fallback.order('created_at', { ascending: false })
       .limit(limit + 1);
