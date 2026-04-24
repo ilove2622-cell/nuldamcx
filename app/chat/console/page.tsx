@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef, Suspense, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/components/ToastProvider';
@@ -140,21 +140,28 @@ function ChatConsolePage() {
     localStorage.setItem('console_customerSidebar', String(showCustomerSidebar));
   }, [showCustomerSidebar]);
 
-  // ─── 세션 목록 로드 (커서 기반 무한 스크롤) ───
-  const nextCursorRef = useRef<string | null>(null);
-  const [hasMoreSessions, setHasMoreSessions] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const sentinelRef = useRef<HTMLDivElement | null>(null);
-
+  // ─── 세션 목록 로드 (자동 전체 페이지네이션, 상한 2000) ───
   const fetchSessions = useCallback(async () => {
     try {
-      const [res, extraRes] = await Promise.all([
-        fetch('/api/chat/sessions?days=7&limit=100').then(r => r.json()),
+      const MAX_SESSIONS = 2000;
+      const fetchAll = async (): Promise<Session[]> => {
+        const all: Session[] = [];
+        let cursor: string | null = null;
+        do {
+          const params = new URLSearchParams({ days: '7', limit: '100' });
+          if (cursor) params.set('cursor', cursor);
+          const res = await fetch(`/api/chat/sessions?${params}`).then(r => r.json());
+          const items = res.data || [];
+          all.push(...items);
+          cursor = res.hasMore ? res.nextCursor : null;
+        } while (cursor && all.length < MAX_SESSIONS);
+        return all;
+      };
+      const [allSessions, extraRes] = await Promise.all([
+        fetchAll(),
         fetch('/api/chat/messages?days=1').then(r => r.json()),
       ]);
-      const newSessions: Session[] = res.data || [];
-      nextCursorRef.current = res.nextCursor || null;
-      setHasMoreSessions(!!res.hasMore);
+      const newSessions: Session[] = allSessions;
       setSessions(prev => {
         if (prev.length === newSessions.length) {
           const same = prev.every((s, i) =>
@@ -183,41 +190,6 @@ function ChatConsolePage() {
     }
     setSessionsLoading(false);
   }, []);
-
-  // 추가 페이지 로드
-  const loadMoreSessions = useCallback(async () => {
-    if (!nextCursorRef.current || loadingMore) return;
-    setLoadingMore(true);
-    try {
-      const params = new URLSearchParams({ days: '7', limit: '100', cursor: nextCursorRef.current });
-      const res = await fetch(`/api/chat/sessions?${params}`).then(r => r.json());
-      const moreItems: Session[] = res.data || [];
-      nextCursorRef.current = res.nextCursor || null;
-      setHasMoreSessions(!!res.hasMore);
-      if (moreItems.length > 0) {
-        setSessions(prev => {
-          const existingIds = new Set(prev.map(s => s.id));
-          const newItems = moreItems.filter(s => !existingIds.has(s.id));
-          return newItems.length > 0 ? [...prev, ...newItems] : prev;
-        });
-      }
-    } catch (e) {
-      console.error('추가 세션 로드 실패:', e);
-    }
-    setLoadingMore(false);
-  }, [loadingMore]);
-
-  // IntersectionObserver로 스크롤 끝 감지 → 추가 로딩
-  useEffect(() => {
-    const el = sentinelRef.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(
-      (entries) => { if (entries[0].isIntersecting && hasMoreSessions) loadMoreSessions(); },
-      { threshold: 0.1 }
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [hasMoreSessions, loadMoreSessions]);
 
   // ─── 메시지 & AI 응답 로드 ───
   const fetchChat = useCallback(async (sessionId: number, isPolling = false) => {
@@ -596,9 +568,6 @@ function ChatConsolePage() {
           onTabChange={setActiveTab}
           onSearchChange={setSessionSearch}
           onToggleStar={handleToggleStar}
-          sentinelRef={sentinelRef}
-          loadingMore={loadingMore}
-          hasMore={hasMoreSessions}
         />
 
         {/* 우측: 채팅 영역 */}
