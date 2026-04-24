@@ -231,6 +231,37 @@ function TagInput({ placeholder, suggestionsType, onAdd }: {
   );
 }
 
+// ─── 상담 이력 아이템 (클릭 시 전체 펼치기) ───
+function HistoryItem({ h, fmtDate }: { h: any; fmtDate: (iso: string) => string }) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <Box
+      onClick={() => setExpanded(v => !v)}
+      sx={{ display: 'flex', alignItems: h.last_message_text && expanded ? 'flex-start' : 'center', gap: 0.5, py: 0.3, cursor: 'pointer', borderRadius: 0.5, '&:hover': { bgcolor: 'rgba(255,255,255,0.03)' } }}
+    >
+      <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.65rem', fontFamily: 'monospace', flexShrink: 0 }}>#{h.id}</Typography>
+      <Chip
+        label={h.status === 'closed' ? '완료' : h.status === 'escalated' ? '전달' : '진행'}
+        size="small"
+        sx={{
+          height: 16, fontSize: '0.6rem', flexShrink: 0,
+          bgcolor: h.status === 'closed' ? 'rgba(16,185,129,0.15)' : h.status === 'escalated' ? 'rgba(239,68,68,0.15)' : 'rgba(59,130,246,0.15)',
+          color: h.status === 'closed' ? '#10b981' : h.status === 'escalated' ? '#ef4444' : '#3b82f6',
+        }}
+      />
+      <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.65rem', flexShrink: 0 }}>{fmtDate(h.created_at)}</Typography>
+      <Typography variant="caption" sx={{
+        color: '#94a3b8', fontSize: '0.68rem', flex: 1,
+        ...(expanded
+          ? { whiteSpace: 'pre-wrap', wordBreak: 'break-all' }
+          : { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }),
+      }}>
+        {h.last_message_text || '—'}
+      </Typography>
+    </Box>
+  );
+}
+
 export default function CustomerSidebar({ session, messages, open, onToggle, onImageClick, onScrollToMessage, onShowDesk }: Props) {
   const [profile, setProfile] = useState<CustomerProfile | null>(null);
   const [tags, setTags] = useState<CustomerTag[]>([]);
@@ -565,22 +596,7 @@ export default function CustomerSidebar({ session, messages, open, onToggle, onI
       <Section title="상담 이력">
         <Stack spacing={0.3}>
           {sessionHistory.map((h: any) => (
-            <Box key={h.id} sx={{ display: 'flex', alignItems: 'center', gap: 0.5, py: 0.3 }}>
-              <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.65rem', fontFamily: 'monospace' }}>#{h.id}</Typography>
-              <Chip
-                label={h.status === 'closed' ? '완료' : h.status === 'escalated' ? '전달' : '진행'}
-                size="small"
-                sx={{
-                  height: 16, fontSize: '0.6rem',
-                  bgcolor: h.status === 'closed' ? 'rgba(16,185,129,0.15)' : h.status === 'escalated' ? 'rgba(239,68,68,0.15)' : 'rgba(59,130,246,0.15)',
-                  color: h.status === 'closed' ? '#10b981' : h.status === 'escalated' ? '#ef4444' : '#3b82f6',
-                }}
-              />
-              <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.65rem' }}>{fmtDate(h.created_at)}</Typography>
-              <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.68rem', flex: 1, overflow: 'hidden', lineHeight: 1.4, maxHeight: '2.8em', wordBreak: 'break-all' }}>
-                {h.last_message_text || '—'}
-              </Typography>
-            </Box>
+            <HistoryItem key={h.id} h={h} fmtDate={fmtDate} />
           ))}
           {sessionHistory.length === 0 && <Typography variant="caption" sx={{ color: '#475569', fontSize: '0.68rem' }}>이력 없음</Typography>}
         </Stack>
