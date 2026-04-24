@@ -604,7 +604,7 @@ function ChatConsolePage() {
         <Typography variant="h6" fontWeight={700}>상담 콘솔</Typography>
         <RealtimeStatus state={realtimeState} />
         {/* KPI 스트립 */}
-        <Stack direction="row" spacing={2} sx={{ ml: 3 }}>
+        <Stack direction="row" spacing={2} sx={{ ml: 3, flexShrink: 1, overflow: 'hidden', minWidth: 0 }}>
           {[
             { label: '오늘 세션', value: kpi.totalSessions, icon: <ChatIcon sx={{ fontSize: 18 }} />, color: '#3b82f6' },
             { label: 'AI 응답', value: kpi.totalAI, icon: <SmartToyIcon sx={{ fontSize: 18 }} />, color: '#8b5cf6' },
@@ -619,8 +619,8 @@ function ChatConsolePage() {
           ))}
         </Stack>
         <Box sx={{ flex: 1 }} />
-        {/* 업데이트 모드 토글 */}
-        <Stack direction="row" alignItems="center" spacing={0.5} sx={{ bgcolor: 'rgba(255,255,255,0.04)', borderRadius: 2, px: 1, py: 0.3, border: '1px solid rgba(255,255,255,0.08)' }}>
+        {/* 업데이트 모드 토글 — 항상 표시 */}
+        <Stack direction="row" alignItems="center" spacing={0.5} sx={{ flexShrink: 0, bgcolor: 'rgba(255,255,255,0.04)', borderRadius: 2, px: 1, py: 0.3, border: '1px solid rgba(255,255,255,0.08)' }}>
           <Chip
             icon={<SyncIcon sx={{ fontSize: 14 }} />}
             label="실시간"
@@ -664,7 +664,7 @@ function ChatConsolePage() {
             </Box>
           )}
         </Stack>
-        <IconButton onClick={() => { fetchSessions(); if (activeSessionId) fetchChat(activeSessionId); }} sx={{ color: '#94a3b8' }}>
+        <IconButton onClick={() => { fetchSessions(); if (activeSessionId) fetchChat(activeSessionId); }} sx={{ color: '#94a3b8', flexShrink: 0 }}>
           <RefreshIcon />
         </IconButton>
       </Box>
