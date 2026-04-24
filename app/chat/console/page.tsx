@@ -290,11 +290,11 @@ function ChatConsolePage() {
         else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') setRealtimeState('disconnected');
       });
 
-    // 폴링 간격: 연결 상태에 따라 다름
+    // 폴링 간격: 15초 고정 (RLS로 인해 Realtime이 실질적으로 작동하지 않음)
     const iv = setInterval(() => {
       fetchSessions();
       if (activeSessionId) fetchChat(activeSessionId, true);
-    }, realtimeState === 'connected' ? 60000 : 10000);
+    }, 15000);
 
     return () => { supabase.removeChannel(channel); clearInterval(iv); };
   }, [fetchSessions, fetchChat, activeSessionId, realtimeState]);
