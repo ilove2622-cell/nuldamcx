@@ -781,14 +781,42 @@ function ChatConsolePage() {
                       onClose={() => { setStatusMenuAnchor(null); setSnoozeSubmenuAnchor(null); }}
                       slotProps={{ paper: { sx: { bgcolor: '#1e293b', border: cardBorder, borderRadius: 1.5, minWidth: 160 } } }}
                     >
-                      <MenuItem
-                        onClick={() => { handleStatusChange(activeSession.id, 'open'); setStatusMenuAnchor(null); }}
-                        selected={activeSession.status === 'open' || activeSession.status === 'escalated'}
-                        sx={{ fontSize: '0.78rem', color: '#e2e8f0', '&.Mui-selected': { bgcolor: 'rgba(59,130,246,0.1)' } }}
-                      >
-                        <ListItemIcon><PlayArrowIcon sx={{ fontSize: 18, color: '#3b82f6' }} /></ListItemIcon>
-                        <ListItemText slotProps={{ primary: { sx: { fontSize: '0.78rem' } } }}>응대중</ListItemText>
-                      </MenuItem>
+                      {/* 응대중/에스컬레이션 상태일 때 종료를 맨 위에 표시 */}
+                      {(activeSession.status === 'open' || activeSession.status === 'escalated') && (
+                        <MenuItem
+                          onClick={() => { handleStatusChange(activeSession.id, 'closed'); setStatusMenuAnchor(null); }}
+                          sx={{ fontSize: '0.78rem', color: '#e2e8f0' }}
+                        >
+                          <ListItemIcon><CheckCircleIcon sx={{ fontSize: 18, color: '#10b981' }} /></ListItemIcon>
+                          <ListItemText slotProps={{ primary: { sx: { fontSize: '0.78rem' } } }}>종료</ListItemText>
+                        </MenuItem>
+                      )}
+                      {(activeSession.status === 'open' || activeSession.status === 'escalated') && (
+                        <Divider sx={{ borderColor: 'rgba(255,255,255,0.06)' }} />
+                      )}
+                      {/* 종료 상태일 때 응대중(재개)을 맨 위에 표시 */}
+                      {activeSession.status === 'closed' && (
+                        <MenuItem
+                          onClick={() => { handleStatusChange(activeSession.id, 'open'); setStatusMenuAnchor(null); }}
+                          sx={{ fontSize: '0.78rem', color: '#e2e8f0' }}
+                        >
+                          <ListItemIcon><ReplayIcon sx={{ fontSize: 18, color: '#3b82f6' }} /></ListItemIcon>
+                          <ListItemText slotProps={{ primary: { sx: { fontSize: '0.78rem' } } }}>재개</ListItemText>
+                        </MenuItem>
+                      )}
+                      {activeSession.status === 'closed' && (
+                        <Divider sx={{ borderColor: 'rgba(255,255,255,0.06)' }} />
+                      )}
+                      {activeSession.status !== 'closed' && (
+                        <MenuItem
+                          onClick={() => { handleStatusChange(activeSession.id, 'open'); setStatusMenuAnchor(null); }}
+                          selected={activeSession.status === 'open' || activeSession.status === 'escalated'}
+                          sx={{ fontSize: '0.78rem', color: '#e2e8f0', '&.Mui-selected': { bgcolor: 'rgba(59,130,246,0.1)' } }}
+                        >
+                          <ListItemIcon><PlayArrowIcon sx={{ fontSize: 18, color: '#3b82f6' }} /></ListItemIcon>
+                          <ListItemText slotProps={{ primary: { sx: { fontSize: '0.78rem' } } }}>응대중</ListItemText>
+                        </MenuItem>
+                      )}
                       <MenuItem
                         onClick={(e) => setSnoozeSubmenuAnchor(e.currentTarget)}
                         selected={activeSession.status === 'snoozed'}
@@ -798,15 +826,16 @@ function ChatConsolePage() {
                         <ListItemText slotProps={{ primary: { sx: { fontSize: '0.78rem' } } }}>대기중</ListItemText>
                         <ExpandMoreIcon sx={{ fontSize: 14, color: '#64748b', transform: 'rotate(-90deg)', ml: 1 }} />
                       </MenuItem>
-                      <Divider sx={{ borderColor: 'rgba(255,255,255,0.06)' }} />
-                      <MenuItem
-                        onClick={() => { handleStatusChange(activeSession.id, 'closed'); setStatusMenuAnchor(null); }}
-                        selected={activeSession.status === 'closed'}
-                        sx={{ fontSize: '0.78rem', color: '#e2e8f0', '&.Mui-selected': { bgcolor: 'rgba(16,185,129,0.1)' } }}
-                      >
-                        <ListItemIcon><CheckCircleIcon sx={{ fontSize: 18, color: '#10b981' }} /></ListItemIcon>
-                        <ListItemText slotProps={{ primary: { sx: { fontSize: '0.78rem' } } }}>종료</ListItemText>
-                      </MenuItem>
+                      {activeSession.status === 'closed' && (
+                        <MenuItem
+                          onClick={() => { handleStatusChange(activeSession.id, 'closed'); setStatusMenuAnchor(null); }}
+                          selected
+                          sx={{ fontSize: '0.78rem', color: '#e2e8f0', '&.Mui-selected': { bgcolor: 'rgba(16,185,129,0.1)' } }}
+                        >
+                          <ListItemIcon><CheckCircleIcon sx={{ fontSize: 18, color: '#10b981' }} /></ListItemIcon>
+                          <ListItemText slotProps={{ primary: { sx: { fontSize: '0.78rem' } } }}>종료</ListItemText>
+                        </MenuItem>
+                      )}
                       <Divider sx={{ borderColor: 'rgba(255,255,255,0.06)' }} />
                       <MenuItem
                         onClick={() => { setStatusMenuAnchor(null); setDeleteDialogOpen(true); setDeleteConfirmName(''); }}
