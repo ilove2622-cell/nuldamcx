@@ -42,6 +42,8 @@ interface SessionListProps {
   onSearchChange: (q: string) => void;
   onToggleStar: (e: React.MouseEvent, id: number) => void;
   sentinelRef?: React.RefObject<HTMLDivElement | null>;
+  loadingMore?: boolean;
+  hasMore?: boolean;
 }
 
 // 탭은 동적으로 건수 포함하여 렌더링
@@ -69,6 +71,7 @@ export default function SessionList({
   filterUnread, filterStarred, filterChannel, filterAgent, filterTag, sortKey,
   onFilterUnreadChange, onFilterStarredChange, onFilterChannelChange, onFilterAgentChange, onFilterTagChange, onSortKeyChange,
   onSelectSession, onTabChange, onSearchChange, onToggleStar, sentinelRef,
+  loadingMore, hasMore,
 }: SessionListProps) {
 
   // 드롭다운 옵션을 sessions에서 동적 추출
@@ -413,6 +416,11 @@ export default function SessionList({
           ))
         )}
         {sentinelRef && <div ref={sentinelRef} style={{ height: 1 }} />}
+        {loadingMore && (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 1.5 }}>
+            <CircularProgress size={20} sx={{ color: '#64748b' }} />
+          </Box>
+        )}
       </Box>
     </Box>
   );
