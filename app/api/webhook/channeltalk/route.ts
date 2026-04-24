@@ -100,6 +100,8 @@ export async function POST(req: NextRequest) {
       await handleChatCreated(payload, refers);
     } else if (event === 'message.created' || event === 'push') {
       await handleMessageCreated(payload, refers);
+    } else if (event === 'userChat.closed') {
+      await handleChatClosed(payload, refers);
     } else {
       console.log(`⏩ 미처리 이벤트: ${event}`);
     }
@@ -134,6 +136,46 @@ async function handleChatCreated(payload: any, refers: any) {
   );
 
   console.log(`📩 새 채팅 세션: ${userChatId} (${channelType})`);
+}
+
+// ─── userChat.closed: 고객이 상담 종료 시 ───
+async function handleChatClosed(payload: any, refers: any) {
+  const userChat = payload.entity || {};
+  const userChatId = userChat.id;
+  if (!userChatId) return;
+
+  const userName = refers.user?.profile?.name || '고객';
+
+  // 세션 찾기
+  const { data: session } = await supabase
+    .from('chat_sessions')
+    .select('id')
+    .eq('user_chat_id', userChatId)
+    .single();
+
+  if (!session) {
+    console.log(`⏩ 종료 이벤트 - 세션 없음: ${userChatId}`);
+    return;
+  }
+
+  // 세션 상태를 closed로 변경
+  await supabase.from('chat_sessions').update({
+    status: 'closed',
+    closed_at: new Date().toISOString(),
+    last_message_at: new Date().toISOString(),
+    last_message_text: `${userName}님이 상담을 종료하였습니다.`,
+    last_message_sender: 'system',
+  }).eq('id', session.id);
+
+  // 시스템 메시지 저장
+  await supabase.from('chat_messages').insert({
+    session_id: session.id,
+    channeltalk_message_id: `closed-${userChatId}-${Date.now()}`,
+    sender: 'system',
+    text: `${userName}님이 상담을 종료하였습니다.`,
+  });
+
+  console.log(`🔒 상담 종료: ${userChatId} (${userName})`);
 }
 
 // ─── message.created / push: 메시지 수신 시 자동응답 플로우 ───

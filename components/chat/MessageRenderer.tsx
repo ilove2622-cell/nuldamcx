@@ -89,7 +89,19 @@ function BlockRenderer({ block, onImageClick, onShowDesk }: { block: MessageBloc
 
 export default function MessageRenderer({ message, onImageClick, onShowDesk }: MessageRendererProps) {
   const isCustomer = message.sender === 'customer';
+  const isSystem = message.sender === 'system';
   const blocks = parseMessageBlocks(message.text);
+
+  // 시스템 메시지 (상담 종료 등)
+  if (isSystem) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', py: 0.5 }}>
+        <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.75rem', bgcolor: 'rgba(255,255,255,0.04)', px: 2, py: 0.5, borderRadius: 3, border: '1px solid rgba(255,255,255,0.08)' }}>
+          {message.text}
+        </Typography>
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ display: 'flex', justifyContent: isCustomer ? 'flex-start' : 'flex-end', opacity: message._optimistic ? 0.6 : 1 }}>
