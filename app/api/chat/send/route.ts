@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
       .from('chat_sessions')
       .select('id')
       .eq('user_chat_id', userChatId)
-      .single();
+      .maybeSingle();
 
     if (session) {
       await supabase.from('chat_messages').insert({
@@ -65,6 +65,7 @@ export async function POST(req: NextRequest) {
       await supabase.from('chat_sessions').update({
         last_message_at: new Date().toISOString(),
         last_message_text: text.slice(0, 100),
+        last_message_sender: 'bot',
       }).eq('id', session.id);
     }
 

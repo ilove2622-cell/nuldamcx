@@ -399,9 +399,11 @@ async function handleMessageCreated(payload: any, refers: any) {
   const MODE = settings.mode;
   const CONFIDENCE_THRESHOLD = settings.threshold;
 
+  // 영업시간 1회만 확인 (에스컬레이션 분기에서 반복 호출 방지)
+  const bh = checkBusinessHours();
+
   // Step 2: 키워드 기반 무조건 에스컬레이션 체크
   if (hasEscalationKeyword(fullCustomerText)) {
-    const bh = checkBusinessHours();
     await recordAndEscalate(session.id, msgRow?.id, userChatId, fullCustomerText, '키워드 감지 (환불/교환/취소/클레임 등)', undefined, MODE, !bh.isOpen);
     if (MODE === 'live') await sendEscalationGuide(userChatId, bh);
     return;
@@ -424,7 +426,6 @@ async function handleMessageCreated(payload: any, refers: any) {
 
     // 무조건 에스컬레이션 카테고리
     if (shouldForceEscalate(llm.category)) {
-      const bh = checkBusinessHours();
       await recordAndEscalate(session.id, msgRow?.id, userChatId, fullCustomerText, `카테고리: ${llm.category}`, llm, MODE, !bh.isOpen);
       if (MODE === 'live') await sendEscalationGuide(userChatId, bh);
       return;
@@ -432,7 +433,6 @@ async function handleMessageCreated(payload: any, refers: any) {
 
     // LLM이 에스컬레이션 판단
     if (llm.escalate) {
-      const bh = checkBusinessHours();
       await recordAndEscalate(session.id, msgRow?.id, userChatId, fullCustomerText, llm.reason, llm, MODE, !bh.isOpen);
       if (MODE === 'live') await sendEscalationGuide(userChatId, bh);
       return;
@@ -440,7 +440,6 @@ async function handleMessageCreated(payload: any, refers: any) {
 
     // 신뢰도 체크
     if (llm.confidence < CONFIDENCE_THRESHOLD) {
-      const bh = checkBusinessHours();
       await recordAndEscalate(
         session.id, msgRow?.id, userChatId, fullCustomerText,
         `신뢰도 부족 (${llm.confidence.toFixed(2)} < ${CONFIDENCE_THRESHOLD})`,
@@ -461,7 +460,6 @@ async function handleMessageCreated(payload: any, refers: any) {
     }, MODE);
   } catch (err: any) {
     console.error('LLM 호출 실패:', err);
-    const bh = checkBusinessHours();
     await recordAndEscalate(session.id, msgRow?.id, userChatId, fullCustomerText, `LLM 오류: ${err.message}`, undefined, MODE, !bh.isOpen);
     if (MODE === 'live') await sendEscalationGuide(userChatId, bh);
   }
@@ -608,7 +606,16 @@ function getOriginalFileUrl(file: any): string | null {
 }
 
 async function getOrCreateSession(userChatId: string, refers: any, message?: any) {
-  // 채널 유형과 고객 정보 확인
+  // 1. 기존 세션이 있으면 그대로 반환 (status/opened_at 덮어쓰지 않음)
+  const { data: existing } = await supabase
+    .from('chat_sessions')
+    .select('id, channel_type')
+    .eq('user_chat_id', userChatId)
+    .maybeSingle();
+
+  if (existing) return existing;
+
+  // 2. 신규 세션 생성
   let channelType = 'native';
   let customerName = refers.user?.profile?.name || null;
   try {
@@ -618,35 +625,34 @@ async function getOrCreateSession(userChatId: string, refers: any, message?: any
     if (!customerName && chatInfo?.name) customerName = chatInfo.name;
   } catch { /* ignore */ }
 
-  // upsert로 경합 조건 방지
-  const upsertData = {
-    user_chat_id: userChatId,
-    channel_type: channelType,
-    customer_id: refers.user?.id || message?.personId || null,
-    customer_name: customerName,
-    status: 'open',
-    opened_at: new Date().toISOString(),
-  };
-
-  const { data: upserted, error: upsertErr } = await supabase
+  const { data: created, error: createErr } = await supabase
     .from('chat_sessions')
-    .upsert(upsertData, { onConflict: 'user_chat_id', ignoreDuplicates: false })
+    .insert({
+      user_chat_id: userChatId,
+      channel_type: channelType,
+      customer_id: refers.user?.id || message?.personId || null,
+      customer_name: customerName,
+      status: 'open',
+      opened_at: new Date().toISOString(),
+    })
     .select('id, channel_type')
     .single();
 
-  if (upsertErr) {
-    // upsert 실패 시 기존 세션 조회 시도
-    const { data: existing } = await supabase
-      .from('chat_sessions')
-      .select('id, channel_type')
-      .eq('user_chat_id', userChatId)
-      .single();
-    if (existing) return existing;
-    console.error(`❌ 세션 생성 실패:`, upsertErr.message);
-    throw new Error(`세션 생성 실패: ${upsertErr.message}`);
+  if (createErr) {
+    // 경합 조건: 동시에 insert 시도 → 기존 세션 조회
+    if (createErr.code === '23505') {
+      const { data: raced } = await supabase
+        .from('chat_sessions')
+        .select('id, channel_type')
+        .eq('user_chat_id', userChatId)
+        .single();
+      if (raced) return raced;
+    }
+    console.error(`❌ 세션 생성 실패:`, createErr.message);
+    throw new Error(`세션 생성 실패: ${createErr.message}`);
   }
 
-  return upserted!;
+  return created!;
 }
 
 interface AIResponseMeta {

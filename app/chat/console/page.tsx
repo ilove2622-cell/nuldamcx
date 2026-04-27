@@ -57,6 +57,7 @@ function ChatConsolePage() {
   const searchParams = useSearchParams();
   const chatEndRef = useRef<HTMLDivElement>(null);
   const sendLockRef = useRef(false); // 중복 발송 방지
+  const activeSessionIdRef = useRef<number | null>(null);
   const { showToast } = useToast();
 
   // 세션 목록
@@ -235,6 +236,8 @@ function ChatConsolePage() {
     if (!isPolling) setMessagesLoading(true);
     try {
       const res = await fetch(`/api/chat/messages?sessionId=${sessionId}`).then(r => r.json());
+      // 폴링 결과가 돌아왔을 때 세션이 이미 바뀌었으면 무시
+      if (isPolling && activeSessionIdRef.current !== sessionId) return;
       const newMsgs: Message[] = res.messages || [];
       const newAi: AIResponse[] = res.aiResponses || [];
       setMessages(prev => {
@@ -267,6 +270,9 @@ function ChatConsolePage() {
     url.searchParams.set('session', String(id));
     window.history.replaceState(null, '', url.toString());
   }, []);
+
+  // activeSessionIdRef 동기화
+  useEffect(() => { activeSessionIdRef.current = activeSessionId; }, [activeSessionId]);
 
   // 세션 선택 시 채팅 로드 — 이전 세션 데이터 즉시 클리어하여 오발송 방지
   useEffect(() => {
@@ -304,16 +310,18 @@ function ChatConsolePage() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_sessions' }, () => fetchSessions())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_messages' }, (payload) => {
         const msgSessionId = (payload.new as any)?.session_id;
-        if (activeSessionId && msgSessionId === activeSessionId) {
-          fetchChat(activeSessionId, true);
+        const curId = activeSessionIdRef.current;
+        if (curId && msgSessionId === curId) {
+          fetchChat(curId, true);
         } else if (msgSessionId) {
           setUnreadSessions(prev => { const next = new Set(prev); next.add(msgSessionId); return next; });
         }
         fetchSessions();
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ai_responses' }, (payload) => {
-        if (activeSessionId && (payload.new as any)?.session_id === activeSessionId) {
-          fetchChat(activeSessionId, true);
+        const curId = activeSessionIdRef.current;
+        if (curId && (payload.new as any)?.session_id === curId) {
+          fetchChat(curId, true);
         }
       })
       .subscribe((status) => {
@@ -324,7 +332,8 @@ function ChatConsolePage() {
     // Realtime이 RLS로 이벤트를 못 받을 경우 대비 — 30초 polling 백업
     const fallbackIv = setInterval(() => {
       fetchSessions();
-      if (activeSessionId) fetchChat(activeSessionId, true);
+      const curId = activeSessionIdRef.current;
+      if (curId) fetchChat(curId, true);
     }, 30_000);
 
     return () => { supabase.removeChannel(channel); clearInterval(fallbackIv); };
@@ -337,10 +346,11 @@ function ChatConsolePage() {
     const ms = pollingInterval * 1000;
     const iv = setInterval(() => {
       fetchSessions();
-      if (activeSessionId) fetchChat(activeSessionId, true);
+      const curId = activeSessionIdRef.current;
+      if (curId) fetchChat(curId, true);
     }, ms);
     return () => clearInterval(iv);
-  }, [fetchSessions, fetchChat, activeSessionId, updateMode, pollingInterval]);
+  }, [fetchSessions, fetchChat, updateMode, pollingInterval]);
 
   // 스크롤
   const prevMsgCountRef = useRef(0);
@@ -390,10 +400,12 @@ function ChatConsolePage() {
 
   // ─── AI 초안 승인 발송 (낙관적 업데이트) ───
   const handleSend = async (aiResponse: AIResponse) => {
-    if (!activeSession) return;
+    // 함수 시작 시 세션 값 캡처 (비동기 중 변경 방지)
+    const session = activeSession;
+    if (!session) return;
     if (sendLockRef.current) return; // 중복 클릭 방지
     // 세션 불일치 방지: AI 초안이 현재 세션 것인지 확인
-    if (aiResponse.session_id && aiResponse.session_id !== activeSession.id) {
+    if (aiResponse.session_id && aiResponse.session_id !== session.id) {
       showToast('세션이 전환되었습니다. 다시 시도해주세요.', 'error');
       return;
     }
@@ -401,10 +413,11 @@ function ChatConsolePage() {
     const idempotencyKey = generateIdempotencyKey();
     setSending(true);
 
-    // 낙관적: 즉시 메시지 표시
+    // 낙관적: 즉시 메시지 표시 (고유 ID로 충돌 방지)
+    const optimisticId = -(Date.now() + Math.random());
     const optimisticMsg: Message = {
-      id: Date.now(),
-      session_id: activeSession.id,
+      id: optimisticId,
+      session_id: session.id,
       sender: 'bot',
       text: aiResponse.answer,
       created_at: new Date().toISOString(),
@@ -417,7 +430,7 @@ function ChatConsolePage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userChatId: activeSession.user_chat_id,
+          userChatId: session.user_chat_id,
           text: aiResponse.answer,
           aiResponseId: aiResponse.id,
           idempotencyKey,
@@ -425,10 +438,13 @@ function ChatConsolePage() {
       });
       if (!res.ok) throw new Error(await res.text());
       showToast('발송 완료', 'success');
-      await fetchChat(activeSession.id);
+      // 세션이 바뀌지 않았을 때만 refetch
+      if (activeSessionIdRef.current === session.id) {
+        await fetchChat(session.id);
+      }
     } catch (err) {
       // 롤백
-      setMessages(prev => prev.filter(m => m.id !== optimisticMsg.id));
+      setMessages(prev => prev.filter(m => m.id !== optimisticId));
       showToast(`발송 실패: ${err}`, 'error');
     } finally {
       setSending(false);
@@ -438,16 +454,18 @@ function ChatConsolePage() {
 
   // ─── 자유 메시지 발송 (낙관적 업데이트) ───
   const handleFreeSend = async () => {
-    if (!activeSession || !freeText.trim()) return;
+    const session = activeSession;
+    if (!session || !freeText.trim()) return;
     if (sendLockRef.current) return;
     sendLockRef.current = true;
     const idempotencyKey = generateIdempotencyKey();
     const textToSend = freeText;
     setSending(true);
 
+    const optimisticId = -(Date.now() + Math.random());
     const optimisticMsg: Message = {
-      id: Date.now(),
-      session_id: activeSession.id,
+      id: optimisticId,
+      session_id: session.id,
       sender: 'bot',
       text: textToSend,
       created_at: new Date().toISOString(),
@@ -461,16 +479,18 @@ function ChatConsolePage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userChatId: activeSession.user_chat_id,
+          userChatId: session.user_chat_id,
           text: textToSend,
           idempotencyKey,
         }),
       });
       if (!res.ok) throw new Error(await res.text());
       showToast('발송 완료', 'success');
-      await fetchChat(activeSession.id);
+      if (activeSessionIdRef.current === session.id) {
+        await fetchChat(session.id);
+      }
     } catch (err) {
-      setMessages(prev => prev.filter(m => m.id !== optimisticMsg.id));
+      setMessages(prev => prev.filter(m => m.id !== optimisticId));
       setFreeText(textToSend);
       showToast(`발송 실패: ${err}`, 'error');
     } finally {
