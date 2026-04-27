@@ -2,9 +2,10 @@ import { createClient } from '@supabase/supabase-js';
 import type { AnalysisResult, RiskLevel, SimilarCase } from '@/types/voc';
 import { makeThumbnail } from './voc-image';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 // 저장 — 원본 + 256px 썸네일을 함께 저장
 export async function saveCase(

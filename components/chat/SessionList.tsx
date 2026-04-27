@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef, useLayoutEffect } from 'react';
 import {
   Box, Typography, Stack, Chip, IconButton, TextField, InputAdornment, Badge,
   Select, MenuItem, FormControl, CircularProgress,
@@ -173,6 +173,40 @@ export default function SessionList({
     const important = sessions.filter(s => starred.has(s.id)).length;
     return { '전체': sessions.length, '응대중': active, '대기중': snoozed, '종료': closed, '중요': important } as Record<TabKey, number>;
   }, [sessions, starred]);
+
+  // 스크롤 위치 보존: 세션 목록이 재정렬되어도 현재 스크롤 위치 유지
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const savedScrollRef = useRef(0);
+
+  // 렌더링 직전에 스크롤 위치 저장
+  useLayoutEffect(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    // 활성 세션이 있으면 해당 세션 DOM으로 스크롤 보정
+    if (activeSessionId) {
+      const activeEl = el.querySelector(`[data-session-id="${activeSessionId}"]`);
+      if (activeEl) {
+        const containerRect = el.getBoundingClientRect();
+        const activeRect = (activeEl as HTMLElement).getBoundingClientRect();
+        // 현재 보이는 영역 밖이면 스크롤하여 보이게
+        if (activeRect.top < containerRect.top || activeRect.bottom > containerRect.bottom) {
+          (activeEl as HTMLElement).scrollIntoView({ block: 'nearest' });
+        }
+        return;
+      }
+    }
+    // 활성 세션 없으면 이전 스크롤 위치 복원
+    if (savedScrollRef.current > 0) {
+      el.scrollTop = savedScrollRef.current;
+    }
+  }, [filteredSessions, activeSessionId]);
+
+  // 스크롤 이벤트로 현재 위치 저장
+  const handleScroll = () => {
+    if (scrollContainerRef.current) {
+      savedScrollRef.current = scrollContainerRef.current.scrollTop;
+    }
+  };
 
   const cardBorder = '1px solid rgba(255,255,255,0.08)';
 
@@ -398,7 +432,7 @@ export default function SessionList({
         />
       </Box>
 
-      <Box sx={{ flex: 1, overflowY: 'auto' }}>
+      <Box ref={scrollContainerRef} onScroll={handleScroll} sx={{ flex: 1, overflowY: 'auto' }}>
         {loading ? (
           <SessionSkeleton />
         ) : filteredSessions.length === 0 ? (
@@ -409,6 +443,7 @@ export default function SessionList({
           filteredSessions.map((session) => (
             <Box
               key={session.id}
+              data-session-id={session.id}
               onClick={() => onSelectSession(session.id)}
               sx={{
                 px: 1.5, py: 1, cursor: 'pointer',

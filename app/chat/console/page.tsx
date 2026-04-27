@@ -56,6 +56,7 @@ function ChatConsolePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const sendLockRef = useRef(false); // 중복 발송 방지
   const { showToast } = useToast();
 
   // 세션 목록
@@ -191,13 +192,14 @@ function ChatConsolePage() {
           );
           if (same) return prev;
         }
-        // last_message_at이 바뀐 세션 = 새 메시지 도착 → 안읽은 표시
+        // last_message_at이 바뀐 세션 중 고객 메시지만 안읽은 표시
         if (prev.length > 0) {
           const prevMap = new Map(prev.map(s => [s.id, s.last_message_at]));
           const changed = newSessions.filter(s =>
-            prevMap.has(s.id) && prevMap.get(s.id) !== s.last_message_at
+            prevMap.has(s.id) && prevMap.get(s.id) !== s.last_message_at &&
+            s.last_message_sender === 'customer' // 봇/상담사 메시지는 unread 안 함
           ).map(s => s.id);
-          // 새로 생긴 세션도 안읽은 표시
+          // 새로 생긴 세션도 안읽은 표시 (고객이 먼저 메시지 보낸 경우)
           const brandNew = newSessions.filter(s => !prevMap.has(s.id)).map(s => s.id);
           const toMark = [...changed, ...brandNew];
           if (toMark.length > 0) {
@@ -266,9 +268,13 @@ function ChatConsolePage() {
     window.history.replaceState(null, '', url.toString());
   }, []);
 
-  // 세션 선택 시 채팅 로드
+  // 세션 선택 시 채팅 로드 — 이전 세션 데이터 즉시 클리어하여 오발송 방지
   useEffect(() => {
     if (activeSessionId) {
+      setMessages([]);
+      setAiResponses([]);
+      setFreeText('');
+      setSelectedDraftIdx(0);
       fetchChat(activeSessionId);
       setUnreadSessions(prev => { const next = new Set(prev); next.delete(activeSessionId); return next; });
     }
@@ -315,7 +321,13 @@ function ChatConsolePage() {
         else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') setRealtimeState('disconnected');
       });
 
-    return () => { supabase.removeChannel(channel); };
+    // Realtime이 RLS로 이벤트를 못 받을 경우 대비 — 30초 polling 백업
+    const fallbackIv = setInterval(() => {
+      fetchSessions();
+      if (activeSessionId) fetchChat(activeSessionId, true);
+    }, 30_000);
+
+    return () => { supabase.removeChannel(channel); clearInterval(fallbackIv); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [updateMode]);
 
@@ -379,6 +391,13 @@ function ChatConsolePage() {
   // ─── AI 초안 승인 발송 (낙관적 업데이트) ───
   const handleSend = async (aiResponse: AIResponse) => {
     if (!activeSession) return;
+    if (sendLockRef.current) return; // 중복 클릭 방지
+    // 세션 불일치 방지: AI 초안이 현재 세션 것인지 확인
+    if (aiResponse.session_id && aiResponse.session_id !== activeSession.id) {
+      showToast('세션이 전환되었습니다. 다시 시도해주세요.', 'error');
+      return;
+    }
+    sendLockRef.current = true;
     const idempotencyKey = generateIdempotencyKey();
     setSending(true);
 
@@ -413,12 +432,15 @@ function ChatConsolePage() {
       showToast(`발송 실패: ${err}`, 'error');
     } finally {
       setSending(false);
+      sendLockRef.current = false;
     }
   };
 
   // ─── 자유 메시지 발송 (낙관적 업데이트) ───
   const handleFreeSend = async () => {
     if (!activeSession || !freeText.trim()) return;
+    if (sendLockRef.current) return;
+    sendLockRef.current = true;
     const idempotencyKey = generateIdempotencyKey();
     const textToSend = freeText;
     setSending(true);
@@ -453,6 +475,7 @@ function ChatConsolePage() {
       showToast(`발송 실패: ${err}`, 'error');
     } finally {
       setSending(false);
+      sendLockRef.current = false;
     }
   };
 

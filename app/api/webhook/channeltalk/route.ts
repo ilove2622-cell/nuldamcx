@@ -98,6 +98,8 @@ export async function POST(req: NextRequest) {
   try {
     if (event === 'userChat.created') {
       await handleChatCreated(payload, refers);
+    } else if (event === 'userChat.updated') {
+      await handleChatUpdated(payload);
     } else if (event === 'message.created' || event === 'push') {
       await handleMessageCreated(payload, refers);
     } else {
@@ -134,6 +136,46 @@ async function handleChatCreated(payload: any, refers: any) {
   );
 
   console.log(`📩 새 채팅 세션: ${userChatId} (${channelType})`);
+}
+
+// ─── userChat.updated: 채팅 상태 변�� (종료 등) 시 세션 동기화 ───
+async function handleChatUpdated(payload: any) {
+  const userChat = payload.entity || {};
+  const userChatId = userChat.id;
+  if (!userChatId) return;
+
+  const state = userChat.state; // 'opened', 'closed', 'snoozed' 등
+
+  if (state === 'closed') {
+    const { data: session } = await supabase
+      .from('chat_sessions')
+      .select('id, status')
+      .eq('user_chat_id', userChatId)
+      .maybeSingle();
+
+    if (session && session.status !== 'closed') {
+      await supabase.from('chat_sessions').update({
+        status: 'closed',
+        closed_at: new Date().toISOString(),
+      }).eq('id', session.id);
+      console.log(`🔒 채널톡 채팅 종료 동기화: ${userChatId}`);
+    }
+  } else if (state === 'opened') {
+    // 종료 후 재오픈 시 상태 복원
+    const { data: session } = await supabase
+      .from('chat_sessions')
+      .select('id, status')
+      .eq('user_chat_id', userChatId)
+      .maybeSingle();
+
+    if (session && session.status === 'closed') {
+      await supabase.from('chat_sessions').update({
+        status: 'open',
+        closed_at: null,
+      }).eq('id', session.id);
+      console.log(`🔓 채널톡 채팅 재오픈 동기화: ${userChatId}`);
+    }
+  }
 }
 
 // ─── message.created / push: 메시지 수신 시 자동응답 플로우 ───
@@ -247,6 +289,8 @@ async function handleMessageCreated(payload: any, refers: any) {
       return;
     }
     console.error(`❌ 메시지 저장 실패:`, msgErr.message);
+    // 메시지 저장 실패 시 자동응답 플로우 중단 (데이터 무결성 보호)
+    return;
   }
 
   // 세션에 마지막 메시지 정보 업데이트

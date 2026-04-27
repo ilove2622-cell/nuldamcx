@@ -2,9 +2,10 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import iconv from 'iconv-lite';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 export async function POST(req: Request) {
   try {
@@ -59,7 +60,8 @@ export async function POST(req: Request) {
 
     if (processedCount > 0 || hasSuccess) {
       // 전송 성공 시 상태를 처리완료로 변경
-      await supabase.from('inquiries').update({ status: '처리완료' }).eq('status', '답변저장');
+      const pendingIds = pendingItems.map((item: any) => item.id);
+      await supabase.from('inquiries').update({ status: '처리완료' }).in('id', pendingIds);
     }
 
     return NextResponse.json({
