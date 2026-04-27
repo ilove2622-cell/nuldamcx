@@ -23,8 +23,9 @@ export async function GET(req: NextRequest) {
       .gte('created_at', since),
     supabase
       .from('chat_sessions')
-      .select('id, status, channel_type, created_at')
-      .gte('created_at', since),
+      .select('id, status, channel_type, last_message_at')
+      .not('last_message_at', 'is', null)
+      .gte('last_message_at', since),
     supabase
       .from('inquiries')
       .select('id, status, channel, inquiry_date, collected_at')
