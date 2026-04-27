@@ -697,6 +697,12 @@ async function recordAndSend(
 
   if (MODE === 'live') {
     await sendMessage(userChatId, answer);
+    // 발송 후 last_message_sender를 bot으로 업데이트 (미답변 필터 정합성)
+    await supabase.from('chat_sessions').update({
+      last_message_at: new Date().toISOString(),
+      last_message_text: answer.slice(0, 100),
+      last_message_sender: 'bot',
+    }).eq('id', sessionId);
     console.log(`✅ 자동응답 발송: [${userChatId}] ${answer.slice(0, 50)}...`);
   } else {
     console.log(`📝 드라이런 기록: [${userChatId}] ${answer.slice(0, 50)}...`);
