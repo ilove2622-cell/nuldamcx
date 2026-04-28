@@ -127,7 +127,15 @@ export default function SessionList({
       if (activeTab === '중요' && !starred.has(s.id)) return false;
       // 토글 필터
       if (filterUnread && !unreadSessions.has(s.id)) return false;
-      if (filterUnanswered && (s.last_message_sender !== 'customer' || s.status === 'closed')) return false;
+      if (filterUnanswered) {
+        if (s.status === 'closed') return false;
+        // 미답변 조건: (1) 마지막이 고객 메시지이거나 (2) 채널톡 빌트인 봇이 "담당자와 연결" 안내 후 멈춤
+        const isCustomerLast = s.last_message_sender === 'customer';
+        const isBotEscalationPending =
+          s.last_message_sender === 'bot' &&
+          /담당자와 연결/.test(s.last_message_text || '');
+        if (!isCustomerLast && !isBotEscalationPending) return false;
+      }
       // 드롭다운 필터
       if (filterChannel && s.channel_type !== filterChannel) return false;
       if (filterAgent && s.assigned_agent !== filterAgent) return false;
