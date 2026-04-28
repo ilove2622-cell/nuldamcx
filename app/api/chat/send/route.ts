@@ -37,8 +37,10 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 1. 채널톡 메시지 발송
-    await sendMessage(userChatId, text);
+    // 1. 채널톡 메시지 발송 — 응답에서 message.id 추출 (webhook echo 중복 방지용)
+    const sendResult = await sendMessage(userChatId, text);
+    const channelMessageId: string | undefined =
+      sendResult?.message?.id || sendResult?.id;
 
     // 2. ai_responses.sent_at 업데이트 (드라이런 → 발송 완료)
     if (aiResponseId) {
@@ -48,7 +50,7 @@ export async function POST(req: NextRequest) {
         .eq('id', aiResponseId);
     }
 
-    // 3. chat_messages에 봇 메시지 기록
+    // 3. chat_messages에 봇 메시지 기록 — message_id로 unique constraint 활용
     const { data: session } = await supabase
       .from('chat_sessions')
       .select('id')
@@ -56,12 +58,17 @@ export async function POST(req: NextRequest) {
       .maybeSingle();
 
     if (session) {
-      await supabase.from('chat_messages').insert({
+      const { error: insErr } = await supabase.from('chat_messages').insert({
         session_id: session.id,
         sender: 'bot',
         text,
+        ...(channelMessageId ? { message_id: channelMessageId } : {}),
         ...(idempotencyKey ? { idempotency_key: idempotencyKey } : {}),
       });
+      // webhook이 먼저 도착해 같은 message_id로 이미 insert한 경우 23505 → 무시
+      if (insErr && insErr.code !== '23505') {
+        console.warn('chat_messages 저장 실패:', insErr.message);
+      }
       await supabase.from('chat_sessions').update({
         last_message_at: new Date().toISOString(),
         last_message_text: text.slice(0, 100),
