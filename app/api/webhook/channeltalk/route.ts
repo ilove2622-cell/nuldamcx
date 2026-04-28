@@ -185,27 +185,39 @@ async function handleMessageCreated(payload: any, refers: any) {
   const userChatId = message.chatId || message.userChatId;
   if (!userChatId) return;
 
-  // 시스템 로그 메시지 중 상담 종료 패턴 감지
+  // 시스템 로그 메시지 처리: log.action === 'close'면 종료 동기화
+  // 채널톡 페이로드 구조: { log: { action: 'close' | 'open' | 'leave' | 'assign' | ... } }
+  // 고객(personType:user)이든 상담원(personType:manager)이든 동일 구조로 들어옴
   if (message.log) {
+    const action = typeof message.log === 'object' ? message.log.action : null;
     const logText = message.plainText || message.blocks?.map((b: any) => b.value || '').join('') || '';
-    if (/님이 상담을 종료하였습니다/.test(logText)) {
+    const isCloseAction = action === 'close' || /님이 상담을 종료하였습니다/.test(logText);
+
+    if (isCloseAction) {
       const session = await getOrCreateSession(userChatId, refers, message);
-      // 종료 메시지 저장
-      await supabase.from('chat_messages').insert({
+      const fallbackText = logText.trim() || '상담이 종료되었습니다.';
+      const closer = message.personType === 'manager' ? '상담원' : '고객';
+
+      // 종료 메시지 저장 (중복 방지)
+      const { error: insertErr } = await supabase.from('chat_messages').insert({
         session_id: session.id,
         sender: 'system',
         message_id: message.id,
-        text: logText.trim(),
+        text: fallbackText,
       });
+      if (insertErr && insertErr.code !== '23505') {
+        console.error(`❌ 종료 system 메시지 저장 실패:`, insertErr.message);
+      }
+
       // 세션 상태 업데이트
       await supabase.from('chat_sessions').update({
         status: 'closed',
         closed_at: new Date().toISOString(),
         last_message_at: new Date().toISOString(),
-        last_message_text: logText.trim().slice(0, 100),
+        last_message_text: fallbackText.slice(0, 100),
         last_message_sender: 'system',
       }).eq('id', session.id);
-      console.log(`🔒 고객 상담 종료 감지 (log): ${userChatId}`);
+      console.log(`🔒 ${closer} 상담 종료 감지 (log.action=close): ${userChatId}`);
     }
     return;
   }
