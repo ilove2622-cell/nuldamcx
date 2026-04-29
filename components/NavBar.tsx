@@ -11,11 +11,15 @@ import BarChartIcon from '@mui/icons-material/BarChart';
 import InboxIcon from '@mui/icons-material/Inbox';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import SettingsIcon from '@mui/icons-material/Settings';
+import ReportProblemIcon from '@mui/icons-material/ReportProblem';
+import PhoneInTalkIcon from '@mui/icons-material/PhoneInTalk';
 import NavigateNextIcon from '@mui/icons-material/NavigateNext';
 
 const NAV_ITEMS = [
   { path: '/chat/console', label: '채팅상담', icon: <HeadsetMicIcon fontSize="small" /> },
   { path: '/board', label: '게시판', icon: <InboxIcon fontSize="small" /> },
+  { path: '/claims', label: '클레임', icon: <ReportProblemIcon fontSize="small" /> },
+  { path: '/aicc', label: 'AICC', icon: <PhoneInTalkIcon fontSize="small" /> },
   { path: '/analytics', label: '분석', icon: <TrendingUpIcon fontSize="small" /> },
   { path: '/status', label: '문의현황', icon: <BarChartIcon fontSize="small" /> },
   { path: '/voc', label: 'VOC', icon: <BiotechIcon fontSize="small" /> },
@@ -27,6 +31,8 @@ const NAV_ITEMS = [
 const BREADCRUMB_MAP: Record<string, string> = {
   '/chat/console': '채팅상담',
   '/board': '게시판',
+  '/claims': '클레임',
+  '/aicc': 'AICC',
   '/analytics': '분석',
   '/ocr': 'OCR',
   '/voc': 'VOC',
