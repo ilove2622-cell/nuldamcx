@@ -1,5 +1,30 @@
 # Claude Memory
 
+## 완료된 인프라 셋업
+
+### 멀티 PC Dropbox 동기화 (2026-04-30 완료) ✅
+
+- **방식**: 개인 Dropbox(Basic 무료) + Junction
+- **Junction**: 메인/새 PC 모두 `~/.claude/` → `~/Dropbox/claude-sync/`
+- **동기화 데이터**: 토큰(`.credentials.json`), 대화기록(`projects/*.jsonl`), 메모리, 설정, 플러그인 — 전부 자동 sync
+- **현재 사용량**: 약 250MB / 2GB (~12%)
+- **셋업 스크립트** (재셋업 또는 또 다른 PC 추가용):
+  - 메인 PC용: `C:\Users\User\setup-claude-dropbox-main.ps1`
+  - 새 PC용: `~\Dropbox\setup-claude-dropbox-newpc.ps1` (Dropbox로 자동 sync됨)
+- **새 PC 추가 시**: Dropbox 로그인 → sync 대기 → Claude Code 설치 → newpc 스크립트 1회 실행
+- **운영 규칙**:
+  - 두 PC 동시 사용 시 입력은 한 번에 한 PC에서만 (sync 충돌 방지)
+  - PC 전환 시 Dropbox 트레이 "Up to date" 확인 후 다른 PC 시작
+  - claude-sync 폴더는 "오프라인에서 사용 가능"(Pinned)으로 설정 — 항상 로컬 보관
+- **백업**: `~\.claude.bak.20260430_115146` (정상 작동 검증 후 삭제 가능)
+
+### 폐기된 git 메모리 sync 방식
+
+- 어제(2026-04-29) 만들었던 git 기반 메모리 sync(`.claude/memory/` git push)는 **Dropbox 도입으로 폐기**
+- 정리 작업 미완료:
+  - 프로젝트 git의 `.claude/memory/` 제거 + `.gitignore` 추가 필요
+  - session-start/end git pull/push hook은 그대로 둘지 폐기할지 결정 필요 (메모리는 Dropbox로 가지만 hook은 다른 용도로 유용할 수 있음)
+
 ## 채널톡 API 연동
 
 - Access Key: `69b3e7a4e53e89238328`
