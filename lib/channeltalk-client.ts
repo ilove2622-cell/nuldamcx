@@ -93,6 +93,25 @@ export async function addNote(userChatId: string, text: string) {
   }
 }
 
+/** 유저챗 메시지 목록 조회 */
+export async function getMessages(
+  userChatId: string,
+  sortOrder: 'asc' | 'desc' = 'desc',
+  limit = 50,
+): Promise<any[]> {
+  const res = await ctFetch(
+    `${BASE_URL}/user-chats/${userChatId}/messages?sortOrder=${sortOrder}&limit=${limit}`,
+    { method: 'GET', headers: authHeaders() },
+  );
+  if (!res.ok) {
+    const body = await res.text();
+    console.error(`getMessages failed (${res.status}): ${body}`);
+    return [];
+  }
+  const json = await res.json();
+  return json.messages || [];
+}
+
 /** 유저챗 정보 조회 (채널 유형 등) */
 export async function getUserChat(userChatId: string): Promise<any> {
   const res = await ctFetch(`${BASE_URL}/user-chats/${userChatId}`, {
