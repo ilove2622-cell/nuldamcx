@@ -57,6 +57,7 @@ export async function GET(req: NextRequest) {
 
         if (session?.user_chat_id) {
           const ctMessages = await ctGetMessages(session.user_chat_id, 'asc', 100);
+          console.log(`[fallback] sessionId=${sessionId} userChatId=${session.user_chat_id} ctMessages=${ctMessages.length}`);
 
           if (ctMessages.length > 0) {
             const rows = ctMessages
@@ -82,10 +83,25 @@ export async function GET(req: NextRequest) {
               .filter(Boolean);
 
             if (rows.length > 0) {
-              // upsert: message_id unique constraint로 중복 방지
-              await supabase
-                .from('chat_messages')
-                .upsert(rows, { onConflict: 'message_id', ignoreDuplicates: true });
+              // 기존 message_id 조회하여 중복 제거
+              const existingIds = new Set(
+                messages
+                  .map((m: any) => m.message_id)
+                  .filter(Boolean)
+              );
+              const newRows = (rows as any[]).filter(
+                (r: any) => r.message_id && !existingIds.has(r.message_id)
+              );
+
+              if (newRows.length > 0) {
+                const { error: insertErr } = await supabase
+                  .from('chat_messages')
+                  .insert(newRows);
+
+                if (insertErr) {
+                  console.error(`[fallback] insert 실패:`, insertErr.message);
+                }
+              }
 
               // DB에서 다시 조회
               const { data: refreshed } = await supabase
@@ -96,6 +112,7 @@ export async function GET(req: NextRequest) {
                 .limit(limit);
 
               messages = refreshed || messages;
+              console.log(`[fallback] 동기화 완료: ${(refreshed || []).length}건`);
             }
           }
         }
