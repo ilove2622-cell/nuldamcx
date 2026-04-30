@@ -78,6 +78,7 @@ export async function GET(req: NextRequest) {
                   sender,
                   message_id: m.id,
                   text,
+                  created_at: new Date(m.createdAt).toISOString(),
                 };
               })
               .filter(Boolean);
